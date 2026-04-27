@@ -1,0 +1,279 @@
+<section class="project-detail-page pm-page-enter" *ngIf="project as currentProject"
+  [ngClass]="['tone--' + getStatusTone(currentProject), 'momentum--' + getMomentumTone(currentProject)]">
+  <div class="bg-decoration" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <header class="detail-header">
+    <div class="title-stack">
+      <span class="eyebrow">Project Details</span>
+      <h1>{{ currentProject.name }}</h1>
+      <p>{{ currentProject.description || 'Detailed project sheet for governance and execution follow-up.' }}</p>
+
+      <div class="headline-badges">
+        <span class="badge badge--status">{{ getStatusLabel(currentProject) }}</span>
+        <span class="badge">{{ getPhaseLabel(currentProject) }}</span>
+        <span class="badge">{{ getProjectManagementTypeLabel(currentProject) }}</span>
+      </div>
+    </div>
+
+    <div class="detail-actions">
+      <button type="button" class="btn btn--secondary" (click)="backToList()">
+        <mat-icon>west</mat-icon>
+        <span>Back</span>
+      </button>
+      <button type="button" class="btn btn--primary" (click)="editProject()">
+        <mat-icon>edit</mat-icon>
+        <span>Edit project</span>
+      </button>
+    </div>
+  </header>
+
+  <section class="kpi-grid">
+    <article class="kpi-card kpi-card--progress">
+      <span class="kpi-label">Progress</span>
+      <div class="kpi-value">{{ getProgress(currentProject) }}%</div>
+      <div class="progress-track">
+        <span class="progress-fill" [ngClass]="'progress-fill--' + getProgressTone(currentProject)"
+          [style.width.%]="getProgress(currentProject)">
+        </span>
+      </div>
+    </article>
+
+    <article class="kpi-card kpi-card--budget">
+      <span class="kpi-label">Budget</span>
+      <div class="kpi-value">{{ currentProject.budget | number:'1.0-0' }}</div>
+      <p>Cost saving: {{ currentProject.costSaving ?? 0 | number:'1.0-0' }}</p>
+    </article>
+
+    <article class="kpi-card kpi-card--hours">
+      <span class="kpi-label">Estimated Hours</span>
+      <div class="kpi-value">{{ currentProject.estimatedHours ?? 0 }}</div>
+      <p>Team members: {{ currentProject.members.length }}</p>
+    </article>
+
+    <article class="kpi-card kpi-card--date">
+      <span class="kpi-label">Due Date</span>
+      <div class="kpi-value">{{ currentProject.estimatedDueDate ? (currentProject.estimatedDueDate | date:'dd MMM y') :
+        'N/A' }}</div>
+      <p>Start: {{ currentProject.startDate | date:'dd MMM y' }}</p>
+    </article>
+  </section>
+
+  <section class="detail-layout">
+    <article class="detail-card">
+      <h2>Governance</h2>
+      <dl class="info-grid">
+        <div>
+          <dt>Status</dt>
+          <dd>{{ getStatusLabel(currentProject) }}</dd>
+        </div>
+        <div>
+          <dt>Phase</dt>
+          <dd>{{ getPhaseLabel(currentProject) }}</dd>
+        </div>
+        <div>
+          <dt>Process Status</dt>
+          <dd>{{ getProcessStatusLabel(currentProject) }}</dd>
+        </div>
+        <div>
+          <dt>Type</dt>
+          <dd>{{ getProjectManagementTypeLabel(currentProject) }}</dd>
+        </div>
+        <div>
+          <dt>Department</dt>
+          <dd>{{ currentProject.departmentName || 'N/A' }}</dd>
+        </div>
+        <div>
+          <dt>Sponsor</dt>
+          <dd>{{ currentProject.sponsor || 'N/A' }}</dd>
+        </div>
+        <div>
+          <dt>Project Manager</dt>
+          <dd>{{ currentProject.projectManagerName || 'Not assigned' }}</dd>
+        </div>
+        <div>
+          <dt>Cost Center</dt>
+          <dd>{{ currentProject.costCenter || 'N/A' }}</dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="detail-card">
+      <h2>Timeline & Metadata</h2>
+      <dl class="info-grid">
+        <div *ngIf="hasParentProject(currentProject)">
+          <dt>Parent Project</dt>
+          <dd>{{ currentProject.parentProjectName }}</dd>
+        </div>
+        <div>
+          <dt>Start Date</dt>
+          <dd>{{ currentProject.startDate | date:'mediumDate' }}</dd>
+        </div>
+        <div>
+          <dt>End Date</dt>
+          <dd>{{ currentProject.endDate ? (currentProject.endDate | date:'mediumDate') : 'N/A' }}</dd>
+        </div>
+        <div>
+          <dt>Estimated Due Date</dt>
+          <dd>{{ currentProject.estimatedDueDate ? (currentProject.estimatedDueDate | date:'mediumDate') : 'N/A' }}</dd>
+        </div>
+        <div>
+          <dt>Digital Contribution</dt>
+          <dd>{{ currentProject.digitalContribution ?? 0 | number:'1.0-2' }}</dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="detail-card detail-card--wide">
+      <h2>Execution Context</h2>
+      <div class="context-grid">
+        <div class="context-block">
+          <h3>Current State</h3>
+          <p>{{ currentProject.currentState || 'No current state provided.' }}</p>
+        </div>
+        <div class="context-block">
+          <h3>Next Steps</h3>
+          <p>{{ currentProject.nextSteps || 'No next steps registered yet.' }}</p>
+        </div>
+        <div class="context-block">
+          <h3>Enhancements</h3>
+          <p>{{ currentProject.enhancements || 'No enhancements listed yet.' }}</p>
+        </div>
+        <div class="context-block">
+          <h3>Roadblocks</h3>
+          <ul class="item-list" *ngIf="splitTextItems(currentProject.roadblocks).length; else noRoadblocks">
+            <li *ngFor="let item of splitTextItems(currentProject.roadblocks)">{{ item }}</li>
+          </ul>
+        </div>
+      </div>
+      <ng-template #noRoadblocks>
+        <p class="empty-copy">No roadblocks registered for now.</p>
+      </ng-template>
+    </article>
+
+    <article class="detail-card detail-card--wide">
+      <h2>Scope & Domains</h2>
+      <div class="chips-grid">
+        <div class="chips-group">
+          <h3>Business Units</h3>
+          <div class="chip-list" *ngIf="currentProject.businessUnits.length; else noBusinessUnits">
+            <span class="chip" *ngFor="let unit of currentProject.businessUnits">{{ unit }}</span>
+          </div>
+          <ng-template #noBusinessUnits>
+            <p class="empty-copy">No business units linked.</p>
+          </ng-template>
+        </div>
+
+        <div class="chips-group">
+          <h3>Technologies</h3>
+          <div class="chip-list" *ngIf="currentProject.technologies.length; else noTechnologies">
+            <span class="chip" *ngFor="let tech of currentProject.technologies">{{ tech }}</span>
+          </div>
+          <ng-template #noTechnologies>
+            <p class="empty-copy">No technologies linked.</p>
+          </ng-template>
+        </div>
+
+        <div class="chips-group">
+          <h3>Solution Domains</h3>
+          <div class="chip-list" *ngIf="currentProject.solutionDomains.length; else noDomains">
+            <span class="chip" *ngFor="let domain of currentProject.solutionDomains">{{ domain }}</span>
+          </div>
+          <ng-template #noDomains>
+            <p class="empty-copy">No solution domains linked.</p>
+          </ng-template>
+        </div>
+      </div>
+    </article>
+
+    <article class="detail-card detail-card--wide">
+      <h2>Team Members</h2>
+      <div class="team-grid" *ngIf="currentProject.members.length; else noMembers">
+        <div class="team-card" *ngFor="let member of currentProject.members">
+          <strong>{{ member.fullName }}</strong>
+          <span>{{ member.roleName }}</span>
+          <small *ngIf="member.email">{{ member.email }}</small>
+        </div>
+      </div>
+      <ng-template #noMembers>
+        <p class="empty-copy">No project members assigned yet.</p>
+      </ng-template>
+    </article>
+
+    <article class="detail-card">
+      <h2>Links & Hosting</h2>
+      <ul class="link-list">
+        <li>
+          <span>Code Source</span>
+          <a *ngIf="currentProject.codeSourceLink; else noCodeLink" [href]="currentProject.codeSourceLink"
+            target="_blank" rel="noopener noreferrer">
+            Open repository
+          </a>
+        </li>
+        <li>
+          <span>Solution</span>
+          <a *ngIf="currentProject.solutionLink; else noSolutionLink" [href]="currentProject.solutionLink"
+            target="_blank" rel="noopener noreferrer">
+            Open solution
+          </a>
+        </li>
+        <li>
+          <span>Server Host</span>
+          <strong>{{ currentProject.serverHostName || 'N/A' }}</strong>
+        </li>
+      </ul>
+      <ng-template #noCodeLink><strong>N/A</strong></ng-template>
+      <ng-template #noSolutionLink><strong>N/A</strong></ng-template>
+    </article>
+
+    <article class="detail-card">
+      <h2>Strategic Criteria</h2>
+      <div class="compact-table" *ngIf="currentProject.strategicCriteria.length; else noCriteria">
+        <div class="compact-row" *ngFor="let c of currentProject.strategicCriteria">
+          <strong>{{ getStrategicCriterionLabel(c.type) }}</strong>
+          <span>Score: {{ getStrategicScoreLabel(c.score) }}</span>
+          <span>{{ c.comment || 'No comment provided.' }}</span>
+        </div>
+      </div>
+      <ng-template #noCriteria>
+        <p class="empty-copy">No strategic criteria entries yet.</p>
+      </ng-template>
+    </article>
+
+    <article class="detail-card detail-card--wide">
+      <h2>KPIs & Resources</h2>
+      <div class="split-grid">
+        <div>
+          <h3>KPIs</h3>
+          <div class="compact-table" *ngIf="currentProject.kpIs.length; else noKpis">
+            <div class="compact-row" *ngFor="let kpi of currentProject.kpIs">
+              <strong>{{ kpi.name }}</strong>
+              <span>Target: {{ kpi.targetValue ?? 'N/A' }} | Current: {{ kpi.currentValue ?? 'N/A' }}</span>
+              <span>Estimated hours: {{ kpi.estimatedHours ?? 'N/A' }} | Actual hours: {{ kpi.actualHours ?? 'N/A'
+                }}</span>
+            </div>
+          </div>
+          <ng-template #noKpis>
+            <p class="empty-copy">No KPI entries yet.</p>
+          </ng-template>
+        </div>
+        <div>
+          <h3>Project Resources</h3>
+          <div class="compact-table" *ngIf="currentProject.projectResources.length; else noResources">
+            <div class="compact-row" *ngFor="let resource of currentProject.projectResources">
+              <strong>{{ resource.itemName }}</strong>
+              <span>Qty: {{ resource.quantity ?? 0 }} | Unit: {{ resource.pricePerUnit ?? 0 | number:'1.0-2' }}</span>
+              <span>Cost center: {{ resource.costCenter || 'N/A' }} | Total: {{ resource.totalCost ?? 0 | number:'1.0-2'
+                }}</span>
+            </div>
+          </div>
+          <ng-template #noResources>
+            <p class="empty-copy">No resources linked yet.</p>
+          </ng-template>
+        </div>
+      </div>
+    </article>
+  </section>
+</section>

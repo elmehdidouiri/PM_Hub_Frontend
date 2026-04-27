@@ -1,0 +1,218 @@
+<div class="register-page">
+  <div class="register-page-layout">
+    <section class="register-shell register-left-pane">
+      <div class="register-content">
+        <div class="register-brand">
+          <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F48009] shadow-sm shadow-orange-200/60">
+            <img src="/assets/images/auth/te-connectivity.jpeg" alt="TE Connectivity" class="h-8 w-8 rounded-lg object-cover" />
+          </div>
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[#F48009]">TE Connectivity</p>
+            <p class="text-sm text-slate-500">Project management platform</p>
+          </div>
+        </div>
+
+        <div class="register-heading">
+          <h1>Sign Up</h1>
+          <p>
+            Create your account to join the TE Connectivity workspace.
+          </p>
+        </div>
+
+        <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="register-form" novalidate>
+          <div class="register-grid">
+            <div class="register-field-group">
+              <label for="firstName" class="register-label">
+                First name <span class="text-red-500">*</span>
+              </label>
+              <input
+                id="firstName"
+                type="text"
+                formControlName="firstName"
+                placeholder="Your first name"
+                class="register-input block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-900 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:bg-white focus:border-[#F48009] focus:shadow-[0_0_0_4px_rgba(244,128,9,0.12)]"
+              />
+              <p *ngIf="registerForm.get('firstName')?.touched && registerForm.get('firstName')?.invalid" class="mt-2 text-sm text-red-500">
+                {{ getErrorMessage('firstName') }}
+              </p>
+            </div>
+
+            <div class="register-field-group">
+              <label for="lastName" class="register-label">
+                Last name <span class="text-red-500">*</span>
+              </label>
+              <input
+                id="lastName"
+                type="text"
+                formControlName="lastName"
+                placeholder="Your last name"
+                class="register-input block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-900 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:bg-white focus:border-[#F48009] focus:shadow-[0_0_0_4px_rgba(244,128,9,0.12)]"
+              />
+              <p *ngIf="registerForm.get('lastName')?.touched && registerForm.get('lastName')?.invalid" class="mt-2 text-sm text-red-500">
+                {{ getErrorMessage('lastName') }}
+              </p>
+            </div>
+          </div>
+
+          <div class="register-field-group">
+            <label for="email" class="register-label">
+              Work email <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="email"
+              type="email"
+              formControlName="email"
+              placeholder="you@company.com"
+              class="register-input block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-900 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:bg-white focus:border-[#F48009] focus:shadow-[0_0_0_4px_rgba(244,128,9,0.12)]"
+            />
+            <p *ngIf="registerForm.get('email')?.touched && registerForm.get('email')?.invalid" class="mt-2 text-sm text-red-500">
+              {{ getErrorMessage('email') }}
+            </p>
+          </div>
+
+          <div class="register-grid">
+            <div class="register-field-group">
+              <label for="password" class="register-label">
+                Password <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <input
+                  id="password"
+                  [type]="hidePassword ? 'password' : 'text'"
+                  formControlName="password"
+                  placeholder="Create a password"
+                  class="register-input block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 pr-14 text-sm text-slate-900 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:bg-white focus:border-[#F48009] focus:shadow-[0_0_0_4px_rgba(244,128,9,0.12)]"
+                />
+                <button
+                  type="button"
+                  (click)="hidePassword = !hidePassword"
+                  class="absolute inset-y-0 right-0 inline-flex items-center px-4 text-slate-400 transition hover:text-slate-700"
+                  [attr.aria-label]="hidePassword ? 'Show password' : 'Hide password'"
+                >
+                  {{ hidePassword ? 'Show' : 'Hide' }}
+                </button>
+              </div>
+              <p *ngIf="registerForm.get('password')?.touched && registerForm.get('password')?.invalid" class="mt-2 text-sm text-red-500">
+                {{ getErrorMessage('password') }}
+              </p>
+            </div>
+
+            <div class="register-field-group">
+              <label for="confirmPassword" class="register-label">
+                Confirm password <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <input
+                  id="confirmPassword"
+                  [type]="hideConfirmPassword ? 'password' : 'text'"
+                  formControlName="confirmPassword"
+                  placeholder="Confirm your password"
+                  class="register-input block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 pr-14 text-sm text-slate-900 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:bg-white focus:border-[#F48009] focus:shadow-[0_0_0_4px_rgba(244,128,9,0.12)]"
+                />
+                <button
+                  type="button"
+                  (click)="hideConfirmPassword = !hideConfirmPassword"
+                  class="absolute inset-y-0 right-0 inline-flex items-center px-4 text-slate-400 transition hover:text-slate-700"
+                  [attr.aria-label]="hideConfirmPassword ? 'Show password confirmation' : 'Hide password confirmation'"
+                >
+                  {{ hideConfirmPassword ? 'Show' : 'Hide' }}
+                </button>
+              </div>
+              <p *ngIf="registerForm.get('confirmPassword')?.touched && (registerForm.get('confirmPassword')?.invalid || registerForm.hasError('passwordMismatch'))" class="mt-2 text-sm text-red-500">
+                {{ registerForm.hasError('passwordMismatch') ? 'Passwords do not match' : getErrorMessage('confirmPassword') }}
+              </p>
+            </div>
+          </div>
+
+          <div class="register-field-group">
+            <label for="roleId" class="register-label">
+              Role <span class="text-red-500">*</span>
+            </label>
+            <select
+              id="roleId"
+              formControlName="roleId"
+              class="register-input block w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-900 outline-none transition duration-200 hover:border-slate-300 focus:bg-white focus:border-[#F48009] focus:shadow-[0_0_0_4px_rgba(244,128,9,0.12)]"
+            >
+              <option value="" disabled selected>Select a role</option>
+              <option *ngFor="let role of roles$ | async" [value]="role.id">{{ role.name }}</option>
+            </select>
+            <p *ngIf="registerForm.get('roleId')?.touched && registerForm.get('roleId')?.invalid" class="mt-2 text-sm text-red-500">
+              Role is required
+            </p>
+          </div>
+
+          <div class="register-panel">
+            <label class="register-terms">
+              <input type="checkbox" formControlName="acceptTerms" class="register-checkbox mt-0.5 h-5 w-5 rounded border-slate-300 text-[#F48009] focus:ring-[#F48009]/30" />
+              <span class="leading-7">
+                I agree to the
+                <a href="#" class="register-nav-link font-semibold text-[#F48009] transition-colors hover:text-[#d86d08]">terms of use</a>
+                and privacy policy.
+              </span>
+            </label>
+
+            <div *ngIf="registerForm.get('acceptTerms')?.touched && registerForm.get('acceptTerms')?.invalid" class="text-sm text-red-500">
+              {{ getErrorMessage('acceptTerms') }}
+            </div>
+
+            <div class="register-progress" *ngIf="!isLoading">
+              <div class="register-progress-head">
+                <span>Profile progress</span>
+                <strong class="font-semibold text-[#F48009]">{{ calculateProgress() | number:'1.0-0' }}%</strong>
+              </div>
+              <div class="register-progress-track">
+                <div class="register-progress-fill" [style.width.%]="calculateProgress()"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="register-submit-block">
+            <button
+              type="submit"
+              [disabled]="isLoading || registerForm.invalid"
+              class="register-submit"
+            >
+              <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
+              <span *ngIf="!isLoading">Create my account</span>
+              <span *ngIf="isLoading">Creating account...</span>
+            </button>
+
+            <p class="register-submit-note">
+              Your information is only used to activate your access to the platform.
+            </p>
+          </div>
+        </form>
+
+        <p class="register-login-link">
+          Already have an account?
+          <a routerLink="/auth/login" class="register-nav-link font-medium text-[#F48009] transition-colors hover:text-[#d86d08]">
+            Sign in
+          </a>
+        </p>
+      </div>
+    </section>
+
+    <section class="register-media-section register-right-pane">
+      <div class="absolute inset-0 opacity-100">
+        <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:52px_52px]"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(244,128,9,0.18),transparent_40%)]"></div>
+        <div class="absolute right-20 top-12 h-[52px] w-[52px] bg-white/8"></div>
+        <div class="absolute right-32 top-24 h-[52px] w-[52px] bg-[#F48009]/15"></div>
+        <div class="absolute bottom-24 left-20 h-[52px] w-[52px] bg-white/8"></div>
+        <div class="absolute bottom-12 left-32 h-[52px] w-[52px] bg-[#F48009]/15"></div>
+      </div>
+
+      <div class="register-media-content">
+        <div class="register-media-badge">
+          <img src="/assets/images/auth/te-connectivity.jpeg" alt="TE Connectivity" class="h-10 w-10 rounded-xl object-cover" />
+        </div>
+        <h2>TE Connectivity</h2>
+        <p>
+          Join the workspace and bring your projects, teams and reporting into one clear flow.
+        </p>
+
+        
+      </div>
+    </section>
+  </div>
+</div>

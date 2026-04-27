@@ -1,0 +1,22 @@
+<div class="toast-card" [attr.data-variant]="data.variant">
+  <div class="toast-ambient"></div>
+  <div class="toast-accent"></div>
+
+  <div class="toast-main">
+    <div class="toast-icon-shell">
+      <mat-icon class="toast-icon">{{ config[data.variant].icon }}</mat-icon>
+    </div>
+
+    <div class="toast-content">
+      <div class="toast-header">
+        <span class="toast-eyebrow">{{ config[data.variant].eyebrow }}</span>
+        <div class="toast-title">{{ data.title }}</div>
+      </div>
+      <p class="toast-message">{{ data.message }}</p>
+    </div>
+  </div>
+
+  <button mat-button class="toast-dismiss" type="button" (click)="dismiss()">
+    Dismiss
+  </button>
+</div>

@@ -1,0 +1,17 @@
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { MatIconModule } from '@angular/material/icon';
+
+import { SharedModule } from '../../shared/shared.module';
+import { AdminRoutingModule } from './admin-routing-module';
+import { RolesAdminPage } from './pages/roles-admin-page/roles-admin-page';
+import { ReferenceAdminPage } from './pages/reference-admin-page/reference-admin-page';
+import { UserApprovalsPage } from './pages/user-approvals/user-approvals';
+
+@NgModule({
+  declarations: [RolesAdminPage, ReferenceAdminPage, UserApprovalsPage],
+  imports: [CommonModule, SharedModule, FormsModule, ReactiveFormsModule, MatIconModule, AdminRoutingModule],
+})
+export class AdminModule {}
+

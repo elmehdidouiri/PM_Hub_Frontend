@@ -1,0 +1,224 @@
+<section class="projects-list-page pm-page-grid pm-page-enter">
+  <header class="page-header pm-surface flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+    <div class="header-main-content flex-1 flex-wrap">
+      <div class="header-logo header-logo--accent">
+        <mat-icon>folder_open</mat-icon>
+      </div>
+      <div>
+        <span class="eyebrow">Projects</span>
+        <h1>{{ isAdmin ? 'Projects directory' : 'My projects' }}</h1>
+        <p *ngIf="isAdmin">
+          Explore the project portfolio, track execution phases and manage delivery scope.
+        </p>
+        <p *ngIf="!isAdmin">
+          Projects you are assigned to as a member or project manager. Open a project to see details.
+        </p>
+      </div>
+    </div>
+    <button type="button" class="refresh-action w-full justify-center xl:w-auto" (click)="refreshProjects()"
+      [disabled]="isRefreshing">
+      <mat-icon>{{ isRefreshing ? 'hourglass_top' : 'refresh' }}</mat-icon>
+      <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh list' }}</span>
+    </button>
+  </header>
+
+  <section class="toolbar-card pm-surface">
+    <div class="search-filter-wrapper flex-col lg:flex-row lg:items-center">
+      <div class="search-box w-full">
+        <mat-icon>search</mat-icon>
+        <input type="text" [ngModel]="searchTerm" (ngModelChange)="onSearchTermChange($event)"
+          placeholder="Search projects..." />
+        <button *ngIf="searchTerm" class="clear-btn" (click)="clearSearch()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="filter-controls w-full lg:w-auto">
+        <select [(ngModel)]="selectedStatus" (change)="onFiltersChanged()" class="list-select">
+          <option *ngFor="let opt of statusOptions" [value]="opt.id">{{ opt.label }}</option>
+        </select>
+
+        <select [(ngModel)]="selectedPhase" (change)="onFiltersChanged()" class="list-select">
+          <option *ngFor="let opt of phaseOptions" [value]="opt.id">{{ opt.label }}</option>
+        </select>
+
+        <select [(ngModel)]="selectedManagementType" (change)="onFiltersChanged()" class="list-select">
+          <option *ngFor="let opt of managementTypeOptions" [value]="opt.id">{{ opt.label }}</option>
+        </select>
+
+        <button class="export-btn" (click)="onExport()" matTooltip="Export to Excel (XLSX)">
+          <mat-icon>download</mat-icon>
+          <span>Export</span>
+        </button>
+      </div>
+
+      <div class="header-actions ml-0 w-full justify-end lg:ml-auto lg:w-auto">
+        <button class="refresh-btn" (click)="refreshProjects()" [disabled]="isRefreshing">
+          <mat-icon [class.spinning]="isRefreshing">refresh</mat-icon>
+        </button>
+        <a *ngIf="isAdmin" class="add-btn" [routerLink]="['/projects/add']" matTooltip="Add Project">
+          <mat-icon>add</mat-icon>
+        </a>
+      </div>
+    </div>
+    <div class="toolbar-card__stats">
+      <div class="stat-pill stat-pill--primary">
+        <strong>{{ totalCount }}</strong>
+        <span>{{ isAdmin ? 'Total projects' : 'Your projects' }}</span>
+      </div>
+      <div class="stat-pill stat-pill--matching" *ngIf="searchTerm">
+        <strong>{{ totalCount }}</strong>
+        <span>Matching Results</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="state-card state-card--loading pm-surface" *ngIf="isLoading">
+    <mat-icon>hourglass_top</mat-icon>
+    <div>
+      <strong>Loading projects</strong>
+      <p>We are retrieving the latest project data from PMHUB.</p>
+    </div>
+  </div>
+
+  <div class="state-card state-card--error pm-surface" *ngIf="!isLoading && errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <div>
+      <strong>Projects could not be loaded</strong>
+      <p>{{ errorMessage }}</p>
+    </div>
+    <button type="button" class="inline-action" (click)="refreshProjects()">Try again</button>
+  </div>
+
+  <div class="state-card state-card--empty pm-surface" *ngIf="!isLoading && !errorMessage && !hasProjects">
+    <mat-icon>folder_off</mat-icon>
+    <div>
+      <strong>No projects found</strong>
+      <p *ngIf="isAdmin">The projects endpoint returned no data yet.</p>
+      <p *ngIf="!isAdmin">You are not assigned to any project yet. Contact an administrator.</p>
+    </div>
+  </div>
+
+  <div class="state-card state-card--empty pm-surface"
+    *ngIf="!isLoading && !errorMessage && hasProjects && !hasFilteredProjects">
+    <mat-icon>filter_alt_off</mat-icon>
+    <div>
+      <strong>No matching result</strong>
+      <p>Adjust your search to find the project you are looking for.</p>
+    </div>
+    <button type="button" class="inline-action" (click)="clearSearch()">Clear search</button>
+  </div>
+
+  <section class="table-card pm-surface overflow-hidden" *ngIf="!isLoading && !errorMessage && hasFilteredProjects">
+    <div class="table-shell overflow-x-auto">
+      <table class="projects-table">
+        <thead>
+          <tr>
+            <th>Projet</th>
+            <th>Département</th>
+            <th>Type</th>
+            <th>Phase</th>
+            <th>Status</th>
+            <th>Sponsor</th>
+            <th class="text-right">Est. Hours</th>
+            <th class="text-right">Act. Hours</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr *ngFor="let project of paginatedProjects; trackBy: trackByProjectId">
+            <td data-label="Projet">
+              <div class="project-cell">
+                <strong>{{ project.name }}</strong>
+                <span class="project-desc">{{ project.description }}</span>
+              </div>
+            </td>
+            <td data-label="Département">{{ project.departmentName }}</td>
+            <td data-label="Type">
+              <div class="type-cell">
+                <span class="type-primary">{{ project.managementTypeLabel }}</span>
+              </div>
+            </td>
+            <td data-label="Phase">
+              <span class="table-badge">{{ project.phaseLabel }}</span>
+            </td>
+            <td data-label="Status">
+              <div class="status-badge" [ngClass]="project.statusClass">
+                <span class="status-indicator"></span>
+                <span class="status-label">{{ project.statusLabel }}</span>
+              </div>
+            </td>
+            <td data-label="Sponsor">
+              <div class="sponsor-cell">
+                <mat-icon>handshake</mat-icon>
+                <span>{{ project.sponsorDisplay }}</span>
+              </div>
+            </td>
+            <td data-label="Est. Hours" class="text-right font-mono">{{ project.estimatedHours }}h</td>
+            <td data-label="Act. Hours" class="text-right font-mono">
+              <strong [class.hours-over]="project.actualHours > project.estimatedHours">
+                {{ project.actualHours }}h
+              </strong>
+            </td>
+            <td data-label="Actions" class="actions-col">
+              <div class="row-actions" *ngIf="isAdmin">
+                <button type="button" class="action-btn action-btn--view" (click)="openDetails(project.id)"
+                  aria-label="View project details">
+                  <mat-icon>visibility</mat-icon>
+                </button>
+                <button type="button" class="action-btn action-btn--edit" (click)="openEdit(project.id)"
+                  aria-label="Edit project">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button type="button" class="action-btn action-btn--delete" (click)="deleteProject(project.raw)"
+                  [disabled]="deletingProjectId === project.id" aria-label="Delete project">
+                  <mat-icon>{{ deletingProjectId === project.id ? 'hourglass_top' : 'delete' }}</mat-icon>
+                </button>
+              </div>
+              <div class="row-actions row-actions--member" *ngIf="!isAdmin">
+                <button type="button" class="action-btn action-btn--view" (click)="openDetails(project.id)"
+                  aria-label="Open project">
+                  <mat-icon>arrow_forward</mat-icon>
+                  <span class="action-btn__label">Open</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-pagination">
+      <div class="table-pagination__info">
+        <div class="page-size-selector">
+          <span>Rows per page:</span>
+          <select [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)" class="page-size-select">
+            <option *ngFor="let size of availablePageSizes" [value]="size">{{ size }}</option>
+          </select>
+          <div class="custom-page-size">
+            <input type="number" [ngModel]="customPageSize" (change)="onCustomPageSizeChange($event)" placeholder="Custom" class="custom-size-input" />
+          </div>
+        </div>
+        <div class="table-pagination__summary">
+          Showing {{ pageStart }}-{{ pageEnd }} of {{ totalCount }} projects
+        </div>
+      </div>
+
+      <div class="table-pagination__controls" *ngIf="totalPagesCount > 1">
+        <button type="button" class="pagination-btn" (click)="onPageChange(currentPage - 1)" [disabled]="currentPage === 1">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+
+        <button type="button" class="pagination-btn" *ngFor="let page of getVisiblePages()"
+          [class.pagination-btn--active]="page === currentPage" (click)="onPageChange(page)">
+          {{ page }}
+        </button>
+
+        <button type="button" class="pagination-btn" (click)="onPageChange(currentPage + 1)" [disabled]="currentPage === totalPagesCount">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+    </div>
+  </section>
+</section>

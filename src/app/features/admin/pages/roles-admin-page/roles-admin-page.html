@@ -1,0 +1,169 @@
+<section class="admin-page pm-page-enter">
+  <header class="page-header">
+    <div>
+       <span class="eyebrow">Management</span>
+       <h1>Security Roles</h1>
+     </div>
+
+    <div class="header-actions">
+      <button type="button" class="refresh-action refresh-action--link" (click)="openCreate()">
+        <mat-icon>add</mat-icon>
+        <span>New role</span>
+      </button>
+      <button type="button" class="refresh-action" (click)="refresh()" [disabled]="isRefreshing">
+        <mat-icon>{{ isRefreshing ? 'hourglass_top' : 'refresh' }}</mat-icon>
+        <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh list' }}</span>
+      </button>
+    </div>
+  </header>
+
+  <section class="toolbar-card">
+    <div class="toolbar-card__search">
+      <mat-icon>search</mat-icon>
+      <input
+        type="text"
+        [ngModel]="searchTerm"
+        (ngModelChange)="onSearchTermChange($event)"
+        placeholder="Search by name or description" />
+      <button type="button" class="clear-search" *ngIf="searchTerm" (click)="clearSearch()" aria-label="Clear search">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="toolbar-card__stats">
+      <div class="stat-pill">
+        <strong>{{ roles.length }}</strong>
+        <span>Total roles</span>
+      </div>
+      <div class="stat-pill" *ngIf="searchTerm">
+        <strong>{{ filteredRoles.length }}</strong>
+        <span>Matching results</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="state-card state-card--loading" *ngIf="isLoading">
+    <mat-icon>hourglass_top</mat-icon>
+    <div>
+      <strong>Loading roles</strong>
+      <p>Fetching the latest roles from <code>/api/roles</code>.</p>
+    </div>
+  </div>
+
+  <div class="state-card state-card--error" *ngIf="!isLoading && errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <div>
+      <strong>Roles could not be loaded</strong>
+      <p>{{ errorMessage }}</p>
+    </div>
+    <button type="button" class="inline-action" (click)="refresh()">Try again</button>
+  </div>
+
+  <div class="state-card state-card--empty" *ngIf="!isLoading && !errorMessage && !hasRoles">
+    <mat-icon>badge</mat-icon>
+    <div>
+      <strong>No roles found</strong>
+      <p>Create your first role to start assigning permissions and responsibilities.</p>
+    </div>
+    <button type="button" class="inline-action" (click)="openCreate()">Create role</button>
+  </div>
+
+  <div class="state-card state-card--empty" *ngIf="!isLoading && !errorMessage && hasRoles && !hasFilteredRoles">
+    <mat-icon>filter_alt_off</mat-icon>
+    <div>
+      <strong>No matching result</strong>
+      <p>Adjust your search to find the role you are looking for.</p>
+    </div>
+    <button type="button" class="inline-action" (click)="clearSearch()">Clear search</button>
+  </div>
+
+  <section class="table-card" *ngIf="!isLoading && !errorMessage && hasFilteredRoles">
+    <div class="table-shell">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr *ngFor="let role of filteredRoles; trackBy: trackByRoleId">
+            <td data-label="Role">
+              <div class="primary-cell">
+                <strong>{{ role.name }}</strong>
+                <span>{{ role.description || '-' }}</span>
+              </div>
+            </td>
+            <td data-label="Status">
+              <span class="table-badge" [class.table-badge--inactive]="!role.isActive">
+                {{ role.isActive ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+            <td data-label="Created">{{ role.createdAt ? (role.createdAt | date:'mediumDate') : '-' }}</td>
+            <td data-label="Actions" class="actions-col">
+              <div class="row-actions">
+                <button type="button" class="action-btn action-btn--edit" (click)="openEdit(role)" aria-label="Edit role">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button
+                  type="button"
+                  class="action-btn action-btn--delete"
+                  (click)="delete(role)"
+                  [disabled]="deletingId === role.id"
+                  aria-label="Delete role">
+                  <mat-icon>{{ deletingId === role.id ? 'hourglass_top' : 'delete' }}</mat-icon>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="drawer" *ngIf="isDrawerOpen" (click)="closeDrawer()">
+    <aside class="drawer__panel" (click)="$event.stopPropagation()">
+      <header class="drawer__header">
+        <div>
+          <strong>{{ editingId ? 'Edit role' : 'Create role' }}</strong>
+          <span>Keep names consistent across the platform.</span>
+        </div>
+        <button type="button" class="drawer__close" (click)="closeDrawer()" [disabled]="saving" aria-label="Close">
+          <mat-icon>close</mat-icon>
+        </button>
+      </header>
+
+      <form class="drawer__body" [formGroup]="roleForm" (ngSubmit)="save()">
+        <label class="field">
+          <span>Name</span>
+          <input type="text" formControlName="name" placeholder="e.g. Project Manager" />
+          <small class="field__error" *ngIf="roleForm.controls.name.touched && roleForm.controls.name.invalid">
+            Role name is required.
+          </small>
+        </label>
+
+        <label class="field">
+          <span>Description</span>
+          <textarea rows="3" formControlName="description" placeholder="Short description (optional)"></textarea>
+        </label>
+
+        <label class="toggle">
+          <input type="checkbox" formControlName="isActive" />
+          <span>Active</span>
+        </label>
+
+        <div class="drawer__footer">
+          <button type="button" class="inline-action" (click)="closeDrawer()" [disabled]="saving">Cancel</button>
+          <button type="submit" class="refresh-action" [disabled]="saving">
+            <mat-icon>{{ saving ? 'hourglass_top' : 'save' }}</mat-icon>
+            <span>{{ saving ? 'Saving...' : 'Save role' }}</span>
+          </button>
+        </div>
+      </form>
+    </aside>
+  </div>
+</section>
+

@@ -1,0 +1,252 @@
+<section class="files-page pm-page-enter">
+  <header class="files-hero">
+    <div class="files-hero__copy">
+      <span class="eyebrow">Vault</span>
+      <h1>Document Repository</h1>
+      <p>
+        Centralize uploads, keep descriptions clean, follow compliance versioning and make the file experience feel
+        organized instead of flat.
+      </p>
+    </div>
+
+    <form class="files-project-switcher" [formGroup]="projectForm" (ngSubmit)="loadFiles()">
+      <label class="pm-field">
+        <span class="pm-field__label">Project ID</span>
+        <input type="text" formControlName="projectId" placeholder="Enter a project id to load its files" />
+      </label>
+      <button type="submit" class="pm-btn-primary">
+        <mat-icon>folder_open</mat-icon>
+        Load files
+      </button>
+    </form>
+  </header>
+
+  <div *ngIf="errorMessage" class="files-alert files-alert--error">
+    <mat-icon>error</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+
+  <section class="files-stats" *ngIf="hasProjectId">
+    <article class="files-stat-card" data-tone="primary">
+      <span>Total files</span>
+      <strong>{{ files.length }}</strong>
+      <p>Documents currently attached to this project.</p>
+    </article>
+    <article class="files-stat-card" data-tone="accent">
+      <span>Compliance items</span>
+      <strong>{{ complianceFilesCount }}</strong>
+      <p>Files eligible for managed version uploads.</p>
+    </article>
+    <article class="files-stat-card" data-tone="neutral">
+      <span>Storage</span>
+      <strong>{{ totalStorageLabel }}</strong>
+      <p>Total file volume across the current project scope.</p>
+    </article>
+    <article class="files-stat-card" data-tone="gold">
+      <span>Versions tracked</span>
+      <strong>{{ versionCount }}</strong>
+      <p>Historic revisions already captured in the platform.</p>
+    </article>
+  </section>
+
+  <div *ngIf="!hasProjectId" class="files-empty files-empty--setup">
+    <mat-icon>inventory_2</mat-icon>
+    <h2>Select a project to begin</h2>
+    <p>Use the project id above or open this page with <code>?projectId=...</code> to instantly load its file workspace.</p>
+  </div>
+
+  <div *ngIf="hasProjectId" class="files-shell">
+    <section class="files-column">
+      <article class="files-panel files-panel--upload">
+        <div class="panel-heading">
+          <h2>Upload a file</h2>
+          <p>Add a polished file record with the right backend type code and a clear description for the team.</p>
+        </div>
+
+        <form class="files-upload-form" [formGroup]="uploadForm" (ngSubmit)="submitUpload()">
+          <label class="pm-field">
+            <span class="pm-field__label">Select file</span>
+            <input type="file" (change)="onUploadFileChange($event)" />
+            <small class="pm-field__hint" *ngIf="uploadFile">{{ uploadFile.name }}</small>
+          </label>
+
+          <label class="pm-field">
+            <span class="pm-field__label">File type code</span>
+            <input
+              type="number"
+              formControlName="fileType"
+              min="0"
+              list="known-file-types"
+              placeholder="Use the backend file type number"
+            />
+            <small class="pm-field__hint">The backend expects the numeric file type value for uploads.</small>
+          </label>
+
+          <datalist id="known-file-types">
+            <option *ngFor="let type of knownFileTypes" [value]="type.value">{{ type.label }}</option>
+          </datalist>
+
+          <label class="pm-field">
+            <span class="pm-field__label">Description</span>
+            <textarea
+              formControlName="description"
+              rows="3"
+              placeholder="Describe what the file contains and how it helps the project."
+            ></textarea>
+          </label>
+
+          <div class="files-chip-list" *ngIf="knownFileTypes.length">
+            <span class="files-chip" *ngFor="let type of knownFileTypes">{{ type.value }} · {{ type.label }}</span>
+          </div>
+
+          <button type="submit" class="pm-btn-primary" [disabled]="isUploading">
+            <mat-icon>upload_file</mat-icon>
+            {{ isUploading ? 'Uploading...' : 'Upload file' }}
+          </button>
+        </form>
+      </article>
+
+      <article class="files-panel files-panel--library">
+        <div class="panel-heading">
+          <h2>File library</h2>
+          <p>Browse the current project repository with clearer categories, metadata and quick actions.</p>
+        </div>
+
+        <div *ngIf="isLoading" class="files-list files-list--loading">
+          <div class="files-skeleton" *ngFor="let item of [1, 2, 3, 4]"></div>
+        </div>
+
+        <div *ngIf="!isLoading && !files.length" class="files-empty">
+          <mat-icon>folder_copy</mat-icon>
+          <h3>No files yet</h3>
+          <p>Upload the first document for this project to start structuring the workspace.</p>
+        </div>
+
+        <div *ngIf="!isLoading && files.length" class="files-list">
+          <button
+            type="button"
+            class="file-card"
+            *ngFor="let file of files; trackBy: trackByFileId"
+            [class.file-card--active]="selectedFile?.id === file.id"
+            (click)="selectFile(file)"
+          >
+            <div class="file-card__header">
+              <span class="file-card__type">{{ file.fileTypeLabel || ('Type ' + file.fileType) }}</span>
+              <span class="file-card__date">{{ formatDate(file.updatedAt || file.createdAt) }}</span>
+            </div>
+            <h3>{{ file.originalFileName }}</h3>
+            <p>{{ file.description || 'No description yet for this file.' }}</p>
+            <div class="file-card__meta">
+              <span>{{ file.fileSizeLabel || totalStorageLabel }}</span>
+              <span>{{ file.versions.length || 0 }} version(s)</span>
+            </div>
+          </button>
+        </div>
+      </article>
+    </section>
+
+    <aside class="files-panel files-panel--details" *ngIf="selectedFile as file">
+      <div class="panel-heading">
+        <h2>Selected file</h2>
+        <p>Use this side panel to refine metadata, download the asset or manage compliance revisions.</p>
+      </div>
+
+      <article class="files-detail-card">
+        <span class="files-detail-card__tag">{{ file.fileTypeLabel || ('Type ' + file.fileType) }}</span>
+        <h3>{{ file.originalFileName }}</h3>
+        <div class="files-detail-card__grid">
+          <span>
+            <mat-icon>calendar_today</mat-icon>
+            {{ formatDate(file.createdAt) }}
+          </span>
+          <span>
+            <mat-icon>hard_drive</mat-icon>
+            {{ file.fileSizeLabel }}
+          </span>
+          <span>
+            <mat-icon>description</mat-icon>
+            {{ file.contentType || 'Unknown content type' }}
+          </span>
+          <span>
+            <mat-icon>history</mat-icon>
+            {{ versions.length }} tracked version(s)
+          </span>
+        </div>
+      </article>
+
+      <form class="files-detail-form" [formGroup]="detailsForm" (ngSubmit)="saveDetails()">
+        <label class="pm-field">
+          <span class="pm-field__label">Description</span>
+          <textarea formControlName="description" rows="4" placeholder="Add a clear file description"></textarea>
+        </label>
+
+        <div class="files-detail-actions">
+          <button type="submit" class="pm-btn-primary" [disabled]="isSavingDetails">
+            <mat-icon>save</mat-icon>
+            {{ isSavingDetails ? 'Saving...' : 'Save details' }}
+          </button>
+          <button type="button" class="pm-btn-secondary" (click)="download(file)">
+            <mat-icon>download</mat-icon>
+            Download
+          </button>
+          <button type="button" class="pm-btn-secondary" (click)="delete(file)" [disabled]="deletingFileId === file.id">
+            <mat-icon>delete</mat-icon>
+            {{ deletingFileId === file.id ? 'Deleting...' : 'Delete' }}
+          </button>
+        </div>
+      </form>
+
+      <section class="files-versioning" *ngIf="isComplianceFile(file); else complianceInfo">
+        <div class="panel-heading panel-heading--compact">
+          <h2>Compliance versioning</h2>
+          <p>Only compliance files expose version upload, exactly as defined by the backend rules.</p>
+        </div>
+
+        <form class="files-version-form" [formGroup]="versionForm" (ngSubmit)="uploadNewVersion()">
+          <label class="pm-field">
+            <span class="pm-field__label">New version file</span>
+            <input type="file" (change)="onVersionFileChange($event)" />
+            <small class="pm-field__hint" *ngIf="versionFile">{{ versionFile.name }}</small>
+          </label>
+
+          <label class="pm-field">
+            <span class="pm-field__label">Version note</span>
+            <textarea formControlName="description" rows="3" placeholder="Summarize what changed in this revision"></textarea>
+          </label>
+
+          <button type="submit" class="pm-btn-primary" [disabled]="isUploadingVersion">
+            <mat-icon>publish</mat-icon>
+            {{ isUploadingVersion ? 'Uploading...' : 'Upload new version' }}
+          </button>
+        </form>
+
+        <div class="files-version-list" *ngIf="versions.length; else versionsEmpty">
+          <article class="files-version-card" *ngFor="let version of versions; trackBy: trackByVersionId">
+            <div>
+              <strong>Version {{ version.versionNumber }}</strong>
+              <p>{{ version.originalFileName }}</p>
+            </div>
+            <span>{{ formatDate(version.createdAt) }}</span>
+          </article>
+        </div>
+      </section>
+
+      <ng-template #versionsEmpty>
+        <div class="files-empty files-empty--inline">
+          <mat-icon>history_toggle_off</mat-icon>
+          <p>No version history yet for this compliance file.</p>
+        </div>
+      </ng-template>
+
+      <ng-template #complianceInfo>
+        <div class="files-note">
+          <mat-icon>info</mat-icon>
+          <div>
+            <strong>Versioning is restricted</strong>
+            <p>The backend only allows new versions for files whose type is labeled as compliance.</p>
+          </div>
+        </div>
+      </ng-template>
+    </aside>
+  </div>
+</section>

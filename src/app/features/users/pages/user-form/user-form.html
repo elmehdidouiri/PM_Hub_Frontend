@@ -1,0 +1,134 @@
+<section class="user-form-page pm-page-enter">
+  <header class="user-form-hero">
+    <div class="user-form-hero__copy">
+      <span class="eyebrow">Users</span>
+      <h1>{{ pageTitle }}</h1>
+      <p>{{ pageDescription }}</p>
+    </div>
+
+    <div class="user-form-hero__meta">
+      <article class="user-form-hero__stat">
+        <span class="user-form-hero__stat-label">Roles loaded</span>
+        <strong>{{ roles.length }}</strong>
+      </article>
+      <article class="user-form-hero__stat">
+        <span class="user-form-hero__stat-label">Progress</span>
+        <strong>{{ calculateProgress() | number: '1.0-0' }}%</strong>
+      </article>
+      <button type="button" class="pm-btn-secondary" (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon>
+        Back to users
+      </button>
+    </div>
+  </header>
+
+  <div *ngIf="errorMessage" class="user-alert user-alert--error">
+    <mat-icon>error</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+
+  <div class="user-shell">
+    <section class="user-panel user-panel--form">
+      <div class="panel-heading">
+        <h2>Account information</h2>
+        <p>Set identity, access role and initial credentials for the new collaborator.</p>
+      </div>
+
+      <div *ngIf="isLoadingRoles" class="user-loading">
+        <div class="user-loading__pulse"></div>
+        <div class="user-loading__pulse user-loading__pulse--short"></div>
+        <div class="user-loading__pulse"></div>
+      </div>
+
+      <form *ngIf="!isLoadingRoles" class="user-form-grid" [formGroup]="form" (ngSubmit)="submit()">
+        <label class="pm-field">
+          <span class="pm-field__label">First name</span>
+          <input type="text" formControlName="firstName" placeholder="Ex. Sara" autocomplete="given-name" />
+          <small class="pm-field__error" *ngIf="form.controls['firstName'].touched && form.controls['firstName'].invalid">
+            {{ getErrorMessage('firstName') }}
+          </small>
+        </label>
+
+        <label class="pm-field">
+          <span class="pm-field__label">Last name</span>
+          <input type="text" formControlName="lastName" placeholder="Ex. Benali" autocomplete="family-name" />
+          <small class="pm-field__error" *ngIf="form.controls['lastName'].touched && form.controls['lastName'].invalid">
+            {{ getErrorMessage('lastName') }}
+          </small>
+        </label>
+
+        <label class="pm-field user-form-grid__full">
+          <span class="pm-field__label">Email</span>
+          <input type="email" formControlName="email" placeholder="name@company.com" autocomplete="email" />
+          <small class="pm-field__error" *ngIf="form.controls['email'].touched && form.controls['email'].invalid">
+            {{ getErrorMessage('email') }}
+          </small>
+        </label>
+
+        <label class="pm-field">
+          <span class="pm-field__label">Password</span>
+          <input [type]="hidePassword ? 'password' : 'text'" formControlName="password" placeholder="Minimum 6 characters" />
+          <small class="pm-field__error" *ngIf="form.controls['password'].touched && form.controls['password'].invalid">
+            {{ getErrorMessage('password') }}
+          </small>
+        </label>
+
+        <label class="pm-field">
+          <span class="pm-field__label">Confirm password</span>
+          <input
+            [type]="hideConfirmPassword ? 'password' : 'text'"
+            formControlName="confirmPassword"
+            placeholder="Repeat the password"
+          />
+          <small
+            class="pm-field__error"
+            *ngIf="form.controls['confirmPassword'].touched && (form.controls['confirmPassword'].invalid || form.hasError('passwordMismatch'))"
+          >
+            {{ getErrorMessage('confirmPassword') }}
+          </small>
+        </label>
+
+        <label class="pm-field user-form-grid__full">
+          <span class="pm-field__label">Role</span>
+          <select formControlName="roleId">
+            <option value="">Select a role</option>
+            <option *ngFor="let role of roles" [value]="role.id">{{ role.name }}</option>
+          </select>
+          <small class="pm-field__error" *ngIf="form.controls['roleId'].touched && form.controls['roleId'].invalid">
+            {{ getErrorMessage('roleId') }}
+          </small>
+        </label>
+
+        <div class="user-form-actions user-form-grid__full">
+          <button type="button" class="pm-btn-secondary" (click)="goBack()">Cancel</button>
+          <button type="submit" class="pm-btn-primary" [disabled]="!canSubmit">
+            <mat-icon>{{ isSubmitting ? 'hourglass_top' : 'person_add' }}</mat-icon>
+            {{ isSubmitting ? 'Creating...' : isEditMode ? 'Update unavailable' : 'Create user' }}
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="user-panel user-panel--preview">
+      <div class="panel-heading">
+        <h2>Live preview</h2>
+        <p>A quick summary of the account that will be created from this form.</p>
+      </div>
+
+      <article class="user-preview-card">
+        <div class="user-preview-card__accent"></div>
+        <div class="user-preview-card__body">
+          <span class="user-preview-card__tag">{{ isEditMode ? 'Edit mode' : 'New account' }}</span>
+          <h3>{{ (form.controls['firstName'].value || '') + ' ' + (form.controls['lastName'].value || '') || 'User name' }}</h3>
+          <p>{{ form.controls['email'].value || 'Email address' }}</p>
+          <div class="user-preview-card__meta">
+            <span>
+              <mat-icon>badge</mat-icon>
+              {{ selectedRoleLabel }}
+            </span>
+          </div>
+        </div>
+      </article>
+    </aside>
+  </div>
+</section>

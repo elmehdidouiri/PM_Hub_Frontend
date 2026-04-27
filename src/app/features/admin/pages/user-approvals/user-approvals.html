@@ -1,0 +1,147 @@
+<section class="approvals-page pm-page-enter">
+
+  <!-- ───── HEADER ───── -->
+  <header class="approvals-header">
+    <div class="approvals-header__left">
+      <div class="header-icon">
+        <mat-icon>how_to_reg</mat-icon>
+      </div>
+      <div>
+        <span class="eyebrow">Administration</span>
+        <h1>User Approvals</h1>
+       </div>
+    </div>
+    <button class="refresh-btn" (click)="refresh()" [disabled]="isLoading">
+      <mat-icon [class.spinning]="isLoading">refresh</mat-icon>
+      <span>{{ isLoading ? 'Loading...' : 'Refresh' }}</span>
+    </button>
+  </header>
+
+  <!-- ───── STATS STRIP ───── -->
+  <div class="stats-strip" *ngIf="!isLoading && !errorMessage">
+    <div class="stat-card stat-card--warning">
+      <mat-icon>pending_actions</mat-icon>
+      <div>
+        <strong>{{ pendingUsers.length }}</strong>
+        <span>Pending Approvals</span>
+      </div>
+    </div>
+    <div class="stat-card stat-card--info">
+      <mat-icon>manage_search</mat-icon>
+      <div>
+        <strong>{{ filteredUsers.length }}</strong>
+        <span>Showing</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───── SEARCH ───── -->
+  <div class="search-bar" *ngIf="!isLoading && !errorMessage && pendingUsers.length > 0">
+    <mat-icon>search</mat-icon>
+    <input
+      type="text"
+      [(ngModel)]="searchTerm"
+      placeholder="Search by name, email or role…"
+      id="approvals-search"
+    />
+    <button *ngIf="searchTerm" class="clear-btn" (click)="searchTerm = ''">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- ───── LOADING ───── -->
+  <div class="state-card state-card--loading" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <div>
+      <strong>Loading pending requests</strong>
+      <p>Fetching users awaiting approval…</p>
+    </div>
+  </div>
+
+  <!-- ───── ERROR ───── -->
+  <div class="state-card state-card--error" *ngIf="!isLoading && errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <div>
+      <strong>Failed to load</strong>
+      <p>{{ errorMessage }}</p>
+    </div>
+    <button class="inline-btn" (click)="refresh()">Try again</button>
+  </div>
+
+  <!-- ───── EMPTY ───── -->
+  <div class="state-card state-card--empty" *ngIf="!isLoading && !errorMessage && pendingUsers.length === 0">
+    <mat-icon>check_circle</mat-icon>
+    <div>
+      <strong>All caught up!</strong>
+      <p>No pending registration requests at the moment.</p>
+    </div>
+  </div>
+
+  <!-- ───── NO SEARCH RESULTS ───── -->
+  <div class="state-card state-card--empty"
+    *ngIf="!isLoading && !errorMessage && pendingUsers.length > 0 && filteredUsers.length === 0">
+    <mat-icon>search_off</mat-icon>
+    <div>
+      <strong>No matches</strong>
+      <p>No users match "<em>{{ searchTerm }}</em>".</p>
+    </div>
+  </div>
+
+  <!-- ───── REQUESTS GRID ───── -->
+  <div class="requests-grid" *ngIf="!isLoading && !errorMessage && filteredUsers.length > 0">
+    <div class="request-card" *ngFor="let user of filteredUsers" [class.request-card--processing]="processingId === user.id">
+
+      <!-- Avatar + identity -->
+      <div class="request-card__header">
+        <div class="avatar">{{ getInitials(user) }}</div>
+        <div class="identity">
+          <h3>{{ user.fullName || (user.firstName + ' ' + user.lastName) }}</h3>
+          <a [href]="'mailto:' + user.email" class="email-link">
+            <mat-icon>mail_outline</mat-icon>
+            {{ user.email }}
+          </a>
+        </div>
+        <div class="role-badge">
+          <mat-icon>badge</mat-icon>
+          {{ user.roleName || 'No role' }}
+        </div>
+      </div>
+
+      <!-- Meta -->
+      <div class="request-card__meta">
+        <div class="meta-item">
+          <mat-icon>calendar_today</mat-icon>
+          <span>Registered {{ formatDate(user.createdAt) }}</span>
+        </div>
+        <div class="meta-item" *ngIf="user.isAdmin">
+          <mat-icon class="admin-icon">shield</mat-icon>
+          <span class="admin-label">Administrator</span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="request-card__actions">
+        <button
+          class="action-btn action-btn--approve"
+          (click)="approve(user)"
+          [disabled]="processingId !== null"
+          id="approve-{{ user.id }}"
+        >
+          <mat-icon>check_circle</mat-icon>
+          <span>{{ processingId === user.id ? 'Processing…' : 'Approve' }}</span>
+        </button>
+        <button
+          class="action-btn action-btn--reject"
+          (click)="reject(user)"
+          [disabled]="processingId !== null"
+          id="reject-{{ user.id }}"
+        >
+          <mat-icon>cancel</mat-icon>
+          <span>Reject</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+</section>

@@ -1,0 +1,360 @@
+@use 'tailwindcss';
+/* Import Variables avec @use (moderne) */
+@use 'styles/variables' as *;
+
+/* Angular Material Theme
+   `azure-blue` in this setup only exposes design tokens, not the full
+   component styles we need for MDC form controls. Use a full prebuilt
+   theme so Material fields/buttons render correctly. */
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+
+@theme {
+  --font-sans: 'Roboto', 'Helvetica Neue', sans-serif;
+  --color-brand-50: #fff5ec;
+  --color-brand-100: #fee5cf;
+  --color-brand-200: #fccfa6;
+  --color-brand-300: #f9b174;
+  --color-brand-400: #f39144;
+  --color-brand-500: #EB8708;
+  --color-brand-600: #cf681b;
+  --color-brand-700: #b25716;
+  --color-brand-800: #8e4514;
+  --color-brand-900: #69340f;
+  --color-shell-50: #fffaf5;
+  --color-shell-100: #f7f4ef;
+  --color-shell-200: #efe4d8;
+  --color-shell-700: #6f6258;
+  --color-shell-900: #241913;
+  --shadow-shell: 0 18px 40px rgba(52, 37, 27, 0.08);
+}
+
+/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+html {
+  --mat-sys-primary: #EB8708;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #fee5cf;
+  --mat-sys-on-primary-container: #5c310f;
+  --mat-sys-secondary: #b25716;
+  --mat-sys-surface-tint: #EB8708;
+  --mat-sys-surface: #fffdfb;
+  --mat-sys-surface-container: #fff7f1;
+  --mat-sys-on-surface: #241913;
+  --mat-sys-outline: #e4cdbb;
+}
+
+body {
+  font-family: $font-family-base;
+  font-size: $font-size-base;
+  color: $text-default;
+  background:
+    radial-gradient(circle at top left, rgba($orange-warm, 0.12), transparent 22%),
+    linear-gradient(180deg, #fffaf6 0%, $bg-secondary 100%);
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 3px solid rgba($orange-crisp, 0.24);
+  outline-offset: 3px;
+}
+
+app-root {
+  display: block;
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+}
+
+.pm-page-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.pm-surface {
+  border: 1px solid rgba($orange-crisp, 0.1);
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 34px rgba(52, 37, 27, 0.06);
+  backdrop-filter: blur(12px);
+}
+
+.pm-kicker,
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba($orange-crisp, 0.1);
+  color: $orange-deep;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+}
+
+.pm-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border: 0;
+  border-radius: 1rem;
+  padding: 0.85rem 1.2rem;
+  background: $orange-crisp;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 16px 32px rgba($orange-crisp, 0.22);
+}
+
+.pm-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border-radius: 1rem;
+  padding: 0.82rem 1.15rem;
+  border: 1px solid rgba($orange-crisp, 0.14);
+  background: rgba(255, 252, 248, 0.96);
+  color: $orange-deep;
+  font-weight: 700;
+}
+
+.refresh-action,
+.export-btn,
+.add-btn,
+.btn-submit,
+.summary-refresh-btn,
+.pm-btn-primary {
+  background: #{$orange-crisp} !important;
+  color: #{$white} !important;
+  border: 0 !important;
+  box-shadow: 0 14px 28px rgba($orange-crisp, 0.2) !important;
+}
+
+.refresh-action--link,
+.inline-action,
+.refresh-btn,
+.pm-btn-secondary {
+  background: linear-gradient(180deg, rgba(255, 248, 241, 0.98), rgba(255, 255, 255, 0.96)) !important;
+  color: #7b5430 !important;
+  border: 1px solid rgba($orange-crisp, 0.16) !important;
+  box-shadow: 0 12px 24px rgba($orange-crisp, 0.08) !important;
+}
+
+.refresh-action:hover,
+.export-btn:hover,
+.add-btn:hover,
+.btn-submit:hover,
+.summary-refresh-btn:hover,
+.pm-btn-primary:hover {
+  filter: saturate(1.05);
+  box-shadow: 0 18px 34px rgba($orange-crisp, 0.24) !important;
+}
+
+.refresh-action--link:hover,
+.inline-action:hover,
+.refresh-btn:hover,
+.pm-btn-secondary:hover {
+  background: rgba(255, 247, 239, 0.98) !important;
+  border-color: rgba($orange-crisp, 0.24) !important;
+  box-shadow: 0 16px 30px rgba($orange-crisp, 0.12) !important;
+}
+
+.pm-input-shell {
+  min-height: 3.5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba($orange-crisp, 0.12);
+  background: rgba(255, 250, 245, 0.88);
+}
+
+.page-header h1,
+.dashboard-header .welcome-text h1,
+.summary-hero__copy h1,
+.hour-entry-header h1 {
+  margin: 0;
+  color: #2f2118;
+  font-size: clamp(1.9rem, 3.2vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.page-header p,
+.dashboard-header .welcome-text p,
+.summary-hero__copy p,
+.hour-entry-header .hour-entry-lead {
+  margin: 0.45rem 0 0;
+  color: #7d6a5b;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.section-head h2,
+.panel-heading h2 {
+  margin: 0.4rem 0 0;
+  color: #2f2118;
+  font-size: clamp(1.35rem, 2.4vw, 1.7rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+/* Utility Classes */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 $spacing-md;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.mt-1 {
+  margin-top: $spacing-sm;
+}
+
+.mt-2 {
+  margin-top: $spacing-md;
+}
+
+.mt-3 {
+  margin-top: $spacing-lg;
+}
+
+.mb-1 {
+  margin-bottom: $spacing-sm;
+}
+
+.mb-2 {
+  margin-bottom: $spacing-md;
+}
+
+.mb-3 {
+  margin-bottom: $spacing-lg;
+}
+
+.p-1 {
+  padding: $spacing-sm;
+}
+
+.p-2 {
+  padding: $spacing-md;
+}
+
+.p-3 {
+  padding: $spacing-lg;
+}
+
+/* Card Styles */
+.card {
+  background: $bg-primary;
+  border: 1px solid rgba($orange-crisp, 0.08);
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-md;
+  padding: $spacing-lg;
+}
+
+/* Button Overrides (Angular Material) */
+.mat-mdc-raised-button {
+  border-radius: 14px !important;
+  font-weight: $font-weight-medium !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 14px 28px rgba($orange-crisp, 0.18) !important;
+}
+
+.mat-mdc-raised-button.mat-primary,
+.mat-mdc-unelevated-button.mat-primary,
+.mat-mdc-fab.mat-primary,
+.mat-mdc-mini-fab.mat-primary {
+  --mdc-filled-button-container-color: #{$orange-crisp};
+  --mdc-filled-button-label-text-color: #{$white};
+}
+
+.mat-mdc-outlined-button {
+  border-radius: 14px !important;
+}
+
+.mat-mdc-form-field-subscript-wrapper {
+  line-height: 1.2;
+}
+
+.mat-mdc-form-field-focus-overlay {
+  background-color: rgba($orange-crisp, 0.03) !important;
+}
+
+.mat-mdc-form-field.mat-focused .mdc-notched-outline__leading,
+.mat-mdc-form-field.mat-focused .mdc-notched-outline__notch,
+.mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing {
+  border-color: $orange-crisp !important;
+}
+
+.mat-mdc-select-panel,
+.mat-mdc-menu-panel,
+.mat-mdc-autocomplete-panel {
+  border-radius: 18px !important;
+  border: 1px solid rgba($orange-crisp, 0.1);
+  box-shadow: $shadow-lg !important;
+}
+
+.mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) {
+  background: rgba($orange-crisp, 0.08) !important;
+}
+
+/* Snackbar Custom Styles */
+.pmhub-toast-panel {
+  --mdc-snackbar-container-color: transparent;
+  --mat-snack-bar-button-color: #c9431b;
+}
+
+.pmhub-toast-panel .mat-mdc-snackbar-surface {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.pmhub-toast-panel .mat-mdc-snack-bar-label {
+  padding: 0 !important;
+}
+
+.pmhub-error-dialog-panel .mat-mdc-dialog-container .mdc-dialog__surface {
+  border-radius: 24px !important;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba($orange-crisp, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba($orange-crisp, 0.28);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba($orange-crisp, 0.42);
+}

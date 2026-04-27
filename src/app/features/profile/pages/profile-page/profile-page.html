@@ -1,0 +1,31 @@
+<section class="profile">
+  <div class="profile__header">
+    <div class="profile__badge">
+      <mat-icon>person</mat-icon>
+    </div>
+    <div>
+      <h2 class="profile__title">Profile</h2>
+      <p class="profile__subtitle">Your account details</p>
+    </div>
+  </div>
+
+  <div class="profile__card">
+    <div class="profile__row">
+      <span class="profile__label">Full name</span>
+      <strong class="profile__value">
+        {{ user?.firstName }} {{ user?.lastName }}
+      </strong>
+    </div>
+
+    <div class="profile__row">
+      <span class="profile__label">Email</span>
+      <strong class="profile__value">{{ user?.email || '-' }}</strong>
+    </div>
+
+    <div class="profile__row">
+      <span class="profile__label">Role</span>
+      <strong class="profile__value">{{ user?.roleName || (user?.isAdmin ? 'Administrator' : '-') }}</strong>
+    </div>
+  </div>
+</section>
+

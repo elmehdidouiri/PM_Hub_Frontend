@@ -1,0 +1,118 @@
+:host {
+  display: block;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.auth-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth-inline-row {
+  margin-top: 0.125rem;
+}
+
+.auth-submit {
+  margin-top: 0.25rem;
+}
+
+.auth-form-footer {
+  margin-top: 0.25rem;
+}
+
+.auth-media-section {
+  position: sticky;
+  top: 0;
+  min-height: 100vh;
+}
+
+.auth-media-content {
+  position: sticky;
+  top: 50vh;
+  transform: translateY(-50%);
+}
+
+.auth-nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.auth-nav-link:hover {
+  transform: translateX(2px);
+}
+
+.auth-nav-link:active {
+  transform: translateX(4px) scale(0.98);
+}
+
+.auth-input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 60px;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.92);
+  color: #0f172a;
+  line-height: 1.5;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.auth-input:hover {
+  border-color: #cbd5e1;
+}
+
+.auth-input:focus {
+  border-color: #f48009;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(244, 128, 9, 0.12);
+}
+
+.auth-input::placeholder {
+  color: #94a3b8;
+}
+
+.auth-input:-webkit-autofill,
+.auth-input:-webkit-autofill:hover,
+.auth-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0f172a;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+.auth-checkbox {
+  accent-color: #f48009;
+}
+
+.auth-submit {
+  border: 0;
+  min-height: 56px;
+  letter-spacing: 0.01em;
+}
+
+.auth-submit:hover:not(:disabled) {
+  filter: saturate(1.04);
+}
+
+.auth-submit .mdc-circular-progress__indeterminate-circle-graphic,
+.auth-submit .mdc-circular-progress__determinate-circle {
+  stroke: #ffffff !important;
+}

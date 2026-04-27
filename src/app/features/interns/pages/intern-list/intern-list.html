@@ -1,0 +1,130 @@
+<section class="interns-list-page pm-page-enter">
+  <header class="page-header">
+    <div class="page-header__copy">
+      <span class="eyebrow">Interns</span>
+      <h1>Administration Hub</h1>
+      <p>Browse the current intern directory, check supervision ownership and jump straight into edits when staffing changes.</p>
+    </div>
+
+    <div class="header-actions">
+      <button type="button" class="pm-btn-primary" (click)="createIntern()">
+        <mat-icon>person_add</mat-icon>
+        Add intern
+      </button>
+      <button type="button" class="pm-btn-secondary" (click)="refreshInterns()" [disabled]="isRefreshing">
+        <mat-icon>{{ isRefreshing ? 'hourglass_top' : 'refresh' }}</mat-icon>
+        {{ isRefreshing ? 'Refreshing...' : 'Refresh list' }}
+      </button>
+    </div>
+  </header>
+
+  <section class="toolbar-card">
+    <div class="toolbar-card__search">
+      <mat-icon>search</mat-icon>
+      <input
+        type="text"
+        [ngModel]="searchTerm"
+        (ngModelChange)="onSearchTermChange($event)"
+        placeholder="Search by intern, role, supervisor or email"
+      />
+      <button type="button" class="clear-search" *ngIf="searchTerm" (click)="clearSearch()" aria-label="Clear search">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="toolbar-card__stats">
+      <div class="stat-pill stat-pill--primary">
+        <strong>{{ interns.length }}</strong>
+        <span>Total interns</span>
+      </div>
+      <div class="stat-pill">
+        <strong>{{ filteredInterns.length }}</strong>
+        <span>{{ searchTerm ? 'Matching results' : 'Visible entries' }}</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="state-card state-card--loading" *ngIf="isLoading">
+    <mat-icon>hourglass_top</mat-icon>
+    <div>
+      <strong>Loading interns</strong>
+      <p>Fetching data from <code>/api/interns</code>.</p>
+    </div>
+  </div>
+
+  <div class="state-card state-card--error" *ngIf="!isLoading && errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <div>
+      <strong>Interns could not be loaded</strong>
+      <p>{{ errorMessage }}</p>
+    </div>
+    <button type="button" class="inline-action" (click)="refreshInterns()">Try again</button>
+  </div>
+
+  <div class="state-card state-card--empty" *ngIf="!isLoading && !errorMessage && !hasInterns">
+    <mat-icon>school</mat-icon>
+    <div>
+      <strong>No interns found</strong>
+      <p>The backend returned no intern records yet.</p>
+    </div>
+    <button type="button" class="inline-action" (click)="createIntern()">Create the first intern</button>
+  </div>
+
+  <div class="state-card state-card--empty" *ngIf="!isLoading && !errorMessage && hasInterns && !hasFilteredInterns">
+    <mat-icon>filter_alt_off</mat-icon>
+    <div>
+      <strong>No matching interns</strong>
+      <p>Adjust the search terms to find the profile you need.</p>
+    </div>
+    <button type="button" class="inline-action" (click)="clearSearch()">Clear search</button>
+  </div>
+
+  <section class="table-card" *ngIf="!isLoading && !errorMessage && hasFilteredInterns">
+    <div class="table-shell">
+      <table class="interns-table">
+        <thead>
+          <tr>
+            <th>Intern</th>
+            <th>Role</th>
+            <th>Supervisor</th>
+            <th>Created</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr *ngFor="let intern of filteredInterns; trackBy: trackByInternId">
+            <td data-label="Intern">
+              <div class="intern-cell">
+                <div class="intern-cell__avatar">{{ intern.name.charAt(0) || '?' }}</div>
+                <div class="intern-cell__copy">
+                  <strong>{{ intern.name }}</strong>
+                </div>
+              </div>
+            </td>
+            <td data-label="Role">
+              <span class="table-badge">{{ intern.roleName || 'Unknown role' }}</span>
+            </td>
+            <td data-label="Supervisor">
+              <div class="supervisor-cell">
+                <strong>{{ intern.supervisorName || 'Unknown supervisor' }}</strong>
+                <span>{{ intern.supervisorEmail || '-' }}</span>
+              </div>
+            </td>
+            <td data-label="Created">{{ formatDate(intern.createdAt) }}</td>
+            <td data-label="Actions" class="actions-col">
+              <div class="row-actions">
+                <button type="button" class="action-btn action-btn--view" (click)="openIntern(intern.id)" aria-label="View intern">
+                  <mat-icon>visibility</mat-icon>
+                </button>
+                <button type="button" class="action-btn action-btn--edit" (click)="editIntern(intern.id)" aria-label="Edit intern">
+                  <mat-icon>edit</mat-icon>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>

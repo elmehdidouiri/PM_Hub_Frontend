@@ -1,0 +1,100 @@
+<section class="intern-detail-page">
+  <header class="detail-hero">
+    <div class="detail-hero__copy">
+      <span class="eyebrow">Intern profile</span>
+      <h1>{{ intern?.name || 'Intern details' }}</h1>
+      <p>Review role ownership, reporting line and profile metadata exactly as exposed by the current backend.</p>
+    </div>
+
+    <div class="detail-hero__actions">
+      <button type="button" class="pm-btn-secondary" (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon>
+        Back to interns
+      </button>
+      <button type="button" class="pm-btn-primary" (click)="editIntern()" [disabled]="!intern">
+        <mat-icon>edit</mat-icon>
+        Edit profile
+      </button>
+    </div>
+  </header>
+
+  <div class="state-card state-card--loading" *ngIf="isLoading">
+    <mat-icon>hourglass_top</mat-icon>
+    <div>
+      <strong>Loading intern profile</strong>
+      <p>Fetching the selected record from <code>/api/interns</code>.</p>
+    </div>
+  </div>
+
+  <div class="state-card state-card--error" *ngIf="!isLoading && errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <div>
+      <strong>Intern profile unavailable</strong>
+      <p>{{ errorMessage }}</p>
+    </div>
+    <button type="button" class="inline-action" (click)="goBack()">Back to list</button>
+  </div>
+
+  <div class="detail-shell" *ngIf="!isLoading && !errorMessage && intern as currentIntern">
+    <section class="detail-card detail-card--identity">
+      <div class="identity-badge">{{ initials }}</div>
+      <div class="identity-copy">
+        <span class="identity-tag">{{ currentIntern.roleName || 'Role not set' }}</span>
+        <h2>{{ currentIntern.name }}</h2>
+        <p>{{ currentIntern.supervisorName || 'Supervisor not set' }}</p>
+      </div>
+    </section>
+
+    <section class="detail-grid">
+      <article class="detail-card">
+        <h3>Role assignment</h3>
+        <dl class="detail-list">
+          <div>
+            <dt>Role</dt>
+            <dd>{{ currentIntern.roleName || 'Unknown role' }}</dd>
+          </div>
+          <div>
+            <dt>Role ID</dt>
+            <dd>{{ currentIntern.roleId || '-' }}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="detail-card">
+        <h3>Supervision</h3>
+        <dl class="detail-list">
+          <div>
+            <dt>Supervisor</dt>
+            <dd>{{ currentIntern.supervisorName || 'Unknown supervisor' }}</dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd>{{ currentIntern.supervisorEmail || '-' }}</dd>
+          </div>
+          <div>
+            <dt>Supervisor ID</dt>
+            <dd>{{ currentIntern.supervisorId || '-' }}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="detail-card">
+        <h3>Audit trail</h3>
+        <dl class="detail-list">
+          <div>
+            <dt>Intern ID</dt>
+            <dd>{{ currentIntern.id }}</dd>
+          </div>
+          <div>
+            <dt>Created at</dt>
+            <dd>{{ formatDate(currentIntern.createdAt) }}</dd>
+          </div>
+          <div>
+            <dt>Updated at</dt>
+            <dd>{{ formatDate(currentIntern.updatedAt) }}</dd>
+          </div>
+        </dl>
+      </article>
+    </section>
+  </div>
+</section>

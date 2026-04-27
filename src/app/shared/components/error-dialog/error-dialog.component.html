@@ -1,0 +1,38 @@
+<div class="dialog-shell">
+  <div class="dialog-hero">
+    <div class="dialog-hero__glow"></div>
+    <span class="error-badge">
+      <mat-icon class="error-icon">error</mat-icon>
+    </span>
+
+    <div class="dialog-title-wrap">
+      <div>
+        <div class="dialog-kicker">Attention required</div>
+        <h2 mat-dialog-title class="dialog-title">{{ data.title }}</h2>
+      </div>
+    </div>
+
+    <p class="dialog-intro">
+      We found something that needs your attention before you can continue.
+      Please review the information below.
+    </p>
+  </div>
+
+  <mat-dialog-content class="dialog-content">
+    <div class="error-stack">
+      <div *ngFor="let error of data.errors" class="error-item">
+        <span class="error-item-marker"></span>
+        <div class="error-item-body">
+          <span class="error-item-label">Details</span>
+          <span class="error-item-text">{{ error }}</span>
+        </div>
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end" class="dialog-actions">
+    <button mat-raised-button color="primary" class="dialog-close" (click)="onClose()">
+      Close
+    </button>
+  </mat-dialog-actions>
+</div>

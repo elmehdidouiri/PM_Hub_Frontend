@@ -1,0 +1,131 @@
+<div
+  class="app-layout min-h-dvh"
+  [class.app-layout--sidebar-open]="sidebarOpen"
+  [class.app-layout--mobile]="isMobile">
+  <div class="app-layout__body" *ngIf="!isLoadingUser; else layoutLoading">
+    <app-sidebar
+      [navItems]="filteredNavItems"
+      [isAdmin]="isAdmin"
+      [userName]="displayName"
+      [roleLabel]="roleLabel"
+      [userInitials]="userInitials"
+      [mobileMenuOpen]="sidebarOpen"
+      [collapsed]="!sidebarOpen && !isMobile"
+      [isMobile]="isMobile"
+      (closeSidebar)="closeSidebar()"
+      (toggleSidebar)="toggleSidebar()"
+      (logoutClicked)="logout()">
+    </app-sidebar>
+
+    <main class="app-layout__content flex min-w-0 flex-col" id="main-content" tabindex="-1">
+      <header class="app-header">
+        <div class="app-header__shell">
+          <div class="app-header__primary-row">
+            <div class="app-header__left">
+              <button
+                type="button"
+                class="app-header__menu-toggle"
+                [class.app-header__menu-toggle--active]="sidebarOpen && isMobile"
+                (click)="toggleSidebar()"
+                aria-label="Toggle Sidebar">
+                <mat-icon>{{ sidebarOpen && isMobile ? 'close' : 'menu' }}</mat-icon>
+              </button>
+
+              <a routerLink="/dashboard" class="app-header__brand" aria-label="Go to dashboard">
+                <img src="/assets/images/auth/logo.svg" alt="PMHUB" />
+                <span class="app-header__brand-name">PMHUB</span>
+              </a>
+
+              <div class="app-header__search">
+                <mat-icon>search</mat-icon>
+                <input type="search" placeholder="Search or type command..." aria-label="Search in platform" />
+               </div>
+            </div>
+
+            <div class="app-header__toolbar">
+              <div class="app-header__actions">
+                <button
+                  type="button"
+                  class="app-header__icon-btn app-header__icon-btn--notification"
+                  aria-label="Notifications">
+                  <mat-icon>notifications_none</mat-icon>
+                  <span class="app-header__dot"></span>
+                </button>
+              </div>
+
+              <div class="app-header__user">
+                <button
+                  type="button"
+                  class="app-header__profile"
+                  (click)="toggleProfileMenu($event)"
+                  aria-label="Open account menu"
+                  [attr.aria-expanded]="profileMenuOpen"
+                  aria-haspopup="true">
+                  <div class="app-header__profile-copy">
+                    <strong>{{ displayName }}</strong>
+                    <span>{{ roleLabel }}</span>
+                  </div>
+                  <div class="app-header__avatar">{{ userInitials }}</div>
+                </button>
+
+                <div class="app-profile-menu" *ngIf="profileMenuOpen" (click)="$event.stopPropagation()">
+                  <div class="app-profile-menu__header">
+                    <div class="app-profile-menu__avatar">{{ userInitials }}</div>
+                    <div class="app-profile-menu__copy">
+                      <strong>{{ displayName }}</strong>
+                      <span>{{ roleLabel }}</span>
+                    </div>
+                  </div>
+
+                  <a class="app-profile-menu__item" routerLink="/profile" (click)="closeProfileMenu()">
+                    <mat-icon>person</mat-icon>
+                    <span>Profile</span>
+                  </a>
+
+                  <button type="button" class="app-profile-menu__item app-profile-menu__item--danger" (click)="logoutFromMenu()">
+                    <mat-icon>logout</mat-icon>
+                    <span>Log out</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="app-header__bottom" *ngIf="!isDashboardLanding">
+            <div class="app-header__breadcrumbs">
+              <ng-container *ngFor="let crumb of breadcrumbs; let last = last">
+                <span [class.app-header__crumb--current]="last">{{ crumb }}</span>
+                <span *ngIf="!last" class="app-header__separator">/</span>
+              </ng-container>
+            </div>
+
+            <div class="app-header__page-meta">
+              <h1 class="app-header__title">{{ pageTitle }}</h1>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="app-layout__page flex-1 px-3 py-2 sm:px-4 sm:py-3 lg:px-5 lg:py-3" [class.app-layout__page--dashboard]="isDashboardLanding">
+        <router-outlet></router-outlet>
+      </div>
+
+      <footer class="app-footer flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="app-footer__left">
+          <strong>PMHUB</strong>
+          <span>Project Management Hub</span>
+        </div>
+        <div class="app-footer__right">
+          <span>© {{ currentYear }} PMHUB. All rights reserved.</span>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <ng-template #layoutLoading>
+    <div class="layout-loader">
+      <div class="spinner"></div>
+      <p>Chargement de votre session...</p>
+    </div>
+  </ng-template>
+</div>

@@ -1,0 +1,187 @@
+<section class="admin-page pm-page-enter">
+  <header class="page-header">
+    <div>
+       <h1>{{ title }}</h1>
+    </div>
+
+    <div class="header-actions">
+      <button type="button" class="refresh-action refresh-action--link" (click)="openCreate()">
+        <mat-icon>add</mat-icon>
+        <span>New {{ title }}</span>
+      </button>
+      <button type="button" class="refresh-action" (click)="refresh()" [disabled]="isRefreshing">
+        <mat-icon>{{ isRefreshing ? 'hourglass_top' : 'refresh' }}</mat-icon>
+        <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh list' }}</span>
+      </button>
+    </div>
+  </header>
+
+  <section class="toolbar-card">
+    <div class="toolbar-card__search">
+      <mat-icon>search</mat-icon>
+      <input
+        type="text"
+        [ngModel]="searchTerm"
+        (ngModelChange)="onSearchTermChange($event)"
+        placeholder="Search by name or description" />
+      <button type="button" class="clear-search" *ngIf="searchTerm" (click)="clearSearch()" aria-label="Clear search">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="toolbar-card__stats">
+      <div class="stat-pill">
+        <strong>{{ items.length }}</strong>
+        <span>Total items</span>
+      </div>
+      <div class="stat-pill" *ngIf="searchTerm">
+        <strong>{{ filteredItems.length }}</strong>
+        <span>Matching results</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="state-card state-card--loading" *ngIf="isLoading">
+    <mat-icon>hourglass_top</mat-icon>
+    <div>
+      <strong>Loading</strong>
+      <p>Fetching the latest data from <code>{{ apiPath }}</code>.</p>
+    </div>
+  </div>
+
+  <div class="state-card state-card--error" *ngIf="!isLoading && errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <div>
+      <strong>Data could not be loaded</strong>
+      <p>{{ errorMessage }}</p>
+    </div>
+    <button type="button" class="inline-action" (click)="refresh()">Try again</button>
+  </div>
+
+  <div class="state-card state-card--empty" *ngIf="!isLoading && !errorMessage && !hasItems">
+    <mat-icon>inventory_2</mat-icon>
+    <div>
+      <strong>No items found</strong>
+      <p>Create your first item to populate this reference list.</p>
+    </div>
+    <button type="button" class="inline-action" (click)="openCreate()">Create {{ title }}</button>
+  </div>
+
+  <div class="state-card state-card--empty" *ngIf="!isLoading && !errorMessage && hasItems && !hasFilteredItems">
+    <mat-icon>filter_alt_off</mat-icon>
+    <div>
+      <strong>No matching result</strong>
+      <p>Adjust your search to find the item you are looking for.</p>
+    </div>
+    <button type="button" class="inline-action" (click)="clearSearch()">Clear search</button>
+  </div>
+
+  <section class="table-card" *ngIf="!isLoading && !errorMessage && hasFilteredItems">
+    <div class="table-shell">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th *ngIf="showBusinessUnitColumn">Business Unit</th>
+            <th *ngIf="showPlantColumn">Plant</th>
+            <th>Description</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr *ngFor="let item of filteredItems; trackBy: trackById">
+            <td data-label="Name">
+              <div class="primary-cell">
+                <strong>{{ item.name }}</strong>
+              </div>
+            </td>
+            <td *ngIf="showBusinessUnitColumn" data-label="Business Unit">
+              {{ item.businessUnitName || '-' }}
+            </td>
+            <td *ngIf="showPlantColumn" data-label="Plant">{{ item.plantName || '-' }}</td>
+            <td data-label="Description">{{ item.description || '-' }}</td>
+            <td data-label="Actions" class="actions-col">
+              <div class="row-actions">
+                <button type="button" class="action-btn action-btn--edit" (click)="openEdit(item)" aria-label="Edit">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button
+                  type="button"
+                  class="action-btn action-btn--delete"
+                  (click)="delete(item)"
+                  [disabled]="deletingId === item.id"
+                  aria-label="Delete">
+                  <mat-icon>{{ deletingId === item.id ? 'hourglass_top' : 'delete' }}</mat-icon>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="drawer" *ngIf="isDrawerOpen" (click)="closeDrawer()">
+    <aside class="drawer__panel" (click)="$event.stopPropagation()">
+      <header class="drawer__header">
+        <div>
+          <strong>{{ editingId ? 'Edit' : 'Create' }} {{ title }}</strong>
+          <span>Keep naming consistent for selection fields.</span>
+        </div>
+        <button type="button" class="drawer__close" (click)="closeDrawer()" [disabled]="saving" aria-label="Close">
+          <mat-icon>close</mat-icon>
+        </button>
+      </header>
+
+      <form class="drawer__body" [formGroup]="form" (ngSubmit)="save()">
+        <label class="field">
+          <span>Name</span>
+          <input type="text" formControlName="name" [placeholder]="'Enter ' + title.toLowerCase().replace('s', '') + ' name'" />
+          <small class="field__error" *ngIf="form.controls.name.touched && form.controls.name.invalid">
+            Name is required.
+          </small>
+        </label>
+
+        <label class="field" *ngIf="requiresDescription">
+          <span>Description</span>
+          <textarea rows="3" formControlName="description" placeholder="Description (optional)"></textarea>
+          <small class="field__error" *ngIf="form.controls.description.touched && form.controls.description.invalid">
+            Description is required.
+          </small>
+        </label>
+
+        <label class="field" *ngIf="requiresBusinessUnit">
+          <span>Business unit</span>
+          <select formControlName="businessUnitId" (change)="onBusinessUnitChange($event)">
+            <option value="">Select business unit</option>
+            <option *ngFor="let bu of businessUnits" [value]="bu.id">{{ bu.label }}</option>
+          </select>
+          <small class="field__error" *ngIf="requiresBusinessUnit && form.controls.businessUnitId.touched && !form.controls.businessUnitId.value">
+            Business unit is required.
+          </small>
+        </label>
+
+        <label class="field" *ngIf="requiresPlant">
+          <span>Plant</span>
+          <select formControlName="plantId">
+            <option value="">{{ isPlantsLoading ? 'Loading plants…' : 'Select plant' }}</option>
+            <option *ngFor="let plant of plants" [value]="plant.id">{{ plant.label }}</option>
+          </select>
+          <small class="field__error" *ngIf="requiresPlant && form.controls.plantId.touched && !form.controls.plantId.value">
+            Plant is required.
+          </small>
+        </label>
+
+        <div class="drawer__footer">
+          <button type="button" class="inline-action" (click)="closeDrawer()" [disabled]="saving">Cancel</button>
+          <button type="submit" class="refresh-action" [disabled]="saving">
+            <mat-icon>{{ saving ? 'hourglass_top' : 'save' }}</mat-icon>
+            <span>{{ saving ? 'Saving...' : 'Save' }}</span>
+          </button>
+        </div>
+      </form>
+    </aside>
+  </div>
+</section>
+

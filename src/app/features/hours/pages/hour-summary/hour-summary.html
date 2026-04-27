@@ -1,0 +1,176 @@
+<section class="hour-summary-page pm-page-grid pm-page-enter">
+  <div class="summary-bg">
+    <div class="summary-orb summary-orb--primary"></div>
+    <div class="summary-orb summary-orb--blue"></div>
+  </div>
+
+  <header class="summary-hero pm-surface">
+    <div class="summary-hero__copy">
+      <span class="eyebrow">Time analytics</span>
+      <h1>Performance Workspace</h1>
+      <p>
+        Track your monthly effort, understand how your time is distributed, and follow the projects
+        where you create the most value.
+      </p>
+    </div>
+
+    <div class="summary-highlight" *ngIf="totalHoursCard as totalCard">
+      <span class="summary-highlight__label">{{ selectedMonthLabel }}</span>
+      <strong>{{ totalCard.value | number:'1.2-2' }}</strong>
+      <span class="summary-highlight__suffix">{{ totalCard.suffix }}</span>
+    </div>
+  </header>
+
+  <section class="summary-toolbar pm-surface" [formGroup]="filtersForm">
+    <div class="summary-toolbar__filters">
+      <mat-form-field appearance="outline">
+        <mat-label>Year</mat-label>
+        <mat-select formControlName="year">
+          <mat-option *ngFor="let year of yearOptions" [value]="year">{{ year }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Month</mat-label>
+        <mat-select formControlName="month">
+          <mat-option *ngFor="let month of monthOptions" [value]="month.value">{{ month.label }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" *ngIf="hasProjectFilter">
+        <mat-label>Project</mat-label>
+        <mat-select formControlName="projectId">
+          <mat-option value="">All my projects</mat-option>
+          <mat-option *ngFor="let project of projectOptions" [value]="project.projectId">
+            {{ project.label }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="summary-toolbar__hint" *ngIf="!hasProjectFilter">
+        <mat-icon>info_outline</mat-icon>
+        <span>Project filtering is not available right now. Your personal totals are still displayed.</span>
+      </div>
+    </div>
+
+    <button mat-flat-button type="button" class="summary-refresh-btn" (click)="refresh()" [disabled]="isRefreshing || isLoading">
+      <mat-icon>{{ isRefreshing ? 'hourglass_top' : 'refresh' }}</mat-icon>
+      <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh data' }}</span>
+    </button>
+  </section>
+
+  <section class="summary-state pm-surface" *ngIf="isLoading">
+    <mat-progress-spinner diameter="52" mode="indeterminate"></mat-progress-spinner>
+    <div>
+      <strong>Loading your hour insights</strong>
+      <p>We are preparing your monthly dashboard and project analytics.</p>
+    </div>
+  </section>
+
+  <section class="summary-state summary-state--error pm-surface" *ngIf="!isLoading && summaryError">
+    <mat-icon>error_outline</mat-icon>
+    <div>
+      <strong>Summary not available yet</strong>
+      <p>{{ summaryError }}</p>
+    </div>
+  </section>
+
+  <ng-container *ngIf="!isLoading && !summaryError">
+    <section class="summary-metrics" *ngIf="monthlySummary.length">
+      <article class="metric-card pm-surface" *ngFor="let card of monthlySummary">
+        <span class="metric-card__label">{{ card.title }}</span>
+        <strong>{{ card.value | number:'1.2-2' }}</strong>
+        <span class="metric-card__suffix">{{ card.suffix }}</span>
+      </article>
+    </section>
+
+    <section class="summary-grid">
+      <article class="summary-panel summary-panel--breakdown pm-surface">
+        <div class="panel-heading">
+          <div>
+            <span class="panel-kicker">Distribution</span>
+            <h2>Hours breakdown</h2>
+          </div>
+          <mat-icon>donut_large</mat-icon>
+        </div>
+
+        <div class="breakdown-list" *ngIf="breakdownCards.length; else noBreakdown">
+          <div class="breakdown-item" *ngFor="let item of breakdownCards">
+            <div class="breakdown-item__top">
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.hours | number:'1.2-2' }} hrs</span>
+            </div>
+            <div class="breakdown-track">
+              <div class="breakdown-fill" [style.width.%]="item.percent"></div>
+            </div>
+            <span class="breakdown-percent">{{ item.percent }}%</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="summary-panel summary-panel--overview pm-surface">
+        <div class="panel-heading">
+          <div>
+            <span class="panel-kicker">Project Lens</span>
+            <h2>Project overview</h2>
+          </div>
+          <mat-icon>workspaces</mat-icon>
+        </div>
+
+        <div class="overview-cards" *ngIf="projectOverviewCards.length; else noOverview">
+          <div class="overview-card" *ngFor="let card of projectOverviewCards">
+            <span>{{ card.title }}</span>
+            <strong>{{ card.value | number:'1.2-2' }} {{ card.suffix }}</strong>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="summary-panel summary-panel--projects pm-surface">
+      <div class="panel-heading">
+        <div>
+          <span class="panel-kicker">Top Projects</span>
+          <h2>Where your time goes the most</h2>
+        </div>
+        <mat-icon>insights</mat-icon>
+      </div>
+
+      <div class="top-projects-list" *ngIf="topProjects.length; else noProjects">
+        <div class="top-project-row" *ngFor="let project of topProjects; let index = index">
+          <div class="top-project-row__rank">{{ index + 1 }}</div>
+          <div class="top-project-row__content">
+            <strong>{{ project.name }}</strong>
+            <span *ngIf="project.currentMonthHours !== null">
+              {{ project.currentMonthHours | number:'1.2-2' }} hrs this month
+            </span>
+            <span *ngIf="project.currentMonthHours === null">Monthly detail not provided by API</span>
+          </div>
+          <div class="top-project-row__metric">
+            {{ project.totalHours | number:'1.2-2' }} hrs
+          </div>
+        </div>
+      </div>
+    </section>
+  </ng-container>
+
+  <ng-template #noBreakdown>
+    <div class="empty-panel">
+      <mat-icon>info_outline</mat-icon>
+      <span>No breakdown data is available for the selected period.</span>
+    </div>
+  </ng-template>
+
+  <ng-template #noOverview>
+    <div class="empty-panel">
+      <mat-icon>info_outline</mat-icon>
+      <span>No project overview metrics are available yet.</span>
+    </div>
+  </ng-template>
+
+  <ng-template #noProjects>
+    <div class="empty-panel">
+      <mat-icon>info_outline</mat-icon>
+      <span>No top projects are available yet for this year.</span>
+    </div>
+  </ng-template>
+</section>
