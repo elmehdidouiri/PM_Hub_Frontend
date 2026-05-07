@@ -17,37 +17,29 @@
     </button>
   </header>
 
-  <!-- ───── STATS STRIP ───── -->
-  <div class="stats-strip" *ngIf="!isLoading && !errorMessage">
-    <div class="stat-card stat-card--warning">
-      <mat-icon>pending_actions</mat-icon>
-      <div>
+
+  <!-- ───── TOOLBAR CARD (Search + Stats) ───── -->
+  <section class="toolbar-card pm-surface" *ngIf="!isLoading && !errorMessage">
+    <div class="toolbar-card__search">
+      <mat-icon>search</mat-icon>
+      <input
+        type="text"
+        [(ngModel)]="searchTerm"
+        placeholder="Search by name, email or role"
+        id="approvals-search"
+      />
+      <button type="button" class="clear-search" *ngIf="searchTerm" (click)="searchTerm = ''" aria-label="Clear search">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <div class="toolbar-card__stats">
+      <div class="stat-pill stat-pill--primary">
         <strong>{{ pendingUsers.length }}</strong>
         <span>Pending Approvals</span>
       </div>
+     
     </div>
-    <div class="stat-card stat-card--info">
-      <mat-icon>manage_search</mat-icon>
-      <div>
-        <strong>{{ filteredUsers.length }}</strong>
-        <span>Showing</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ───── SEARCH ───── -->
-  <div class="search-bar" *ngIf="!isLoading && !errorMessage && pendingUsers.length > 0">
-    <mat-icon>search</mat-icon>
-    <input
-      type="text"
-      [(ngModel)]="searchTerm"
-      placeholder="Search by name, email or role…"
-      id="approvals-search"
-    />
-    <button *ngIf="searchTerm" class="clear-btn" (click)="searchTerm = ''">
-      <mat-icon>close</mat-icon>
-    </button>
-  </div>
+  </section>
 
   <!-- ───── LOADING ───── -->
   <div class="state-card state-card--loading" *ngIf="isLoading">

@@ -1,11 +1,26 @@
-<div class="app-shell min-h-screen" *ngIf="isReady$ | async; else loading">
-  <main class="app-shell__content flex-1">
-    <router-outlet></router-outlet>
-  </main>
-</div>
+<div class="app-root-shell" [class.app-root-shell--ready]="(isReady$ | async) && !(isAuthenticating$ | async)">
+  <!-- Show app only when ready and NOT authenticating/refreshing -->
+  <ng-container *ngIf="(isReady$ | async) && !(isAuthenticating$ | async); else loading">
+    <div class="app-shell min-h-screen">
+      <main class="app-shell__content flex-1">
+        <router-outlet></router-outlet>
+      </main>
+    </div>
+  </ng-container>
 
-<ng-template #loading>
-  <div class="loading-overlay">
-    <div class="spinner"></div>
-  </div>
-</ng-template>
+  <ng-template #loading>
+    <div class="initial-splash">
+      <div class="splash-content">
+        <div class="splash-logo">
+          <img src="/assets/images/auth/logo.svg" alt="PMHUB Logo" class="pulse-logo" />
+        </div>
+        <div class="splash-loader">
+          <div class="loader-bar">
+            <div class="loader-progress"></div>
+          </div>
+          <p class="loader-text">Synchronisation de votre session...</p>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</div>

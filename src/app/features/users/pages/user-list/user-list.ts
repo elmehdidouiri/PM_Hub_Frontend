@@ -1,4 +1,6 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 
 import { UsersApiService, AdminUserDto } from '../../../../core/services/users-api.service';
 import { NotificationService } from '../../../../core/services/notification.service';
@@ -12,6 +14,7 @@ import { NotificationService } from '../../../../core/services/notification.serv
 export class UserList implements OnInit {
   private readonly usersApi = inject(UsersApiService);
   private readonly notifications = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
   private readonly zone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -105,6 +108,29 @@ export class UserList implements OnInit {
       return;
     }
 
+    const data: ConfirmationDialogData = {
+      title: 'Delete Collaborator',
+      message: `Are you sure you want to delete ${this.getDisplayName(user)}? This action will permanently remove their profile and all associated data.`,
+      icon: 'person_remove',
+      saveLabel: 'Delete Permanently',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px',
+      panelClass: 'pm-dialog-panel'
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === 'save') {
+        this.executeDelete(id);
+      }
+    });
+  }
+
+  private executeDelete(id: string): void {
     this.deletingUserId = id;
     this.usersApi.deleteUser(id).subscribe({
       next: () => {

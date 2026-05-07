@@ -1,2 +1,302 @@
-<p>user-detail works!</p>
+<div class="page-loader" *ngIf="isLoading()">
+  <div class="loader-spinner"></div>
+  <span>Fetching talent profile...</span>
+</div>
 
+<div class="user-detail-container pm-page-enter" *ngIf="!isLoading()">
+  <!-- Header / Profile Card -->
+  <header class="profile-header glass-card">
+    <div class="profile-main">
+      <div class="avatar-circle">
+        {{ user()?.firstName?.charAt(0) }}{{ user()?.lastName?.charAt(0) }}
+      </div>
+      <div class="profile-info">
+        <div class="name-row">
+          <h1>{{ user()?.firstName }} {{ user()?.lastName }}</h1>
+          <span class="role-badge" [class.admin]="user()?.isAdmin">
+            <mat-icon>{{ user()?.isAdmin ? 'verified_user' : 'person' }}</mat-icon>
+            {{ user()?.roleName || 'Member' }}
+          </span>
+        </div>
+        <p class="email-text"><mat-icon>email</mat-icon> {{ user()?.email }}</p>
+      </div>
+    </div>
+    
+    <div class="header-actions">
+      <button class="btn-outline" [routerLink]="['/users', userId(), 'edit']">
+        <mat-icon>edit</mat-icon> Edit Profile
+      </button>
+      <button class="btn-primary" routerLink="/users">
+        <mat-icon>arrow_back</mat-icon> Back to List
+      </button>
+    </div>
+  </header>
+
+  <!-- Filter Bar -->
+  <section class="filter-bar filter-bar--compact glass-card">
+    <div class="filter-group">
+      <label>Analysis Period</label>
+      <div class="flt" (click)="picker.open()" [class.flt--on]="range.value.start || range.value.end">
+        <mat-icon>calendar_today</mat-icon>
+        <span class="flt__label">{{ periodLabel() }}</span>
+        <mat-icon class="flt__arrow">expand_more</mat-icon>
+
+        <!-- Hidden Input for Datepicker trigger -->
+        <mat-form-field class="hidden-picker-trigger">
+          <mat-date-range-input [formGroup]="range" [rangePicker]="picker">
+            <input matStartDate formControlName="start">
+            <input matEndDate formControlName="end">
+          </mat-date-range-input>
+          <mat-date-range-picker #picker></mat-date-range-picker>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <div class="flt-sep"></div>
+
+    <div class="filter-group">
+      <label>Project Scope</label>
+      <div class="flt" (click)="projectPicker.open()" [class.flt--on]="currentFilters().projectId">
+        <mat-icon>assignment</mat-icon>
+        <mat-select #projectPicker [value]="currentFilters().projectId" (selectionChange)="updateFilter('projectId', $event.value)" (click)="$event.stopPropagation()" panelClass="flt-panel">
+          <mat-select-trigger>{{ projectLabel() }}</mat-select-trigger>
+          <mat-option [value]="undefined">All Projects</mat-option>
+          <mat-option *ngFor="let p of projects()" [value]="p.id">{{ p.name }}</mat-option>
+        </mat-select>
+        <mat-icon class="flt__arrow">expand_more</mat-icon>
+      </div>
+    </div>
+
+    <div class="filter-status" *ngIf="isFiltering()">
+      <div class="mini-spinner"></div>
+      <span>Refreshing data...</span>
+    </div>
+  </section>
+
+  <mat-tab-group class="detail-tabs">
+    <!-- Tab 1: Insights & Performance -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>analytics</mat-icon> Performance Insights
+      </ng-template>
+      
+      <div class="tab-content">
+        <!-- KPI Grid - 4x2 layout -->
+        <div class="metrics-grid metrics-grid--expanded">
+          <pm-metric-card *ngFor="let m of performanceMetrics()"
+            [label]="m.label" [value]="m.value" [note]="m.note"
+            [icon]="m.icon" [tone]="m.tone" [progress]="m.progress">
+          </pm-metric-card>
+        </div>
+
+        <div class="charts-layout">
+          <!-- Effort Distribution -->
+          <div class="chart-container glass-card">
+            <div class="chart-header">
+              <h3>Effort Distribution (Hours)</h3>
+              <mat-icon>donut_large</mat-icon>
+            </div>
+            <div class="distribution-list">
+              <div class="dist-item" *ngFor="let cat of effortDistribution()">
+                <div class="dist-info">
+                  <span class="dist-color" [style.background-color]="getCatColor(cat.label)"></span>
+                  <span class="dist-name">{{ cat.label }}</span>
+                  <span class="dist-pct">{{ cat.value }}h ({{ cat.percent }}%)</span>
+                </div>
+                <div class="dist-track">
+                  <div class="dist-fill" [style.width.%]="cat.percent" [style.background-color]="getCatColor(cat.label)"></div>
+                </div>
+              </div>
+              <div *ngIf="!effortDistribution().length" class="empty-mini">No time entries recorded.</div>
+            </div>
+          </div>
+
+          <!-- Monthly Workload -->
+          <pm-chart-bar title="Monthly Workload" icon="insights" [data]="workloadTrendChart()" color="#f47c00"></pm-chart-bar>
+        </div>
+
+        <!-- Secondary Charts -->
+        <div class="charts-layout">
+           <pm-chart-bar title="Stage Distribution" icon="layers" [data]="stageWorkload()" color="#3b82f6"></pm-chart-bar>
+           
+           <div class="chart-container glass-card top-projects-list">
+              <div class="chart-header">
+                <h3>High-Impact Projects</h3>
+                <mat-icon>trending_up</mat-icon>
+              </div>
+              <div class="mini-table">
+                <div class="mini-row" *ngFor="let tp of performance()?.topProjects">
+                   <div class="tp-info">
+                      <strong>{{ tp.projectName }}</strong>
+                      <span>{{ tp.phase }} • {{ tp.status }}</span>
+                   </div>
+                   <div class="tp-val">
+                      <strong>{{ tp.totalHours }}h</strong>
+                      <span>{{ tp.totalCost.toLocaleString() }} DH</span>
+                   </div>
+                </div>
+                <div *ngIf="!performance()?.topProjects?.length" class="empty-mini">No impact data.</div>
+              </div>
+           </div>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Tab 2: Project Allocations -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>assignment</mat-icon> Project Portfolio ({{ projects().length }})
+      </ng-template>
+      
+      <div class="tab-content">
+        <div class="projects-grid">
+          <div class="project-tile glass-card" *ngFor="let p of projects()">
+            <div class="tile-top">
+              <div class="phase-group">
+                <span class="phase-badge">{{ p.phaseLabel || p.phase }}</span>
+                <span class="type-badge">{{ p.projectManagementTypeLabel || 'Standard' }}</span>
+              </div>
+              <span class="status-dot" [attr.data-status]="(p.statusLabel || p.status).toString().toLowerCase()" [matTooltip]="p.statusLabel || p.status"></span>
+            </div>
+            <h3>{{ p.name }}</h3>
+            <p class="dept-text">{{ p.departmentName }}</p>
+            
+            <div class="tile-stats">
+              <div class="stat">
+                <div class="stat-header">
+                  <span class="lbl">Progress</span>
+                  <span class="val">{{ p.progressPercentage || 0 }}%</span>
+                </div>
+                <div class="progress-wrap">
+                  <div class="progress-fill" [style.width.%]="p.progressPercentage || 0"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <div class="stat-mini">
+                  <span class="lbl">Actual</span>
+                  <strong>{{ p.actualHours || 0 }}h</strong>
+                </div>
+                <div class="stat-mini">
+                  <span class="lbl">Estimated</span>
+                  <strong>{{ p.estimatedHours || 0 }}h</strong>
+                </div>
+                <div class="stat-mini">
+                  <span class="lbl">Budget</span>
+                  <strong>{{ (p.budget || 0).toLocaleString() }} DH</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="!projects().length" class="empty-state">
+            <mat-icon>folder_open</mat-icon>
+            <p>No projects assigned to this user.</p>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Tab 3: Supervised Interns -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>groups</mat-icon> Managed Interns ({{ interns().length }})
+      </ng-template>
+      
+      <div class="tab-content">
+        <div class="interns-list" *ngIf="interns().length > 0">
+          <div class="intern-card glass-card" *ngFor="let intern of interns()">
+            <div class="intern-header">
+              <div class="intern-info">
+                <h4>{{ intern.name || (intern.firstName + ' ' + intern.lastName) }}</h4>
+                <p>{{ intern.email }} • {{ intern.roleName || intern.departmentName || 'Intern' }}</p>
+              </div>
+              <button class="btn-icon" matTooltip="View Intern Details" (click)="openInternDetails(intern)">
+                <mat-icon>visibility</mat-icon>
+              </button>
+            </div>
+            
+            <div class="intern-allocations" *ngIf="internProjectsMap().get(intern.id) as internProjs">
+              <p class="section-hint">ACTIVE ALLOCATIONS</p>
+              <div class="mini-project-list">
+                <div class="mini-proj" *ngFor="let ip of internProjs">
+                  <span class="dot"></span>
+                  <span class="name">{{ ip.name }}</span>
+                  <span class="pct">{{ ip.progressPercentage || 0 }}%</span>
+                </div>
+                <div *ngIf="!internProjs.length" class="empty-hint">No active projects</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="interns().length === 0" class="empty-state pm-surface">
+           <mat-icon>hail</mat-icon>
+           <h3>No supervised interns</h3>
+           <p>This user does not have any active internship supervisions assigned to them at this time.</p>
+        </div>
+      </div>
+    </mat-tab>
+    <!-- Tab 3: Premium Approvals (Admin) -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon [matBadge]="pendingPremium().length" [matBadgeHidden]="pendingPremium().length === 0" matBadgeColor="warn">stars</mat-icon> Premium Approvals
+      </ng-template>
+
+      <div class="tab-content">
+        <div class="premium-approvals-list" *ngIf="pendingPremium().length > 0">
+          <div class="approval-card glass-card" *ngFor="let entry of pendingPremium()">
+            <div class="approval-header">
+              <div class="entry-main">
+                <span class="reason-tag">{{ entry.premiumReason || 'Selected By User' }}</span>
+                <h4>{{ entry.projectName || 'General Activity' }}</h4>
+                <p class="date-text"><mat-icon>calendar_today</mat-icon> {{ entry.date | date:'fullDate' }}</p>
+              </div>
+              <div class="entry-stats">
+                <div class="stat-box">
+                  <span class="lbl">Execution</span>
+                  <strong>{{ entry.executionHours }}h</strong>
+                </div>
+                <div class="stat-box">
+                  <span class="lbl">Supervision</span>
+                  <strong>{{ entry.supervisionHours }}h</strong>
+                </div>
+                <div class="stat-box stat-box--total">
+                  <span class="lbl">Total</span>
+                  <strong>{{ entry.totalHours }}h</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="approval-footer">
+              <div class="entry-meta" *ngIf="entry.notes">
+                <mat-icon>notes</mat-icon>
+                <span>{{ entry.notes }}</span>
+              </div>
+              <div class="action-group">
+                <button class="btn-reject" (click)="handlePremiumDecision(entry.id, false)">
+                  <mat-icon>close</mat-icon> Reject
+                </button>
+                <button class="btn-approve" (click)="handlePremiumDecision(entry.id, true)">
+                  <mat-icon>check</mat-icon> Approve Premium
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="empty-approvals" *ngIf="pendingPremium().length === 0">
+          <div class="empty-visual">
+            <mat-icon>verified</mat-icon>
+          </div>
+          <h3>All Premium Hours Processed</h3>
+          <p>This user has no pending premium hour requests at the moment.</p>
+        </div>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>
+
+<div class="error-container" *ngIf="error()">
+  <mat-icon>error_outline</mat-icon>
+  <p>{{ error() }}</p>
+  <button class="btn-primary" (click)="ngOnInit()">Retry</button>
+</div>

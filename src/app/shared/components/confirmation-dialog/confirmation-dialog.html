@@ -1,1 +1,20 @@
-<p>confirmation-dialog works!</p>
+<div class="pm-dialog">
+  <div class="pm-dialog__icon">
+    <mat-icon>{{ data.icon || 'edit_note' }}</mat-icon>
+  </div>
+  <div class="pm-dialog__content">
+    <h2>{{ data.title }}</h2>
+    <p>{{ data.message }}</p>
+  </div>
+  <div class="pm-dialog__actions">
+    <button type="button" mat-stroked-button (click)="close('cancel')">
+      {{ data.cancelLabel || 'Continue editing' }}
+    </button>
+    <button type="button" mat-stroked-button class="pm-dialog__discard" (click)="close('discard')" *ngIf="data.discardLabel">
+      {{ data.discardLabel }}
+    </button>
+    <button type="button" mat-flat-button class="pm-dialog__save" [color]="data.saveColor || 'primary'" (click)="close('save')">
+      {{ data.saveLabel || 'Save draft' }}
+    </button>
+  </div>
+</div>

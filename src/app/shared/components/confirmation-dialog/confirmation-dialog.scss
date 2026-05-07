@@ -1,0 +1,71 @@
+@use '../../../../styles/_variables' as *;
+
+:host {
+  display: block;
+}
+
+.pm-dialog {
+  width: min(92vw, 460px);
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  background: linear-gradient(180deg, #fffaf5, #ffffff);
+  border: 1px solid rgba($orange-crisp, 0.18);
+  border-radius: 16px;
+}
+
+.pm-dialog__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: $orange-deep;
+  background: rgba($orange-crisp, 0.12);
+}
+
+.pm-dialog__icon mat-icon {
+  width: 26px;
+  height: 26px;
+  font-size: 26px;
+}
+
+.pm-dialog__content h2 {
+  margin: 0;
+  color: $text-default;
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+.pm-dialog__content p {
+  margin: 0.45rem 0 0;
+  color: $text-muted;
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.pm-dialog__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.pm-dialog__save {
+  background: $orange-crisp !important;
+  color: #ffffff !important;
+  font-weight: 850;
+}
+
+.pm-dialog__discard {
+  color: #b42318 !important;
+  border-color: rgba(180, 35, 24, 0.28) !important;
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  .pm-dialog__actions button {
+    width: 100%;
+  }
+}

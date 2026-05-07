@@ -15,11 +15,13 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { AuthRoutingModule } from './auth-routing-module';
 import { Register } from './pages/register/register';
 import { Login } from './pages/login/login';
+import { ForgotPassword } from './pages/forgot-password/forgot-password';
 
 @NgModule({
   declarations: [
     Login,
-    Register
+    Register,
+    ForgotPassword
   ],
   imports: [
     CommonModule,

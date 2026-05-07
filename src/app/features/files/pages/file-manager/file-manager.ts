@@ -1,4 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 
@@ -24,6 +26,7 @@ export class FileManager implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly fileService = inject(FileService);
   private readonly notifications = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
 
   readonly projectForm = this.formBuilder.nonNullable.group({
     projectId: ['', [Validators.required, Validators.minLength(2)]],
@@ -276,11 +279,28 @@ export class FileManager implements OnInit {
       return;
     }
 
-    const confirmed = window.confirm(`Delete "${file.originalFileName}"? This action cannot be undone.`);
-    if (!confirmed) {
-      return;
-    }
+    const data: ConfirmationDialogData = {
+      title: 'Delete Project File',
+      message: `Are you sure you want to delete "${file.originalFileName}"? This action cannot be undone and will remove all versions of this file.`,
+      icon: 'delete_sweep',
+      saveLabel: 'Delete File',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
 
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === 'save') {
+        this.executeDelete(file);
+      }
+    });
+  }
+
+  private executeDelete(file: ProjectFileDto): void {
     this.deletingFileId = file.id;
     this.fileService.delete(this.currentProjectId, file.id).subscribe({
       next: () => {

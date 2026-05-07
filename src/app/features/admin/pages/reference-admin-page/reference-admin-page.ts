@@ -1,4 +1,6 @@
 import { ChangeDetectorRef, Component, NgZone, OnDestroy, OnInit, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import { ActivatedRoute } from '@angular/router';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { Subscription, map } from 'rxjs';
@@ -35,6 +37,7 @@ type ReferenceFormShape = {
 export class ReferenceAdminPage implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly notifications = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
   private readonly zone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly subscriptions = new Subscription();
@@ -300,8 +303,30 @@ export class ReferenceAdminPage implements OnInit, OnDestroy {
   }
 
   delete(item: ReferenceItem): void {
-    this.deletingId = item.id;
-    this.getDeleteRequest(item.id).subscribe({
+    const data: ConfirmationDialogData = {
+      title: `Delete ${this.title.replace(/s$/, '')}`,
+      message: `Are you sure you want to delete "${item.name}" from ${this.title.toLowerCase()}? This action cannot be undone and may affect related projects or users.`,
+      icon: 'inventory_2',
+      saveLabel: 'Delete Permanently',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === 'save') {
+        this.executeDelete(item.id);
+      }
+    });
+  }
+
+  private executeDelete(id: string): void {
+    this.deletingId = id;
+    this.getDeleteRequest(id).subscribe({
       next: () => {
         this.zone.run(() => {
           this.notifications.showSuccess('Deleted successfully');

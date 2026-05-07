@@ -4,7 +4,7 @@
     <h1>Create Project </h1>
   </div>
 
-  <mat-stepper linear [orientation]="stepperOrientation">
+  <mat-stepper linear [orientation]="'vertical'">
     <mat-step [stepControl]="step1Group" [formGroup]="step1Group" label="Step 1: Management & Type">
       <div class="step-layout">
         <div class="step-title">
@@ -139,6 +139,11 @@
             <small *ngIf="isInvalid(step3Group.get('departmentId'))">Department is required.</small>
           </div>
           <div class="field">
+            <label>Cost Center *</label>
+            <input type="text" formControlName="costCenter" />
+            <small *ngIf="isInvalid(step3Group.get('costCenter'))">Cost center is required.</small>
+          </div>
+          <div class="field">
             <label>Cost Saving</label>
             <input type="number" min="0" formControlName="costSaving" />
           </div>
@@ -159,15 +164,35 @@
         <div class="form-grid">
           <div class="field">
             <label>Technologies</label>
-            <select formControlName="technologyIds" multiple>
-              <option *ngFor="let option of references.technologies" [value]="option.id">{{ option.label }}</option>
-            </select>
+            <div class="inline-editor">
+              <select [formControl]="technologyDraft">
+                <option value="">Select technology</option>
+                <option *ngFor="let option of references.technologies" [value]="option.id">{{ option.label }}</option>
+              </select>
+              <button type="button" mat-stroked-button (click)="addTechnology()">Add</button>
+            </div>
+            <div class="list-grid" *ngIf="selectedTechnologies.length > 0">
+              <div class="list-item" *ngFor="let technology of selectedTechnologies">
+                <span>{{ technology.label }}</span>
+                <button type="button" mat-button color="warn" (click)="removeTechnology(technology.id)">Remove</button>
+              </div>
+            </div>
           </div>
           <div class="field">
             <label>Solution Domains</label>
-            <select formControlName="solutionDomainIds" multiple>
-              <option *ngFor="let option of references.solutionDomains" [value]="option.id">{{ option.label }}</option>
-            </select>
+            <div class="inline-editor">
+              <select [formControl]="solutionDomainDraft">
+                <option value="">Select solution domain</option>
+                <option *ngFor="let option of references.solutionDomains" [value]="option.id">{{ option.label }}</option>
+              </select>
+              <button type="button" mat-stroked-button (click)="addSolutionDomain()">Add</button>
+            </div>
+            <div class="list-grid" *ngIf="selectedSolutionDomains.length > 0">
+              <div class="list-item" *ngFor="let solution of selectedSolutionDomains">
+                <span>{{ solution.label }}</span>
+                <button type="button" mat-button color="warn" (click)="removeSolutionDomain(solution.id)">Remove</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="action-row">
@@ -181,7 +206,7 @@
       <div class="step-layout">
         <div class="step-title">
           <h2>Timeline</h2>
-          <p>Plan dates and effort for project delivery tracking.</p>
+          <p>Plan dates and effort when they are already known.</p>
         </div>
         <div class="form-grid">
           <div class="field">
@@ -197,7 +222,8 @@
           <div class="field">
             <label>Estimated Due Date</label>
             <input type="date" formControlName="estimatedDueDate" />
-            <small *ngIf="wizardForm.errors?.['estimatedDateInvalid']">Estimated due date must be after start date.</small>
+            <small *ngIf="wizardForm.errors?.['estimatedDateInvalid']">Estimated due date must be after start
+              date.</small>
           </div>
           <div class="field">
             <label>Estimated Hours</label>
@@ -223,22 +249,56 @@
         </div>
 
         <div class="form-grid strategic-grid">
-          <div class="field"><label>Financial Impact (0-10)</label><input type="number" min="0" max="10"
-              formControlName="financialImpact" /></div>
-          <div class="field"><label>Customer Impact (0-10)</label><input type="number" min="0" max="10"
-              formControlName="customerImpact" /></div>
-          <div class="field"><label>Operational Efficiency (0-10)</label><input type="number" min="0" max="10"
-              formControlName="operationalEfficiency" /></div>
-          <div class="field"><label>Strategic Alignment (0-10)</label><input type="number" min="0" max="10"
-              formControlName="strategicAlignment" /></div>
-          <div class="field"><label>Cross Functional Impact (0-10)</label><input type="number" min="0" max="10"
-              formControlName="crossFunctionalImpact" /></div>
-          <div class="field"><label>Innovation Digitalisation (0-10)</label><input type="number" min="0" max="10"
-              formControlName="innovationDigitalisation" /></div>
-          <div class="field"><label>Risk Mitigation Urgency (0-10)</label><input type="number" min="0" max="10"
-              formControlName="riskMitigationUrgency" /></div>
-          <div class="field"><label>Sustainability ESG (0-10)</label><input type="number" min="0" max="10"
-              formControlName="sustainabilityESG" /></div>
+          <div class="field">
+            <label>Financial Impact (0-10)</label>
+            <input type="number" min="0" max="10" formControlName="financialImpact" />
+            <small *ngIf="strategicCriterionError('financialImpact')">{{ strategicCriterionError('financialImpact') }}</small>
+          </div>
+          <div class="field">
+            <label>Customer Impact (0-10)</label>
+            <input type="number" min="0" max="10" formControlName="customerImpact" />
+            <small *ngIf="strategicCriterionError('customerImpact')">{{ strategicCriterionError('customerImpact') }}</small>
+          </div>
+          <div class="field">
+            <label>Operational Efficiency (0-10)</label>
+            <input type="number" min="0" max="10" formControlName="operationalEfficiency" />
+            <small *ngIf="strategicCriterionError('operationalEfficiency')">{{ strategicCriterionError('operationalEfficiency') }}</small>
+          </div>
+          <div class="field">
+            <label>Strategic Alignment (0-10)</label>
+            <input type="number" min="0" max="10" formControlName="strategicAlignment" />
+            <small *ngIf="strategicCriterionError('strategicAlignment')">{{ strategicCriterionError('strategicAlignment') }}</small>
+          </div>
+          <div class="field">
+            <label>Cross Functional Impact (0-10)</label>
+            <input type="number" min="0" max="10" formControlName="crossFunctionalImpact" />
+            <small *ngIf="strategicCriterionError('crossFunctionalImpact')">{{ strategicCriterionError('crossFunctionalImpact') }}</small>
+          </div>
+          <div class="field">
+            <label>Innovation Digitalisation (0-10)</label>
+            <input type="number" min="0" max="10" formControlName="innovationDigitalisation" />
+            <small *ngIf="strategicCriterionError('innovationDigitalisation')">{{ strategicCriterionError('innovationDigitalisation') }}</small>
+          </div>
+          <div class="field">
+            <label>Risk Mitigation Urgency (0-10)</label>
+            <input type="number" min="0" max="10" formControlName="riskMitigationUrgency" />
+            <small *ngIf="strategicCriterionError('riskMitigationUrgency')">{{ strategicCriterionError('riskMitigationUrgency') }}</small>
+          </div>
+          <div class="field">
+            <label>Sustainability ESG (0-10)</label>
+            <input type="number" min="0" max="10" formControlName="sustainabilityESG" />
+            <small *ngIf="strategicCriterionError('sustainabilityESG')">{{ strategicCriterionError('sustainabilityESG') }}</small>
+          </div>
+        </div>
+        <div class="strategic-score-summary">
+          <div>
+            <span>Total</span>
+            <strong>{{ strategicScoreTotal }} / 80</strong>
+          </div>
+          <div>
+            <span>Average</span>
+            <strong>{{ strategicScoreAverage }} / 10</strong>
+          </div>
         </div>
         <div class="action-row">
           <button mat-stroked-button matStepperPrevious>Back</button>
@@ -264,14 +324,14 @@
             </div>
             <div class="field" *ngIf="memberDraft.controls['userId'].value">
               <label>Role</label>
-              <input type="text" formControlName="role" />
+              <input type="text" formControlName="role" readonly />
             </div>
           </div>
           <button type="button" mat-stroked-button (click)="addTeamMember()">Add Member</button>
         </div>
         <div formArrayName="teamMembers" class="list-grid">
           <div class="list-item" *ngFor="let member of teamMembers.controls; index as i" [formGroupName]="i">
-            <span>{{ member.get('userId')?.value }} - {{ member.get('role')?.value }}</span>
+            <span>{{ userLabel(member.get('userId')?.value) }} - {{ member.get('role')?.value }}</span>
             <button type="button" mat-button color="warn" (click)="removeTeamMember(i)">Remove</button>
           </div>
         </div>
@@ -294,13 +354,14 @@
             <div class="field"><label>Price Per Unit *</label><input type="number" min="0"
                 formControlName="pricePerUnit" /></div>
             <div class="field"><label>Quantity *</label><input type="number" min="1" formControlName="quantity" /></div>
+            <div class="field"><label>Cost Center *</label><input type="text" formControlName="costCenter" /></div>
           </div>
           <button type="button" mat-stroked-button (click)="addBudgetItem()">Add Budget Item</button>
         </div>
         <div formArrayName="budgetItems" class="list-grid">
           <div class="list-item" *ngFor="let item of budgetItems.controls; index as i" [formGroupName]="i">
             <span>{{ item.get('itemName')?.value }} - {{ item.get('pricePerUnit')?.value }} x {{
-              item.get('quantity')?.value }}</span>
+              item.get('quantity')?.value }} - {{ item.get('costCenter')?.value }}</span>
             <button type="button" mat-button color="warn" (click)="removeBudgetItem(i)">Remove</button>
           </div>
         </div>
@@ -325,6 +386,14 @@
           </div>
           <div class="field span-2"><label>Enhancements</label><textarea rows="2"
               formControlName="enhancements"></textarea></div>
+          <div class="field">
+            <label>Code Source Link</label>
+            <input type="url" formControlName="codeSourceLink" />
+          </div>
+          <div class="field">
+            <label>Solution Link</label>
+            <input type="url" formControlName="solutionLink" />
+          </div>
           <div class="field span-2">
             <label>Roadblocks</label>
             <div class="inline-editor">
@@ -352,13 +421,34 @@
           <h2>Project Files</h2>
           <p>Attach required documentation and project artifacts.</p>
         </div>
-        
+
         <div class="card file-upload-card">
-          <div class="upload-trigger">
-            <mat-icon>cloud_upload</mat-icon>
-            <p>Drag and drop files here or click to browse</p>
-            <input type="file" (change)="onFileSelected($event)" multiple style="display: none" #fileInput />
-            <button type="button" mat-stroked-button (click)="fileInput.click()">Select Files</button>
+          <div class="file-draft-grid">
+            <div class="field">
+              <label>Document Type *</label>
+              <select [formControl]="fileTypeDraft">
+                <option [ngValue]="null">Select document type</option>
+                <option *ngFor="let option of projectFileTypeOptions" [ngValue]="option.value"
+                  [disabled]="isProjectFileTypeSelected(option.value)">{{ option.label }}
+                </option>
+              </select>
+              <small *ngIf="projectFileTypeError()">{{ projectFileTypeError() }}</small>
+            </div>
+            <div class="field">
+              <label>File *</label>
+              <div class="file-picker">
+                <input type="file" (change)="onFileSelected($event)" style="display: none" #fileInput />
+                <button type="button" mat-stroked-button (click)="fileInput.click()">Attach File</button>
+                <span>{{ pendingProjectFile?.name || 'No file attached' }}</span>
+              </div>
+            </div>
+            <div class="field span-2">
+              <label>Description</label>
+              <input type="text" [formControl]="fileDescriptionDraft" />
+            </div>
+            <button type="button" mat-stroked-button class="add-file-button" (click)="addProjectFile(fileInput)">
+              Add File
+            </button>
           </div>
         </div>
 
@@ -374,13 +464,11 @@
             <div class="file-settings form-grid">
               <div class="field">
                 <label>Document Type</label>
-                <select [(ngModel)]="fileData.fileType" [ngModelOptions]="{standalone: true}">
-                  <option *ngFor="let option of projectFileTypeOptions" [ngValue]="option.value">{{ option.label }}</option>
-                </select>
+                <span class="file-type-pill">{{ enumLabel(fileData.fileType, ProjectFileType) }}</span>
               </div>
               <div class="field">
-                <label>Description (Optional)</label>
-                <input type="text" [(ngModel)]="fileData.description" [ngModelOptions]="{standalone: true}" placeholder="e.g. Initial draft" />
+                <label>Description</label>
+                <span class="file-description">{{ fileData.description || '-' }}</span>
               </div>
             </div>
             <button type="button" mat-icon-button color="warn" (click)="removeFile(i)" aria-label="Remove file">

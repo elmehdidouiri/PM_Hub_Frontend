@@ -1,4 +1,6 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 
 import { Role } from '../../../../core/models';
@@ -20,6 +22,7 @@ type RoleFormShape = {
 export class RolesAdminPage implements OnInit {
   private readonly rolesApi = inject(RolesApiService);
   private readonly notifications = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
   private readonly zone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -157,8 +160,30 @@ export class RolesAdminPage implements OnInit {
   }
 
   delete(role: Role): void {
-    this.deletingId = role.id;
-    this.rolesApi.deleteRole(role.id).subscribe({
+    const data: ConfirmationDialogData = {
+      title: 'Delete Security Role',
+      message: `Are you sure you want to delete the "${role.name}" role? This might affect users currently assigned to it.`,
+      icon: 'admin_panel_settings',
+      saveLabel: 'Delete Permanently',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === 'save') {
+        this.executeDelete(role.id);
+      }
+    });
+  }
+
+  private executeDelete(id: string): void {
+    this.deletingId = id;
+    this.rolesApi.deleteRole(id).subscribe({
       next: () => {
         this.zone.run(() => {
           this.notifications.showSuccess('Role deleted');

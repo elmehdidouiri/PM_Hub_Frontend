@@ -1,0 +1,97 @@
+<div class="dialog-container">
+  <header class="dialog-header">
+    <div class="header-main">
+      <h2>Intern Performance & Tracking</h2>
+      <p>{{ data.intern.name }} • {{ data.intern.email }}</p>
+    </div>
+    <button class="btn-close" (click)="close()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+
+  <div class="dialog-content">
+    <div class="loader-state" *ngIf="isLoading()">
+      <div class="spinner"></div>
+      <p>Loading allocation details...</p>
+    </div>
+
+    <div class="error-state" *ngIf="error()">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ error() }}</p>
+    </div>
+
+    <div class="allocations-list" *ngIf="!isLoading() && !error()">
+      <div class="allocation-section" *ngFor="let alloc of allocations()">
+        <div class="alloc-card premium-card">
+          <div class="alloc-header">
+            <div class="alloc-title">
+               <span class="alloc-tag">ACTIVE ALLOCATION</span>
+               <h3>{{ alloc.roleName }}</h3>
+            </div>
+            <div class="alloc-summary">
+               <div class="summary-item">
+                  <span class="lbl">Total Booked</span>
+                  <strong>{{ alloc.hoursWorked }}h</strong>
+               </div>
+               <div class="summary-item">
+                  <span class="lbl">Allocated</span>
+                  <strong>{{ alloc.allocatedHours }}h</strong>
+               </div>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="alloc-progress">
+             <div class="progress-info">
+                <span>Usage Progress</span>
+                <span>{{ ((alloc.hoursWorked / alloc.allocatedHours) * 100).toFixed(2) }}%</span>
+             </div>
+             <div class="progress-track">
+                <div class="progress-fill" [style.width.%]="(alloc.hoursWorked / alloc.allocatedHours) * 100"></div>
+             </div>
+          </div>
+
+          <div class="details-grid">
+             <div class="detail-box">
+                <label>Remaining</label>
+                <span [class.over-budget]="alloc.remainingHours < 0">{{ alloc.remainingHours }}h</span>
+             </div>
+             <div class="detail-box">
+                <label>Allocation Date</label>
+                <span>{{ alloc.allocationDate | date:'mediumDate' }}</span>
+             </div>
+          </div>
+
+          <!-- Hour Entries Table -->
+          <div class="hour-entries-section">
+             <h4>Activity Log</h4>
+             <div class="mini-table">
+                <div class="table-header">
+                   <span>Date</span>
+                   <span>Hours</span>
+                   <span>By</span>
+                   <span>Notes</span>
+                </div>
+                <div class="table-row" *ngFor="let entry of alloc.hourEntries">
+                   <span>{{ entry.date | date:'shortDate' }}</span>
+                   <strong>{{ entry.hours }}h</strong>
+                   <span>{{ entry.bookedByUserName }}</span>
+                   <span class="note" [matTooltip]="entry.notes || 'No notes'">{{ entry.notes || '-' }}</span>
+                </div>
+                <div *ngIf="!alloc.hourEntries.length" class="empty-hint">No hours logged yet.</div>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="!allocations().length" class="empty-state">
+         <mat-icon>sentiment_dissatisfied</mat-icon>
+         <p>No active allocations found for this intern.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="dialog-footer">
+    <button class="btn-primary" (click)="close()">Close Details</button>
+  </footer>
+</div>

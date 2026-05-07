@@ -2,7 +2,7 @@ import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { HttpBackend, HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
-import { BehaviorSubject, Observable, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, throwError, combineLatest } from 'rxjs';
 import { catchError, finalize, map, shareReplay } from 'rxjs/operators';
 import { jwtDecode } from 'jwt-decode';
 
@@ -10,44 +10,43 @@ import { environment } from '../../../environments/environment';
 import { StorageService } from './storage.service';
 import { NotificationService } from './notification.service';
 import { UserSessionService } from './user-session.service';
+import { TokenStoreService } from './token-store.service';
 import {
   ApiResponse,
   AuthResponse,
+  ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
-  User
+  ResetPasswordRequest,
+  User,
+  VerifyResetCodeRequest,
+  VerifyResetCodeResponse
 } from '../models';
 
-/**
- * Memory-based store to prevent flicker and handle SSR hydration issues.
- * Storing the token in a static class ensures it's available instantly.
- */
-export class AuthStore {
-  private static _token: string | null = null;
-  private static _refreshToken: string | null = null;
-
-  static getToken(): string | null {
-    return this._token;
-  }
-
-  static setToken(token: string | null): void {
-    this._token = token;
-  }
-
-  static getRefreshToken(): string | null {
-    return this._refreshToken;
-  }
-
-  static setRefreshToken(token: string | null): void {
-    this._refreshToken = token;
-  }
-}
+const ADMIN_ROLES = new Set([
+  'admin',
+  'administrator',
+  'administrateur',
+  'super admin',
+  'superadmin',
+  'super administrateur',
+]);
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   private readonly legacyTokenExpirationKey = 'pmhub_token_expiration';
+  private readonly legacyStorageKeys = [
+    'pmhub_user',
+    'currentUser',
+    'authToken',
+    'authtoken',
+    'pmhubtoken',
+    'pmhubToken',
+    'projectDashboardPreferences',
+    '--projectDashboardPreferences',
+  ];
   private apiUrl = `${environment.apiUrl}/auth`;
   private refreshHttpClient: HttpClient;
   private refreshRequest$: Observable<AuthResponse> | null = null;
@@ -61,11 +60,32 @@ export class AuthService {
   private readonly isReadySubject = new BehaviorSubject<boolean>(false);
   public isReady$ = this.isReadySubject.asObservable();
 
+  private readonly isInitializingSubject = new BehaviorSubject<boolean>(true);
+  public isInitializing$ = this.isInitializingSubject.asObservable();
+
+  private readonly isRefreshingSubject = new BehaviorSubject<boolean>(false);
+  public isRefreshing$ = this.isRefreshingSubject.asObservable();
+
   get isReadyValue(): boolean {
     return this.isReadySubject.value;
   }
 
+  get isInitializing(): boolean {
+    return this.isInitializingSubject.value;
+  }
+
+  get isRefreshing(): boolean {
+    return this.isRefreshingSubject.value;
+  }
+
+  get isAuthenticating$(): Observable<boolean> {
+    return combineLatest([this.isInitializing$, this.isRefreshing$]).pipe(
+      map(([init, refresh]) => init || refresh)
+    );
+  }
+
   setReady(): void {
+    this.isInitializingSubject.next(false);
     this.isReadySubject.next(true);
   }
 
@@ -76,14 +96,15 @@ export class AuthService {
     private storageService: StorageService,
     private notificationService: NotificationService,
     private userSessionService: UserSessionService,
+    private tokenStore: TokenStoreService,
     @Inject(PLATFORM_ID) private platformId: any
   ) {
     this.refreshHttpClient = new HttpClient(httpBackend);
     
-    // Immediate sync from storage to memory store
+    // Immediate sync from storage to memory store via TokenStoreService
     if (isPlatformBrowser(this.platformId)) {
-      AuthStore.setToken(this.storageService.getItem(environment.tokenKey));
-      AuthStore.setRefreshToken(this.storageService.getItem(environment.refreshTokenKey));
+      this.tokenStore.setAccessToken(this.storageService.getItem(environment.tokenKey));
+      this.tokenStore.setRefreshToken(this.storageService.getItem(environment.refreshTokenKey));
     }
     
     this.loadUserFromStorage();
@@ -91,6 +112,7 @@ export class AuthService {
 
   private loadUserFromStorage(): void {
     this.storageService.removeItem(this.legacyTokenExpirationKey);
+    this.clearLegacyStorage();
 
     const token = this.getToken();
 
@@ -131,6 +153,51 @@ export class AuthService {
         }
 
         throw new Error(response.message || 'Registration failed');
+      }),
+      catchError((error) => this.handleError(error))
+    );
+  }
+
+  forgotPassword(data: ForgotPasswordRequest): Observable<string> {
+    return this.http.post<ApiResponse<unknown>>(`${this.apiUrl}/forgot-password`, data).pipe(
+      map((response) => {
+        if (response.success) {
+          return response.message || 'Password recovery instructions have been sent.';
+        }
+
+        throw new Error(response.message || 'Password recovery failed');
+      }),
+      catchError((error) => this.handleError(error))
+    );
+  }
+
+  verifyResetCode(data: VerifyResetCodeRequest): Observable<string> {
+    return this.http
+      .post<ApiResponse<VerifyResetCodeResponse | string>>(`${this.apiUrl}/verify-reset-code`, data)
+      .pipe(
+        map((response) => {
+          if (!response.success || !response.data) {
+            throw new Error(response.message || 'Reset code verification failed');
+          }
+
+          if (typeof response.data === 'string') {
+            return response.data;
+          }
+
+          return response.data.resetToken;
+        }),
+        catchError((error) => this.handleError(error))
+      );
+  }
+
+  resetPassword(data: ResetPasswordRequest): Observable<string> {
+    return this.http.post<ApiResponse<unknown>>(`${this.apiUrl}/reset-password`, data).pipe(
+      map((response) => {
+        if (response.success) {
+          return response.message || 'Your password has been reset. Please sign in again.';
+        }
+
+        throw new Error(response.message || 'Password reset failed');
       }),
       catchError((error) => this.handleError(error))
     );
@@ -191,11 +258,11 @@ export class AuthService {
     };
 
     this.storageService.setItem(environment.tokenKey, authData.token);
-    AuthStore.setToken(authData.token);
+    this.tokenStore.setAccessToken(authData.token);
 
     if (authData.refreshToken) {
       this.storageService.setItem(environment.refreshTokenKey, authData.refreshToken);
-      AuthStore.setRefreshToken(authData.refreshToken);
+      this.tokenStore.setRefreshToken(authData.refreshToken);
     }
 
     this.currentUserSubject.next(user);
@@ -218,6 +285,7 @@ export class AuthService {
     }
 
     if (!this.refreshRequest$) {
+      this.isRefreshingSubject.next(true);
       this.refreshRequest$ = this.refreshHttpClient
         .post<ApiResponse<AuthResponse>>(`${this.apiUrl}/refresh`, { refreshToken })
         .pipe(
@@ -230,11 +298,12 @@ export class AuthService {
             throw new Error(response.message || 'Token refresh failed');
           }),
           catchError((err) => {
-            this.clearAccessTokenData();
+            this.clearAuthData(); // Clear everything: access token AND refresh token
             return throwError(() => err);
           }),
           finalize(() => {
             this.refreshRequest$ = null;
+            this.isRefreshingSubject.next(false);
           }),
           shareReplay(1)
         );
@@ -244,17 +313,27 @@ export class AuthService {
   }
 
   logout(): void {
-    const returnUrl = this.router.url;
+    const currentUrl = this.router.url;
+    const returnUrl = currentUrl.includes('/auth/') ? '/dashboard' : currentUrl;
+    
     this.clearAuthData();
     this.notificationService.showInfo('Vous avez ete deconnecte');
-    this.router.navigate(['/auth/login'], { queryParams: { returnUrl } });
+    
+    if (!currentUrl.includes('/auth/login')) {
+      this.router.navigate(['/auth/login'], { queryParams: { returnUrl } });
+    }
   }
 
   sessionExpiredLogout(): void {
-    const returnUrl = this.router.url;
+    const currentUrl = this.router.url;
+    const returnUrl = currentUrl.includes('/auth/') ? '/dashboard' : currentUrl;
+    
     this.clearAuthData();
     this.notificationService.showInfo('Votre session a expire. Veuillez vous reconnecter.');
-    this.router.navigate(['/auth/login'], { queryParams: { returnUrl } });
+    
+    if (!currentUrl.includes('/auth/login')) {
+      this.router.navigate(['/auth/login'], { queryParams: { returnUrl } });
+    }
   }
 
   clearInvalidSession(): void {
@@ -266,12 +345,13 @@ export class AuthService {
   private clearAuthData(): void {
     this.clearAccessTokenData();
     this.storageService.removeItem(environment.refreshTokenKey);
-    AuthStore.setRefreshToken(null);
+    this.tokenStore.setRefreshToken(null);
   }
 
   private clearAccessTokenData(): void {
     this.storageService.removeItem(environment.tokenKey);
-    AuthStore.setToken(null);
+    this.clearLegacyStorage();
+    this.tokenStore.setAccessToken(null);
 
     this.currentUserSubject.next(null);
     this.userSessionService.clear();
@@ -279,17 +359,17 @@ export class AuthService {
   }
 
   getToken(): string | null {
-    const memToken = AuthStore.getToken();
+    const memToken = this.tokenStore.accessToken;
     if (memToken) return memToken;
 
     if (!isPlatformBrowser(this.platformId)) return null;
     const storeToken = this.storageService.getItem<string>(environment.tokenKey);
-    AuthStore.setToken(storeToken);
+    this.tokenStore.setAccessToken(storeToken);
     return storeToken;
   }
 
   getRefreshToken(): string | null {
-    const memToken = AuthStore.getRefreshToken();
+    const memToken = this.tokenStore.refreshToken;
     if (memToken) return memToken;
 
     if (!isPlatformBrowser(this.platformId)) return null;
@@ -301,12 +381,16 @@ export class AuthService {
 
     if (this.isTokenExpired(storeToken)) {
       this.storageService.removeItem(environment.refreshTokenKey);
-      AuthStore.setRefreshToken(null);
+      this.tokenStore.setRefreshToken(null);
       return null;
     }
 
-    AuthStore.setRefreshToken(storeToken);
+    this.tokenStore.setRefreshToken(storeToken);
     return storeToken;
+  }
+
+  private clearLegacyStorage(): void {
+    this.legacyStorageKeys.forEach((key) => this.storageService.removeItem(key));
   }
 
   getCurrentUser(): User | null {
@@ -332,19 +416,11 @@ export class AuthService {
       return false;
     }
 
-    if (user.isAdmin === true) {
+    if (user?.isAdmin) {
       return true;
     }
     const role = (user.roleName || '').trim().toLowerCase();
-    const adminRoles = new Set([
-      'admin',
-      'administrator',
-      'administrateur',
-      'super admin',
-      'superadmin',
-      'super administrateur',
-    ]);
-    return adminRoles.has(role);
+    return ADMIN_ROLES.has(role);
   }
 
   private isTokenExpired(token: string): boolean {

@@ -3,6 +3,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs/operators';
 
 import { AuthService } from '../../core/services/auth';
+import { BreadcrumbService } from '../../core/services/breadcrumb.service';
 import { User } from '../../core/models';
 
 export interface NavChildItem {
@@ -34,6 +35,7 @@ export interface NavItem {
 export class MainLayout implements OnInit {
   private authService = inject(AuthService);
   private router = inject(Router);
+  private breadcrumbService = inject(BreadcrumbService);
   private viewportInitialized = false;
 
   user: User | null = null;
@@ -117,8 +119,8 @@ export class MainLayout implements OnInit {
     // Sync user state and loading flag
     this.authService.currentUser$.subscribe(u => {
       this.user = u;
+      this.isLoadingUser = false; // Always stop loading once we have a definitive answer
       if (u) {
-        this.isLoadingUser = false;
         this.refreshFilteredNavItems();
       }
     });
@@ -128,6 +130,9 @@ export class MainLayout implements OnInit {
     if (this.user) {
       this.isLoadingUser = false;
       this.refreshFilteredNavItems();
+    } else if (this.authService.isReadyValue) {
+      // If the app is ready but no user, we're not loading anymore
+      this.isLoadingUser = false;
     }
 
     this.updateViewportState();
@@ -270,8 +275,12 @@ export class MainLayout implements OnInit {
       return 'Edit';
     }
 
-    if (segments[0] === 'projects' && this.looksLikeId(lastSegment)) {
+    if (segments.includes('projects') && this.looksLikeId(lastSegment)) {
       return 'Project Details';
+    }
+
+    if (segments.includes('users') && this.looksLikeId(lastSegment)) {
+      return this.breadcrumbService.getLabel(lastSegment) || 'User Profile';
     }
 
     return this.labelizeSegment(lastSegment);
@@ -294,6 +303,10 @@ export class MainLayout implements OnInit {
 
       if (segments[index - 1] === 'projects' && this.looksLikeId(segment)) {
         return 'Details';
+      }
+
+      if (segments[index - 1] === 'users' && this.looksLikeId(segment)) {
+        return this.breadcrumbService.getLabel(segment) || 'Profile';
       }
 
       return this.labelizeSegment(segment);
@@ -319,7 +332,9 @@ export class MainLayout implements OnInit {
   }
 
   private looksLikeId(value: string): boolean {
-    return /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-9a-f]{24})$/i.test(value);
+    // Standard UUID regex (more permissive version) or 24-char hex (MongoDB style)
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) || 
+           /^[0-9a-f]{24}$/i.test(value);
   }
 
   toggleSidebar(): void {

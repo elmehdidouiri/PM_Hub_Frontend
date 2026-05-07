@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, map, catchError } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
+import { Observable, map, catchError, throwError } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
 import { ApiResponse } from '../../../core/models';
@@ -15,7 +15,12 @@ import {
 } from '../../interns/models/intern.models';
 import {
   CreateProjectDto,
+  DashboardAdminBiDto,
+  DashboardExtendedDto,
   DashboardFilterParams,
+  DashboardOverviewDto,
+  DashboardPerformanceDto,
+  DashboardPerformanceProjectDto,
   DashboardStatsDto,
   PaginatedResponse,
   ProjectDto,
@@ -57,7 +62,7 @@ export class ProjectService {
               headers: this.buildHeaders(),
               params: {
                 pageNumber: 1,
-                pageSize: 2000,
+                pageSize: 50,
               },
             })
             .pipe(map((response) => this.normalizeProjectsList(response)))
@@ -78,6 +83,27 @@ export class ProjectService {
       .pipe(map((response) => this.normalizeDashboardStats(response)));
   }
 
+  getUserDashboardOverview(filters: DashboardFilterParams): Observable<DashboardOverviewDto> {
+    return this.http
+      .get<ApiResponse<DashboardOverviewDto> | DashboardOverviewDto>(`${environment.apiUrl}/dashboard/me`, {
+        headers: this.buildHeaders(),
+        params: this.buildDashboardParams(filters),
+      })
+      .pipe(map((response) => this.normalizeDashboardOverview(response)));
+  }
+
+  getUserDashboardPerformance(filters: DashboardFilterParams): Observable<DashboardPerformanceDto> {
+    return this.http
+      .get<ApiResponse<DashboardPerformanceDto> | DashboardPerformanceDto>(
+        `${environment.apiUrl}/dashboard/me/performance`,
+        {
+          headers: this.buildHeaders(),
+          params: this.buildDashboardParams(filters),
+        }
+      )
+      .pipe(map((response) => this.normalizeDashboardPerformance(response)));
+  }
+
   getAdminDashboardStats(): Observable<DashboardStatsDto> {
     return this.getAdminDashboardStatsFiltered({});
   }
@@ -91,13 +117,57 @@ export class ProjectService {
       .pipe(map((response) => this.normalizeDashboardStats(response)));
   }
 
+  getAdminDashboardOverview(filters: DashboardFilterParams): Observable<DashboardOverviewDto> {
+    return this.http
+      .get<ApiResponse<DashboardOverviewDto> | DashboardOverviewDto>(`${environment.apiUrl}/dashboard/admin`, {
+        headers: this.buildHeaders(),
+        params: this.buildDashboardParams(filters),
+      })
+      .pipe(map((response) => this.normalizeDashboardOverview(response)));
+  }
+
+  getAdminDashboardBi(filters: DashboardFilterParams): Observable<DashboardAdminBiDto> {
+    return this.http
+      .get<ApiResponse<DashboardAdminBiDto> | DashboardAdminBiDto>(`${environment.apiUrl}/dashboard/admin/bi`, {
+        headers: this.buildHeaders(),
+        params: this.buildDashboardParams(filters),
+      })
+      .pipe(map((response) => this.normalizeDashboardBi(response)));
+  }
+
+  getAdminDashboardExtended(filters: DashboardFilterParams): Observable<DashboardExtendedDto> {
+    return this.http
+      .get<ApiResponse<DashboardExtendedDto>>(`${environment.apiUrl}/dashboard/admin/extended`, {
+        headers: this.buildHeaders(),
+        params: this.buildDashboardParams(filters),
+      })
+      .pipe(map((response) => response.data!));
+  }
+
+  getAdminUserPerformance(userId: string, filters: DashboardFilterParams): Observable<DashboardPerformanceDto> {
+    return this.http
+      .get<ApiResponse<DashboardPerformanceDto> | DashboardPerformanceDto>(
+        `${environment.apiUrl}/dashboard/admin/user/${userId}/performance`,
+        {
+          headers: this.buildHeaders(),
+          params: this.buildDashboardParams(filters),
+        }
+      )
+      .pipe(map((response) => this.normalizeDashboardPerformance(response)));
+  }
+
   createProject(payload: any): Observable<ProjectDto> {
     const mappedPayload = this.mapToBackendDto(payload);
     return this.http
       .post<ApiResponse<ProjectDto>>(this.apiUrl, mappedPayload, {
         headers: this.buildHeaders(),
       })
-      .pipe(map((response) => this.unwrapResponse(response, 'Unable to create project')));
+      .pipe(
+        map((response) => this.unwrapResponse(response, 'Unable to create project')),
+        catchError((error) =>
+          throwError(() => new Error(this.extractErrorMessage(error, 'Unable to create project')))
+        )
+      );
   }
 
   updateProject(id: string, payload: any): Observable<ProjectDto> {
@@ -106,7 +176,12 @@ export class ProjectService {
       .put<ApiResponse<ProjectDto>>(`${this.apiUrl}/${id}`, mappedPayload, {
         headers: this.buildHeaders(),
       })
-      .pipe(map((response) => this.unwrapResponse(response, 'Unable to update project')));
+      .pipe(
+        map((response) => this.unwrapResponse(response, 'Unable to update project')),
+        catchError((error) =>
+          throwError(() => new Error(this.extractErrorMessage(error, 'Unable to update project')))
+        )
+      );
   }
 
   private mapToBackendDto(form: any): any {
@@ -123,7 +198,10 @@ export class ProjectService {
         customerImpact: 2,
         operationalEfficiency: 3,
         strategicAlignment: 4,
-        resourceUtilization: 5
+        crossFunctionalImpact: 5,
+        innovationDigitalisation: 6,
+        riskMitigationUrgency: 7,
+        sustainabilityESG: 8
       };
 
       Object.entries(form.strategicCriteria).forEach(([key, value]) => {
@@ -162,7 +240,8 @@ export class ProjectService {
 
     // 4. Map Members (teamMembers -> members)
     const members = (form.teamMembers || []).map((m: any) => ({
-      userId: typeof m === 'string' ? m : (m.userId || m.id || m)
+      userId: typeof m === 'string' ? m : (m.userId || m.id || m),
+      roleId: typeof m === 'string' ? '' : (m.roleId || m.RoleId || '')
     }));
 
     // 5. Construct final DTO for Backend
@@ -171,7 +250,7 @@ export class ProjectService {
       description: form.description || '',
       departmentId: form.departmentId,
       projectManagerId: form.projectManagerId,
-      startDate: form.startDate,
+      startDate: form.startDate || null,
       endDate: form.endDate,
       estimatedDueDate: form.estimatedDueDate || form.endDate,
       phase: Number(form.phase) || 0,
@@ -240,7 +319,9 @@ export class ProjectService {
     
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
-        httpParams = httpParams.set(key, String(value));
+        const apiKey = this.toProjectSearchParamName(key);
+        const apiValue = apiKey === 'pageSize' ? Math.min(Number(value) || 10, 50) : value;
+        httpParams = httpParams.set(apiKey, String(apiValue));
       }
     });
 
@@ -600,6 +681,54 @@ export class ProjectService {
     throw new Error(response.message || fallbackMessage);
   }
 
+  private extractErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (error instanceof Error && !(error instanceof HttpErrorResponse)) {
+      return error.message || fallbackMessage;
+    }
+
+    if (error instanceof HttpErrorResponse) {
+      const backendError = error.error;
+
+      if (typeof backendError === 'string' && backendError.trim()) {
+        return backendError.trim();
+      }
+
+      if (backendError && typeof backendError === 'object') {
+        const raw = backendError as Record<string, unknown>;
+        const directMessage = this.firstString(raw, ['message', 'Message', 'error', 'Error', 'detail', 'title']);
+        if (directMessage) {
+          return directMessage;
+        }
+
+        const validationErrors = raw['errors'];
+        if (validationErrors && typeof validationErrors === 'object') {
+          const messages = Object.values(validationErrors as Record<string, unknown>)
+            .flatMap((value) => (Array.isArray(value) ? value : [value]))
+            .filter((value): value is string => typeof value === 'string' && !!value.trim());
+
+          if (messages.length) {
+            return messages.join(' ');
+          }
+        }
+      }
+
+      return error.message || fallbackMessage;
+    }
+
+    return fallbackMessage;
+  }
+
+  private firstString(record: Record<string, unknown>, keys: string[]): string {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    return '';
+  }
+
   private isApiResponse(value: unknown): value is ApiResponse<any> {
     return typeof value === 'object' && value !== null && 'success' in (value as any);
   }
@@ -656,6 +785,24 @@ export class ProjectService {
     return params;
   }
 
+  private toProjectSearchParamName(key: string): string {
+    const map: Record<string, string> = {
+      PageNumber: 'pageNumber',
+      PageSize: 'pageSize',
+      Search: 'search',
+      SortBy: 'sortBy',
+      SortDescending: 'sortDescending',
+      Status: 'status',
+      Phase: 'phase',
+      ProjectType: 'projectType',
+      DepartmentId: 'departmentId',
+      BusinessUnitId: 'businessUnitId',
+      ProjectManagerId: 'projectManagerId',
+    };
+
+    return map[key] ?? key;
+  }
+
   private normalizeDashboardStats(response: ApiResponse<DashboardStatsDto> | DashboardStatsDto): DashboardStatsDto {
     const payload = this.isApiResponse(response) ? response.data : response;
     const raw = (payload ?? {}) as Record<string, unknown>;
@@ -691,6 +838,137 @@ export class ProjectService {
     return normalized;
   }
 
+  private normalizeDashboardOverview(
+    response: ApiResponse<DashboardOverviewDto> | DashboardOverviewDto
+  ): DashboardOverviewDto {
+    const payload = this.isApiResponse(response) ? response.data : response;
+    const raw = (payload ?? {}) as Record<string, unknown>;
+    const summary = (raw['summary'] ?? raw) as Record<string, unknown>;
+    const charts = (raw['charts'] ?? {}) as Record<string, unknown>;
+
+    return {
+      summary: {
+        totalProjects: this.toFiniteNumber(summary['totalProjects']),
+        totalEstimatedHours: this.toFiniteNumber(summary['totalEstimatedHours']),
+        totalTrackedHours: this.toFiniteNumber(summary['totalTrackedHours']),
+        ytdHours: this.toFiniteNumber(summary['ytdHours']),
+        averageOtd: this.toFiniteNumber(summary['averageOtd']),
+        averageEffectiveness: this.toFiniteNumber(summary['averageEffectiveness']),
+        delayedProjects: this.toFiniteNumber(summary['delayedProjects']),
+        totalUsers: this.toFiniteNumber(summary['totalUsers']),
+        activeUsers: this.toFiniteNumber(summary['activeUsers']),
+        approvedUsers: this.toFiniteNumber(summary['approvedUsers']),
+        annualGoalProgressPercentage: this.toFiniteNumber(summary['annualGoalProgressPercentage'] ?? summary['annualGoalProgress']),
+      },
+      charts: {
+        projectsByStatus: this.normalizeLabelValues(charts['projectsByStatus']),
+        projectsByPhase: this.normalizeLabelValues(charts['projectsByPhase']),
+        topProjectsByHours: this.normalizeTopProjects(charts['topProjectsByHours']),
+        usersByRole: this.normalizeRoleValues(charts['usersByRole']),
+        projectTeamMembersByRole: this.normalizeRoleValues(charts['projectTeamMembersByRole']),
+        monthlyHoursBreakdownByCategory: this.normalizeLabelValues(charts['monthlyHoursBreakdownByCategory']),
+        hoursByStage: this.normalizeLabelValues(charts['hoursByStage']),
+        deliveryMetrics: this.normalizeLabelValues(charts['deliveryMetrics']),
+      },
+    };
+  }
+
+  private normalizeDashboardBi(
+    response: ApiResponse<DashboardAdminBiDto> | DashboardAdminBiDto
+  ): DashboardAdminBiDto {
+    const payload = this.isApiResponse(response) ? response.data : response;
+    const raw = (payload ?? {}) as Record<string, unknown>;
+
+    return {
+      filters: this.toPlainRecord(raw['filters']),
+      kpis: this.toPlainRecord(raw['kpis']),
+      charts: this.toPlainRecord(raw['charts']),
+      tables: this.toPlainRecord(raw['tables']),
+      alerts: Array.isArray(raw['alerts']) ? raw['alerts'] : [],
+    };
+  }
+
+  private normalizeDashboardPerformance(
+    response: ApiResponse<DashboardPerformanceDto> | DashboardPerformanceDto
+  ): DashboardPerformanceDto {
+    const payload = this.isApiResponse(response) ? response.data : response;
+    const raw = (payload ?? {}) as Record<string, unknown>;
+    const summary = (raw['summary'] ?? {}) as Record<string, unknown>;
+    const charts = (raw['charts'] ?? {}) as Record<string, unknown>;
+
+    return {
+      summary: {
+        totalLoggedHours: this.toFiniteNumber(summary['totalLoggedHours']),
+        ytdLoggedHours: this.toFiniteNumber(summary['ytdLoggedHours']),
+        expectedHours: this.toFiniteNumber(summary['expectedHours']),
+        utilizationRate: this.toFiniteNumber(summary['utilizationRate']),
+        averageHoursPerLoggedDay: this.toFiniteNumber(summary['averageHoursPerLoggedDay']),
+        loggedDays: this.toFiniteNumber(summary['loggedDays']),
+        projectsWithLoggedHours: this.toFiniteNumber(summary['projectsWithLoggedHours']),
+        assignedProjects: this.toFiniteNumber(summary['assignedProjects']),
+        delayedAssignedProjects: this.toFiniteNumber(summary['delayedAssignedProjects']),
+        premiumApprovedHours: this.toFiniteNumber(summary['premiumApprovedHours']),
+        premiumPendingHours: this.toFiniteNumber(summary['premiumPendingHours']),
+        totalCost: this.toFiniteNumber(summary['totalCost']),
+        annualGoalProgressPercentage: this.toFiniteNumber(summary['annualGoalProgressPercentage'] ?? summary['annualGoalProgress']),
+      },
+      charts: {
+        hoursByCategory: this.normalizeLabelValues(charts['hoursByCategory']),
+        hoursByStage: this.normalizeLabelValues(charts['hoursByStage']),
+        monthlyHoursByCategory: this.normalizeMonthlyPerformanceHours(charts['monthlyHoursByCategory']),
+        premiumHours: this.normalizeLabelValues(charts['premiumHours']),
+      },
+      topProjects: this.normalizePerformanceProjects(raw['topProjects']),
+    };
+  }
+
+  private normalizeMonthlyPerformanceHours(source: unknown): DashboardPerformanceDto['charts']['monthlyHoursByCategory'] {
+    if (!Array.isArray(source)) {
+      return [];
+    }
+
+    return source.map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        year: this.toFiniteNumber(row['year']),
+        month: this.toFiniteNumber(row['month']),
+        monthName: String(row['monthName'] ?? '').trim(),
+        totalHours: this.toFiniteNumber(row['totalHours']),
+        executionHours: this.toFiniteNumber(row['executionHours']),
+        supervisionHours: this.toFiniteNumber(row['supervisionHours']),
+        processHours: this.toFiniteNumber(row['processHours']),
+        managementHours: this.toFiniteNumber(row['managementHours']),
+        rAndDHours: this.toFiniteNumber(row['rAndDHours']),
+        workshopHours: this.toFiniteNumber(row['workshopHours']),
+        otherHours: this.toFiniteNumber(row['otherHours']),
+        internManagementHours: this.toFiniteNumber(row['internManagementHours']),
+      };
+    });
+  }
+
+  private normalizePerformanceProjects(source: unknown): DashboardPerformanceProjectDto[] {
+    if (!Array.isArray(source)) {
+      return [];
+    }
+
+    return source
+      .map((item) => {
+        const row = item as Record<string, unknown>;
+        return {
+          projectId: String(row['projectId'] ?? row['id'] ?? '').trim(),
+          projectName: String(row['projectName'] ?? row['name'] ?? row['label'] ?? '').trim(),
+          status: String(row['status'] ?? '').trim(),
+          phase: String(row['phase'] ?? '').trim(),
+          totalHours: this.toFiniteNumber(row['totalHours']),
+          totalCost: this.toFiniteNumber(row['totalCost']),
+          projectProgressPercentage: this.toFiniteNumber(row['projectProgressPercentage']),
+          estimatedDueDate: row['estimatedDueDate'] ? String(row['estimatedDueDate']) : null,
+          isDelayed: Boolean(row['isDelayed']),
+        };
+      })
+      .filter((item) => item.projectId || item.projectName);
+  }
+
   private normalizeChartMap(source: unknown): Record<string, number> {
     if (Array.isArray(source)) {
       return source.reduce<Record<string, number>>((acc, item) => {
@@ -707,5 +985,77 @@ export class ProjectService {
       return source as Record<string, number>;
     }
     return {};
+  }
+
+  private normalizeLabelValues(source: unknown): Array<{ label: string; value: number }> {
+    if (Array.isArray(source)) {
+      return source
+        .map((item) => {
+          const row = item as Record<string, unknown>;
+          return {
+            label: String(row['label'] ?? row['name'] ?? row['key'] ?? '').trim(),
+            value: this.toFiniteNumber(row['value'] ?? row['count']),
+          };
+        })
+        .filter((item) => item.label);
+    }
+
+    if (source && typeof source === 'object') {
+      return Object.entries(source as Record<string, unknown>).map(([label, value]) => ({
+        label,
+        value: this.toFiniteNumber(value),
+      }));
+    }
+
+    return [];
+  }
+
+  private normalizeTopProjects(source: unknown): Array<{ projectId: string; projectName: string; value: number }> {
+    if (!Array.isArray(source)) {
+      return [];
+    }
+
+    return source
+      .map((item) => {
+        const row = item as Record<string, unknown>;
+        const projectId = String(row['projectId'] ?? row['id'] ?? '').trim();
+        const projectName = String(row['projectName'] ?? row['name'] ?? row['label'] ?? '').trim();
+        return {
+          projectId,
+          projectName,
+          value: this.toFiniteNumber(row['value'] ?? row['hours'] ?? row['totalHours']),
+        };
+      })
+      .filter((item) => item.projectId || item.projectName);
+  }
+
+  private normalizeRoleValues(source: unknown): Array<{ roleId: string; roleName: string; value: number }> {
+    if (!Array.isArray(source)) {
+      return [];
+    }
+
+    return source
+      .map((item) => {
+        const row = item as Record<string, unknown>;
+        const roleId = String(row['roleId'] ?? row['id'] ?? '').trim();
+        const roleName = String(row['roleName'] ?? row['name'] ?? row['label'] ?? '').trim();
+        return {
+          roleId,
+          roleName,
+          value: this.toFiniteNumber(row['value'] ?? row['count']),
+        };
+      })
+      .filter((item) => item.roleId || item.roleName);
+  }
+
+  private toFiniteNumber(value: unknown): number {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private toPlainRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   }
 }

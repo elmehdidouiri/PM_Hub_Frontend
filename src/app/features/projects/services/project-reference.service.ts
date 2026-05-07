@@ -95,6 +95,8 @@ export class ProjectReferenceService {
                         id,
                         label: fullName || this.readString(record, ['email']) || 'Unnamed user',
                         email: this.readString(record, ['email']),
+                        roleId: this.readString(record, ['roleId', 'RoleId']),
+                        roleName: this.readString(record, ['roleName', 'role']),
                       };
                     })
                     .filter((user) => !!user.id)
@@ -141,6 +143,8 @@ export class ProjectReferenceService {
                 id,
                 label: fullName || this.readString(record, ['email']) || 'Unnamed user',
                 email: this.readString(record, ['email']),
+                roleId: this.readString(record, ['roleId', 'RoleId']),
+                roleName: this.readString(record, ['roleName', 'role']),
               };
             })
             .filter((user) => !!user.id)

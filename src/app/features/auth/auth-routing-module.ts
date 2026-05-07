@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { Login } from './pages/login/login';
 import { Register } from './pages/register/register';
+import { ForgotPassword } from './pages/forgot-password/forgot-password';
 import { guestGuard } from '../../core/guards/guest-guard';
   
 
@@ -19,6 +20,11 @@ const routes: Routes = [
   {
     path: 'register',
     component: Register,
+    canActivate: [guestGuard]
+  },
+  {
+    path: 'forgot-password',
+    component: ForgotPassword,
     canActivate: [guestGuard]
   }
 ];

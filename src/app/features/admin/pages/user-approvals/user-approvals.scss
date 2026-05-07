@@ -120,119 +120,115 @@
 /* ─────────────────────────────────────────
    STATS STRIP
 ───────────────────────────────────────── */
-.stats-strip {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
+
+/* --- Users page style imports for toolbar and pills --- */
+.toolbar-card,
+.state-card,
+.table-card {
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.95);
 }
 
-.stat-card {
+.toolbar-card {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  padding: 1rem 1.4rem;
-  border-radius: 18px;
-  border: 1px solid transparent;
-  min-width: 160px;
-
-  mat-icon {
-    font-size: 1.75rem;
-    width: 1.75rem;
-    height: 1.75rem;
-    flex-shrink: 0;
-  }
-
-  strong {
-    display: block;
-    font-size: 1.4rem;
-    font-weight: 800;
-    line-height: 1;
-  }
-
-  span {
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-top: 0.15rem;
-  }
-
-  &--warning {
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(255, 255, 255, 0.95));
-    border-color: rgba(251, 191, 36, 0.22);
-
-    mat-icon { color: #d97706; }
-    strong    { color: #92400e; }
-    span      { color: #b45309; }
-  }
-
-  &--info {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(255, 255, 255, 0.95));
-    border-color: rgba(59, 130, 246, 0.18);
-
-    mat-icon { color: #2563eb; }
-    strong    { color: #1e3a8a; }
-    span      { color: #3b82f6; }
-  }
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
 }
 
-/* ─────────────────────────────────────────
-   SEARCH BAR
-───────────────────────────────────────── */
-.search-bar {
+.toolbar-card__search {
+  position: relative;
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.65rem 1rem;
-  border: 1px solid rgba(203, 213, 225, 0.85);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-  transition: all 0.2s;
-  max-width: 500px;
+  min-height: 3.5rem;
+  min-width: 0;
+  padding: 0 1rem;
+  border: 1px solid rgba(232, 119, 34, 0.12);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 252, 248, 0.95));
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 
   &:focus-within {
-    border-color: #f47c00;
-    box-shadow: 0 0 0 3px rgba(244, 124, 0, 0.1);
-    background: #fff;
+    border-color: rgba(232, 119, 34, 0.35);
+    box-shadow: 0 16px 32px rgba(232, 119, 34, 0.12);
+    transform: translateY(-1px);
   }
 
   mat-icon {
-    color: #94a3b8;
-    font-size: 1.1rem;
-    width: 1.1rem;
-    height: 1.1rem;
-    flex-shrink: 0;
+    color: #8f7f71;
+    flex: 0 0 auto;
   }
 
   input {
     flex: 1;
-    border: none;
-    background: none;
-    outline: none;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: #2a201b;
     font: inherit;
-    font-size: 0.9rem;
-    color: #1e293b;
 
-    &::placeholder { color: #94a3b8; }
+    &:focus {
+      outline: none;
+    }
+  }
+}
+
+.clear-search {
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(232, 119, 34, 0.08);
+  color: #d96500;
+  cursor: pointer;
+  transition: transform 0.18s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+}
+
+.toolbar-card__stats {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.stat-pill {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 120px;
+  padding: 0.8rem 1rem;
+  border-radius: 18px;
+  background: #EB8708;
+  border: 1px solid rgba(232, 119, 34, 0.1);
+
+  strong {
+    color: #2c211c;
+    font-size: 1.1rem;
   }
 
-  .clear-btn {
-    border: none;
-    background: none;
-    color: #94a3b8;
-    cursor: pointer;
-    padding: 2px;
-    display: flex;
-    border-radius: 50%;
-    transition: all 0.15s;
+  span {
+    color: #8b7b6e;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+}
 
-    &:hover {
-      background: rgba(244, 124, 0, 0.1);
-      color: #f47c00;
-    }
+.stat-pill--primary {
+  background: linear-gradient(135deg, rgba(232, 119, 34, 0.14), rgba(255, 255, 255, 0.96));
+  border-color: rgba(232, 119, 34, 0.18);
 
-    mat-icon { font-size: 16px; width: 16px; height: 16px; }
+  strong {
+    color: #b25716;
   }
 }
 

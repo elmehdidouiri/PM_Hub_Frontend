@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 // Shared Components
 import { ErrorDialogComponent } from './components/error-dialog/error-dialog.component';
+import { ConfirmationDialog } from './components/confirmation-dialog/confirmation-dialog';
 
 const MATERIAL_MODULES = [
   MatButtonModule,
@@ -21,6 +22,9 @@ const MATERIAL_MODULES = [
 
  
 @NgModule({
+  declarations: [
+    ConfirmationDialog
+  ],
   imports: [
     CommonModule,
     ...MATERIAL_MODULES,
@@ -29,7 +33,8 @@ const MATERIAL_MODULES = [
   exports: [
     CommonModule,
     ...MATERIAL_MODULES,
-    ErrorDialogComponent
+    ErrorDialogComponent,
+    ConfirmationDialog
   ]
 })
 export class SharedModule { }

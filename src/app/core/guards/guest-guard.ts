@@ -19,19 +19,16 @@ export const guestGuard: CanActivateFn = (route, state) => {
   return authService.isReady$.pipe(
     filter(ready => ready === true),
     take(1),
-    switchMap(() => {
-      if (authService.isAuthenticated()) {
-        return of(router.parseUrl(returnUrl));
+    map(() => {
+      // If NOT authenticated, allow access to login/register
+      if (!authService.isAuthenticated()) {
+        return true;
       }
 
-      if (authService.getRefreshToken()) {
-        return authService.refreshAccessToken().pipe(
-          map((): UrlTree => router.parseUrl(returnUrl)),
-          catchError(() => of(true))
-        );
-      }
-
-      return of(true);
+      // If authenticated, redirect to dashboard or returnUrl
+      // Safe check: if returnUrl points to login, go to dashboard instead
+      const safeReturnUrl = returnUrl.includes('/auth/login') ? '/dashboard' : returnUrl;
+      return router.parseUrl(safeReturnUrl);
     })
   );
 };

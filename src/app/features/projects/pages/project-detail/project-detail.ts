@@ -1,9 +1,12 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { catchError, of } from 'rxjs';
 
 import {
   ProcessStatus,
   ProjectDto,
+  ProjectFileDto,
+  ProjectFileType,
   ProjectType,
   ProjectManagementType,
   ProjectPhase,
@@ -11,6 +14,7 @@ import {
   StrategicCriterionScore,
   StrategicCriterionType,
 } from '../../models';
+import { ProjectFilesApiService } from '../../../../core/services/project-files-api.service';
 
 @Component({
   selector: 'app-project-detail',
@@ -73,15 +77,37 @@ export class ProjectDetail implements OnInit {
     [StrategicCriterionType.SustainabilityESG]: 'Sustainability / ESG',
   };
 
+  readonly requiredProjectFileTypes: Array<{ value: ProjectFileType; label: string }> = [
+    { value: ProjectFileType.BRD, label: 'BRD' },
+    { value: ProjectFileType.FDD, label: 'FDD' },
+    { value: ProjectFileType.PROCESS, label: 'PROCESS' },
+    { value: ProjectFileType.UAT, label: 'UAT' },
+    { value: ProjectFileType.RiskAssessment, label: 'RiskAssessment' },
+    { value: ProjectFileType.Timeline, label: 'Timeline' },
+    { value: ProjectFileType.StrategicEvaluation, label: 'StrategicEvaluation' },
+    { value: ProjectFileType.OnePager, label: 'OnePager' },
+    { value: ProjectFileType.SharePoint, label: 'SharePoint' },
+    { value: ProjectFileType.SAPApproval, label: 'SAPApproval' },
+    { value: ProjectFileType.Compliance, label: 'Compliance' },
+  ];
+
   project?: ProjectDto;
+  projectFiles: ProjectFileDto[] = [];
+  isLoadingFiles = false;
+  fileLoadError = '';
 
   constructor(
     private readonly route: ActivatedRoute,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly projectFilesApi: ProjectFilesApiService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
     this.project = this.route.snapshot.data['project'] as ProjectDto | undefined;
+    if (this.project?.id) {
+      this.loadProjectFiles(this.project.id);
+    }
   }
 
   backToList(): void {
@@ -140,6 +166,114 @@ export class ProjectDetail implements OnInit {
     return 'advanced';
   }
 
+  getInitials(value: string | null | undefined): string {
+    const words = (value || 'Project')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    return words
+      .slice(0, 2)
+      .map((word) => word.charAt(0).toUpperCase())
+      .join('') || 'P';
+  }
+
+  getResourceTotal(project: ProjectDto): number {
+    return (project.projectResources || []).reduce((total, resource) => {
+      const explicitTotal = Number(resource.totalCost);
+      if (Number.isFinite(explicitTotal) && explicitTotal > 0) {
+        return total + explicitTotal;
+      }
+
+      return total + (Number(resource.pricePerUnit) || 0) * (Number(resource.quantity) || 0);
+    }, 0);
+  }
+
+  getDueDateHint(project: ProjectDto): string {
+    if (!project.estimatedDueDate) {
+      return '(vide)';
+    }
+
+    const due = new Date(project.estimatedDueDate);
+    if (Number.isNaN(due.getTime())) {
+      return 'Invalid due date';
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    const days = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+
+    if (days < 0) {
+      return `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`;
+    }
+
+    if (days === 0) {
+      return 'Due today';
+    }
+
+    return `${days} day${days === 1 ? '' : 's'} remaining`;
+  }
+
+  getStrategicAverage(project: ProjectDto): string {
+    const criteria = project.strategicCriteria || [];
+    if (!criteria.length) {
+      return '(vide)';
+    }
+
+    const average = criteria.reduce((total, item) => total + (Number(item.score) || 0), 0) / criteria.length;
+    return `${Math.round(average * 10) / 10}/10`;
+  }
+
+  getStrategicScorePercent(score: number | null): number {
+    const value = Number(score ?? 0);
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(100, (value / 10) * 100));
+  }
+
+  getRecordLabel(value: unknown): string {
+    if (!value || typeof value !== 'object') {
+      return this.displayValue(value);
+    }
+
+    const record = value as Record<string, unknown>;
+    const label =
+      this.readString(record, ['name', 'title', 'label', 'description', 'currentState', 'roadblock', 'summary']);
+
+    return label || 'Item';
+  }
+
+  getRecordMeta(value: unknown): string {
+    if (!value || typeof value !== 'object') {
+      return '';
+    }
+
+    const record = value as Record<string, unknown>;
+    return (
+      this.readString(record, ['statusLabel', 'phaseLabel', 'fileTypeLabel', 'roleName', 'typeLabel']) ||
+      this.readString(record, ['createdAt', 'updatedAt', 'joinedAt'])
+    );
+  }
+
+  displayValue(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '(vide)';
+    }
+
+    if (typeof value === 'string') {
+      return value.trim() || '(vide)';
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? String(value) : '(vide)';
+    }
+
+    return String(value) || '(vide)';
+  }
+
   splitTextItems(value: string | null | undefined): string[] {
     if (!value) {
       return [];
@@ -175,7 +309,7 @@ export class ProjectDetail implements OnInit {
     }
     const label = project.projectManagementTypeLabel;
     if (label && label.toLowerCase() !== 'development') return label;
-    return value !== undefined && value !== null ? `Category ${value}` : 'N/A';
+    return value !== undefined && value !== null ? `Category ${value}` : '(vide)';
   }
 
   getProjectTypeLabel(project: ProjectDto): string {
@@ -185,7 +319,7 @@ export class ProjectDetail implements OnInit {
     }
     const label = project.projectTypeLabel;
     if (label && label.toLowerCase() !== 'development') return label;
-    return value !== undefined && value !== null ? `Type ${value}` : 'N/A';
+    return value !== undefined && value !== null ? `Type ${value}` : '(vide)';
   }
 
   getStrategicCriterionLabel(type: number): string {
@@ -194,7 +328,7 @@ export class ProjectDetail implements OnInit {
 
   getStrategicScoreLabel(score: number | null): string {
     if (score === null || score === undefined) {
-      return 'N/A';
+      return '(vide)';
     }
     if (score === StrategicCriterionScore.Low) {
       return 'Low (1)';
@@ -214,5 +348,68 @@ export class ProjectDetail implements OnInit {
       return false;
     }
     return name.toLowerCase() !== 'n/a';
+  }
+
+  getProjectKpis(project: ProjectDto): ProjectDto['KPIs'] {
+    return project.kpis ?? project.KPIs ?? project.kpIs ?? [];
+  }
+
+  getDocumentCompletionCount(): number {
+    const present = new Set(this.projectFiles.map((file) => this.normalizeFileTypeLabel(file)));
+    return this.requiredProjectFileTypes.filter((type) => present.has(type.label.toLowerCase())).length;
+  }
+
+  getMissingProjectFileTypes(): string[] {
+    const present = new Set(this.projectFiles.map((file) => this.normalizeFileTypeLabel(file)));
+    return this.requiredProjectFileTypes
+      .filter((type) => !present.has(type.label.toLowerCase()))
+      .map((type) => type.label);
+  }
+
+  hasProjectFileType(label: string): boolean {
+    const normalized = label.toLowerCase();
+    return this.projectFiles.some((file) => this.normalizeFileTypeLabel(file) === normalized);
+  }
+
+  private loadProjectFiles(projectId: string): void {
+    this.isLoadingFiles = true;
+    this.fileLoadError = '';
+    this.projectFilesApi
+      .list(projectId)
+      .pipe(
+        catchError(() => {
+          this.fileLoadError = 'Unable to load project files.';
+          return of([] as unknown[]);
+        })
+      )
+      .subscribe((files) => {
+        this.projectFiles = [...(files as ProjectFileDto[])];
+        this.isLoadingFiles = false;
+        this.cdr.detectChanges();
+      });
+  }
+
+  private normalizeFileTypeLabel(file: ProjectFileDto): string {
+    const label = (file.fileTypeLabel || '').trim();
+    if (label) {
+      return label.toLowerCase();
+    }
+
+    const enumLabel = this.requiredProjectFileTypes.find((type) => type.value === file.fileType)?.label || '';
+    return enumLabel.toLowerCase();
+  }
+
+  private readString(record: Record<string, unknown>, keys: string[]): string {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return String(value);
+      }
+    }
+
+    return '';
   }
 }

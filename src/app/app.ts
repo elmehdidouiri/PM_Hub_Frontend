@@ -28,6 +28,10 @@ export class App implements OnInit {
     return this.authService.isReady$;
   }
 
+  get isAuthenticating$() {
+    return this.authService.isAuthenticating$;
+  }
+
   logout() {
     this.authService.logout();
   }

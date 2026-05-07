@@ -1,9 +1,14 @@
 import { Component, HostListener, OnInit } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin, of, catchError } from 'rxjs';
+import { Observable, forkJoin, of, catchError, map } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
 
 import { NotificationService } from '../../../../core/services/notification.service';
+import {
+  ConfirmationDialog,
+  ConfirmationDialogResult,
+} from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import {
   CreateProjectDto,
   ProcessStatus,
@@ -26,11 +31,13 @@ import { ProjectService } from '../../services/project';
   styleUrls: ['./project-form.scss'],
 })
 export class ProjectForm implements OnInit {
+  private readonly draftStorageKey = 'pmhub.project.create.draft';
   protected readonly ProcessStatus = ProcessStatus;
   protected readonly ProjectPhase = ProjectPhase;
   protected readonly ProjectStatus = ProjectStatus;
+  protected readonly ProjectFileType = ProjectFileType;
   isSubmitting = false;
-  stepperOrientation: 'horizontal' | 'vertical' = 'horizontal';
+  stepperOrientation: 'horizontal' | 'vertical' = 'vertical';
   references: ProjectReferenceData = {
     departments: [],
     plants: [],
@@ -52,11 +59,11 @@ export class ProjectForm implements OnInit {
   ];
 
   readonly projectManagementTypeOptions = [
-    { value: ProjectManagementType.DigitalOperation,      label: 'Digital Operation' },
-    { value: ProjectManagementType.DigitalSolution,       label: 'Digital Solution' },
-    { value: ProjectManagementType.Infrastructure,        label: 'Infrastructure' },
+    { value: ProjectManagementType.DigitalOperation, label: 'Digital Operation' },
+    { value: ProjectManagementType.DigitalSolution, label: 'Digital Solution' },
+    { value: ProjectManagementType.Infrastructure, label: 'Infrastructure' },
     { value: ProjectManagementType.ProcessSimplification, label: 'Process Simplification' },
-    { value: ProjectManagementType.Other,                 label: 'Other' },
+    { value: ProjectManagementType.Other, label: 'Other' },
   ];
   readonly phaseOptions = Object.values(ProjectPhase).filter((v) => typeof v === 'number');
   readonly statusOptions = Object.values(ProjectStatus).filter((v) => typeof v === 'number');
@@ -66,7 +73,13 @@ export class ProjectForm implements OnInit {
   readonly budgetDraft: FormGroup;
   readonly roadblockDraft: FormControl<string>;
   readonly businessUnitDraft: FormControl<string>;
+  readonly technologyDraft: FormControl<string>;
+  readonly solutionDomainDraft: FormControl<string>;
+  readonly fileTypeDraft: FormControl<ProjectFileType | null>;
+  readonly fileDescriptionDraft: FormControl<string>;
   readonly wizardForm: FormGroup;
+  pendingProjectFile: File | null = null;
+  private submittedSuccessfully = false;
 
   constructor(
     private readonly fb: FormBuilder,
@@ -74,21 +87,28 @@ export class ProjectForm implements OnInit {
     private readonly referenceService: ProjectReferenceService,
     private readonly notificationService: NotificationService,
     private readonly router: Router,
-    private readonly route: ActivatedRoute
+    private readonly route: ActivatedRoute,
+    private readonly dialog: MatDialog
   ) {
     this.memberDraft = this.fb.group({
       userId: this.fb.nonNullable.control('', Validators.required),
       role: this.fb.nonNullable.control('', Validators.required),
+      roleId: this.fb.nonNullable.control('', Validators.required),
     });
 
     this.budgetDraft = this.fb.group({
       itemName: this.fb.nonNullable.control('', Validators.required),
       pricePerUnit: this.fb.control<number | null>(null, [Validators.required, Validators.min(0)]),
       quantity: this.fb.control<number | null>(null, [Validators.required, Validators.min(1)]),
+      costCenter: this.fb.nonNullable.control('', Validators.required),
     });
 
     this.roadblockDraft = this.fb.nonNullable.control('');
     this.businessUnitDraft = this.fb.nonNullable.control('');
+    this.technologyDraft = this.fb.nonNullable.control('');
+    this.solutionDomainDraft = this.fb.nonNullable.control('');
+    this.fileTypeDraft = this.fb.control<ProjectFileType | null>(null, Validators.required);
+    this.fileDescriptionDraft = this.fb.nonNullable.control('');
 
     this.wizardForm = this.fb.group({
       step1: this.fb.group({
@@ -109,6 +129,7 @@ export class ProjectForm implements OnInit {
         businessUnitIds: this.fb.nonNullable.control<string[]>([], Validators.minLength(1)),
         plantName: this.fb.nonNullable.control(''),
         departmentId: this.fb.nonNullable.control('', Validators.required),
+        costCenter: this.fb.nonNullable.control('', Validators.required),
         costSaving: this.fb.control<number | null>(null, Validators.min(0)),
       }),
       step4: this.fb.group({
@@ -142,6 +163,8 @@ export class ProjectForm implements OnInit {
         currentState: this.fb.nonNullable.control(''),
         nextSteps: this.fb.nonNullable.control(''),
         enhancements: this.fb.nonNullable.control(''),
+        codeSourceLink: this.fb.nonNullable.control(''),
+        solutionLink: this.fb.nonNullable.control(''),
         roadblocks: this.fb.array<FormControl<string>>([]),
       }),
       step10: this.fb.group({
@@ -155,7 +178,7 @@ export class ProjectForm implements OnInit {
   dateValidator(group: AbstractControl): { [key: string]: any } | null {
     const step5 = (group as FormGroup).get('step5');
     if (!step5) return null;
-    
+
     const start = step5.get('startDate')?.value;
     const end = step5.get('endDate')?.value;
     const estimated = step5.get('estimatedDueDate')?.value;
@@ -167,7 +190,7 @@ export class ProjectForm implements OnInit {
       errors['endDateInvalid'] = true;
       hasError = true;
     }
-    
+
     if (start && estimated && new Date(estimated) < new Date(start)) {
       errors['estimatedDateInvalid'] = true;
       hasError = true;
@@ -193,33 +216,66 @@ export class ProjectForm implements OnInit {
 
   onFileSelected(event: any): void {
     const files: FileList = event.target.files;
-    if (files && files.length > 0) {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        this.projectFiles.push({
-          file: file,
-          fileType: ProjectFileType.BRD,
-          fileName: file.name
-        });
-      }
+    this.pendingProjectFile = files && files.length > 0 ? files[0] : null;
+  }
+
+  addProjectFile(fileInput?: HTMLInputElement): void {
+    if (this.fileTypeDraft.invalid || !this.pendingProjectFile) {
+      this.fileTypeDraft.markAsTouched();
+      return;
+    }
+
+    if (this.isProjectFileTypeSelected(this.fileTypeDraft.value)) {
+      this.fileTypeDraft.setErrors({ duplicateFileType: true });
+      this.fileTypeDraft.markAsTouched();
+      this.notificationService.showWarning('Only one project file is allowed for each document type.');
+      return;
+    }
+
+    this.projectFiles.push({
+      file: this.pendingProjectFile,
+      fileType: this.fileTypeDraft.value as ProjectFileType,
+      description: this.fileDescriptionDraft.value.trim() || undefined,
+      fileName: this.pendingProjectFile.name,
+    });
+
+    this.pendingProjectFile = null;
+    this.fileTypeDraft.reset(null);
+    this.fileDescriptionDraft.reset('');
+    if (fileInput) {
+      fileInput.value = '';
     }
   }
 
   removeFile(index: number): void {
     this.projectFiles.splice(index, 1);
+    this.fileTypeDraft.updateValueAndValidity();
   }
 
   ngOnInit(): void {
     this.updateStepperOrientation();
     this.loadReferences();
+    this.restoreDraft();
     this.updateDynamicValidators();
     this.step1Group.controls['projectManagementType'].valueChanges.subscribe(() => this.updateDynamicValidators());
     this.step1Group.controls['projectType'].valueChanges.subscribe(() => this.updateDynamicValidators());
+    this.memberDraft.controls['userId'].valueChanges.subscribe((userId) => this.syncMemberRole(userId));
   }
 
   @HostListener('window:resize')
   onWindowResize(): void {
     this.updateStepperOrientation();
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (!this.hasUnsavedChanges()) {
+      return;
+    }
+
+    this.saveDraft(false);
+    event.preventDefault();
+    event.returnValue = '';
   }
 
   get step1Group(): FormGroup {
@@ -265,6 +321,17 @@ export class ProjectForm implements OnInit {
     return this.step9Group.controls['roadblocks'] as FormArray<FormControl<string>>;
   }
 
+  get strategicScoreTotal(): number {
+    return Object.values(this.step6Group.getRawValue()).reduce<number>(
+      (total, value) => total + (Number(value) || 0),
+      0
+    );
+  }
+
+  get strategicScoreAverage(): number {
+    return Math.round((this.strategicScoreTotal / 8) * 10) / 10;
+  }
+
   get showParentProject(): boolean {
     const value = this.step1Group.controls['projectType'].value as ProjectType;
     return value === ProjectType.NewPhase || value === ProjectType.Extension || value === ProjectType.Sustain;
@@ -286,7 +353,11 @@ export class ProjectForm implements OnInit {
       return;
     }
     this.teamMembers.push(this.fb.group(this.memberDraft.getRawValue()));
-    this.memberDraft.reset({ userId: '', role: '' });
+    this.memberDraft.reset({ userId: '', role: '', roleId: '' });
+  }
+
+  userLabel(userId: string): string {
+    return this.references.users.find((user) => user.id === userId)?.label || userId;
   }
 
   removeTeamMember(index: number): void {
@@ -299,7 +370,7 @@ export class ProjectForm implements OnInit {
       return;
     }
     this.budgetItems.push(this.fb.group(this.budgetDraft.getRawValue()));
-    this.budgetDraft.reset({ itemName: '', pricePerUnit: null, quantity: null });
+    this.budgetDraft.reset({ itemName: '', pricePerUnit: null, quantity: null, costCenter: '' });
   }
 
   removeBudgetItem(index: number): void {
@@ -328,6 +399,64 @@ export class ProjectForm implements OnInit {
     this.step3Group.controls['businessUnitIds'].setValue(next);
     this.step3Group.controls['businessUnitIds'].markAsDirty();
     this.step3Group.controls['businessUnitIds'].updateValueAndValidity();
+  }
+
+  get selectedTechnologies(): SelectOption[] {
+    const ids = this.step4Group.controls['technologyIds'].value ?? [];
+    const selected = new Set(ids);
+    return this.references.technologies.filter((technology) => selected.has(technology.id));
+  }
+
+  get selectedSolutionDomains(): SelectOption[] {
+    const ids = this.step4Group.controls['solutionDomainIds'].value ?? [];
+    const selected = new Set(ids);
+    return this.references.solutionDomains.filter((solution) => selected.has(solution.id));
+  }
+
+  addTechnology(): void {
+    const selectedId = this.technologyDraft.value;
+    if (!selectedId) {
+      return;
+    }
+
+    const current = this.step4Group.controls['technologyIds'].value ?? [];
+    if (!current.includes(selectedId)) {
+      this.step4Group.controls['technologyIds'].setValue([...current, selectedId]);
+      this.step4Group.controls['technologyIds'].markAsDirty();
+      this.step4Group.controls['technologyIds'].updateValueAndValidity();
+    }
+
+    this.technologyDraft.setValue('');
+  }
+
+  removeTechnology(id: string): void {
+    const current = this.step4Group.controls['technologyIds'].value ?? [];
+    this.step4Group.controls['technologyIds'].setValue(current.filter((item: string) => item !== id));
+    this.step4Group.controls['technologyIds'].markAsDirty();
+    this.step4Group.controls['technologyIds'].updateValueAndValidity();
+  }
+
+  addSolutionDomain(): void {
+    const selectedId = this.solutionDomainDraft.value;
+    if (!selectedId) {
+      return;
+    }
+
+    const current = this.step4Group.controls['solutionDomainIds'].value ?? [];
+    if (!current.includes(selectedId)) {
+      this.step4Group.controls['solutionDomainIds'].setValue([...current, selectedId]);
+      this.step4Group.controls['solutionDomainIds'].markAsDirty();
+      this.step4Group.controls['solutionDomainIds'].updateValueAndValidity();
+    }
+
+    this.solutionDomainDraft.setValue('');
+  }
+
+  removeSolutionDomain(id: string): void {
+    const current = this.step4Group.controls['solutionDomainIds'].value ?? [];
+    this.step4Group.controls['solutionDomainIds'].setValue(current.filter((item: string) => item !== id));
+    this.step4Group.controls['solutionDomainIds'].markAsDirty();
+    this.step4Group.controls['solutionDomainIds'].updateValueAndValidity();
   }
 
   addRoadblock(): void {
@@ -360,12 +489,14 @@ export class ProjectForm implements OnInit {
     });
 
     const payload = this.buildCreatePayload();
-    
+
     this.projectService.createProject(payload).subscribe({
       next: (project) => {
+        this.submittedSuccessfully = true;
+        this.clearDraft(false);
         // Upload files if any
         if (this.projectFiles.length > 0) {
-          const uploadTasks = this.projectFiles.map(fileData => 
+          const uploadTasks = this.projectFiles.map(fileData =>
             this.projectService.uploadProjectFile(project.id, fileData).pipe(
               catchError(err => {
                 console.error('File upload failed:', err);
@@ -400,6 +531,83 @@ export class ProjectForm implements OnInit {
     return !!control && control.invalid && (control.dirty || control.touched);
   }
 
+  isProjectFileTypeSelected(fileType: ProjectFileType | null): boolean {
+    return fileType !== null && this.projectFiles.some((file) => file.fileType === fileType);
+  }
+
+  strategicCriterionError(controlName: string): string {
+    const control = this.step6Group.get(controlName);
+    if (!this.isInvalid(control)) {
+      return '';
+    }
+
+    if (control?.errors?.['required']) {
+      return 'This score is required.';
+    }
+
+    if (control?.errors?.['min'] || control?.errors?.['max']) {
+      return 'Enter a score between 0 and 10.';
+    }
+
+    return 'Invalid score.';
+  }
+
+  projectFileTypeError(): string {
+    if (!this.isInvalid(this.fileTypeDraft)) {
+      return '';
+    }
+
+    if (this.fileTypeDraft.errors?.['duplicateFileType']) {
+      return 'This document type already has a file.';
+    }
+
+    if (this.fileTypeDraft.errors?.['required']) {
+      return 'Document type is required before attaching a file.';
+    }
+
+    return 'Invalid document type.';
+  }
+
+  hasUnsavedChanges(): boolean {
+    return !this.submittedSuccessfully && (this.wizardForm.dirty || this.projectFiles.length > 0 || !!this.pendingProjectFile);
+  }
+
+  confirmDiscardOrSave(): Observable<boolean> | boolean {
+    if (!this.hasUnsavedChanges()) {
+      return true;
+    }
+
+    return this.dialog
+      .open<ConfirmationDialog, unknown, ConfirmationDialogResult>(ConfirmationDialog, {
+        panelClass: 'pm-dialog-panel',
+        disableClose: true,
+        data: {
+          title: 'Project draft not finished',
+          message:
+            'You have an unfinished project creation. Save it as a draft, discard it, or continue editing before doing something else.',
+          saveLabel: 'Save draft',
+          discardLabel: 'Discard draft',
+          cancelLabel: 'Continue editing',
+        },
+      })
+      .afterClosed()
+      .pipe(
+        map((result) => {
+          if (result === 'save') {
+            this.saveDraft(true);
+            return true;
+          }
+
+          if (result === 'discard') {
+            this.clearDraft(true);
+            return true;
+          }
+
+          return false;
+        })
+      );
+  }
+
   private buildCreatePayload(): any {
     const step1 = this.step1Group.getRawValue();
     const step2 = this.step2Group.getRawValue();
@@ -407,7 +615,7 @@ export class ProjectForm implements OnInit {
     const step4 = this.step4Group.getRawValue();
     const step5 = this.step5Group.getRawValue();
     const step6 = this.step6Group.getRawValue();
-    const step10 = this.step10Group.getRawValue();
+    const step9 = this.step9Group.getRawValue();
 
     return {
       projectManagementType: step1.projectManagementType as ProjectManagementType,
@@ -421,10 +629,11 @@ export class ProjectForm implements OnInit {
       businessUnitIds: step3.businessUnitIds ?? [],
       plantName: this.emptyToNull(step3.plantName),
       departmentId: step3.departmentId,
+      costCenter: this.emptyToNull(step3.costCenter),
       costSaving: this.numberOrNull(step3.costSaving),
       technologyIds: step4.technologyIds ?? [],
       solutionDomainIds: step4.solutionDomainIds ?? [],
-      startDate: this.toApiDate(step5.startDate)!,
+      startDate: this.toApiDate(step5.startDate) as string,
       endDate: this.toApiDate(step5.endDate),
       estimatedDueDate: this.toApiDate(step5.estimatedDueDate),
       estimatedHours: this.numberOrNull(step5.estimatedHours),
@@ -442,19 +651,106 @@ export class ProjectForm implements OnInit {
       teamMembers: this.teamMembers.getRawValue().map((item) => ({
         userId: String(item['userId']),
         role: String(item['role']).trim(),
+        roleId: String(item['roleId'] || this.roleIdForUser(String(item['userId']))).trim(),
       })),
       budgetItems: this.budgetItems.getRawValue().map((item) => ({
         itemName: String(item['itemName']).trim(),
         pricePerUnit: Number(item['pricePerUnit']),
         quantity: Number(item['quantity']),
+        costCenter: String(item['costCenter']).trim(),
       })),
-      currentState: this.emptyToNull(step10.currentState),
-      nextSteps: this.emptyToNull(step10.nextSteps),
-      enhancements: this.emptyToNull(step10.enhancements),
+      currentState: this.emptyToNull(step9.currentState),
+      nextSteps: this.emptyToNull(step9.nextSteps),
+      enhancements: this.emptyToNull(step9.enhancements),
+      codeSourceLink: this.emptyToNull(step9.codeSourceLink),
+      solutionLink: this.emptyToNull(step9.solutionLink),
       roadblocks: this.roadblocks.getRawValue().map((rb) => rb.trim()).filter(Boolean),
       parentProjectId: this.showParentProject ? step1.parentProjectId || null : null,
       processStatus: this.showProcessStatus ? (step1.processStatus as ProcessStatus | null) : null,
     };
+  }
+
+  private syncMemberRole(userId: string): void {
+    const selectedUser = this.references.users.find((user) => user.id === userId);
+    this.memberDraft.controls['role'].setValue(selectedUser?.roleName || '');
+    this.memberDraft.controls['roleId'].setValue(this.roleIdForUser(userId));
+  }
+
+  private roleIdForUser(userId: string): string {
+    const selectedUser = this.references.users.find((user) => user.id === userId);
+    if (!selectedUser) {
+      return '';
+    }
+
+    if (selectedUser.roleId) {
+      return selectedUser.roleId;
+    }
+
+    const roleName = (selectedUser.roleName || '').toLowerCase();
+    return this.references.roles.find((role) => role.label.toLowerCase() === roleName)?.id || '';
+  }
+
+  private saveDraft(showNotification: boolean): void {
+    const draft = {
+      savedAt: new Date().toISOString(),
+      form: this.wizardForm.getRawValue(),
+      teamMembers: this.teamMembers.getRawValue(),
+      budgetItems: this.budgetItems.getRawValue(),
+      roadblocks: this.roadblocks.getRawValue(),
+    };
+
+    localStorage.setItem(this.draftStorageKey, JSON.stringify(draft));
+    if (showNotification) {
+      this.notificationService.showSuccess('Project draft saved.');
+    }
+  }
+
+  private clearDraft(showNotification: boolean): void {
+    localStorage.removeItem(this.draftStorageKey);
+    this.wizardForm.markAsPristine();
+    this.pendingProjectFile = null;
+    this.projectFiles = [];
+    if (showNotification) {
+      this.notificationService.showInfo('Project draft discarded.');
+    }
+  }
+
+  private restoreDraft(): void {
+    const rawDraft = localStorage.getItem(this.draftStorageKey);
+    if (!rawDraft) {
+      return;
+    }
+
+    try {
+      const draft = JSON.parse(rawDraft) as {
+        form?: Record<string, any>;
+        teamMembers?: Array<Record<string, unknown>>;
+        budgetItems?: Array<Record<string, unknown>>;
+        roadblocks?: string[];
+      };
+
+      if (draft.form) {
+        this.wizardForm.patchValue(draft.form, { emitEvent: false });
+      }
+
+      this.teamMembers.clear();
+      (draft.teamMembers || []).forEach((member) => this.teamMembers.push(this.fb.group(member)));
+
+      this.budgetItems.clear();
+      (draft.budgetItems || []).forEach((item) => this.budgetItems.push(this.fb.group(item)));
+
+      this.roadblocks.clear();
+      (draft.roadblocks || []).forEach((roadblock) => {
+        if (roadblock) {
+          this.roadblocks.push(this.fb.nonNullable.control(String(roadblock)));
+        }
+      });
+
+      this.wizardForm.markAsPristine();
+      this.notificationService.showInfo('Saved project draft restored.');
+    } catch {
+      localStorage.removeItem(this.draftStorageKey);
+    }
   }
 
   private loadReferences(): void {

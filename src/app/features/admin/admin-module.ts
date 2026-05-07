@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDialogModule } from '@angular/material/dialog';
 
 import { SharedModule } from '../../shared/shared.module';
 import { AdminRoutingModule } from './admin-routing-module';
@@ -11,7 +12,7 @@ import { UserApprovalsPage } from './pages/user-approvals/user-approvals';
 
 @NgModule({
   declarations: [RolesAdminPage, ReferenceAdminPage, UserApprovalsPage],
-  imports: [CommonModule, SharedModule, FormsModule, ReactiveFormsModule, MatIconModule, AdminRoutingModule],
+  imports: [CommonModule, SharedModule, FormsModule, ReactiveFormsModule, MatIconModule, MatDialogModule, AdminRoutingModule],
 })
 export class AdminModule {}
 

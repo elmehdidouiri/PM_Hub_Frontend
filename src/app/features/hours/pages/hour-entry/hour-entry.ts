@@ -1,4 +1,6 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { catchError, finalize, of } from 'rxjs';
@@ -26,6 +28,7 @@ export class HourEntry implements OnInit {
   private readonly hours = inject(Hour);
   private readonly fb = inject(FormBuilder);
   private readonly notifications = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
   private readonly zone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -338,6 +341,31 @@ export class HourEntry implements OnInit {
   }
 
   removeInternSelection(internAllocationId: string): void {
+    const intern = this.selectedInterns.find(i => i.internAllocationId === internAllocationId);
+    if (!intern) return;
+
+    const data: ConfirmationDialogData = {
+      title: 'Remove Intern Supervision',
+      message: `Are you sure you want to remove the supervision hours for ${intern.internName}?`,
+      icon: 'person_remove',
+      saveLabel: 'Remove',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result === 'save') {
+        this.executeRemoveIntern(internAllocationId);
+      }
+    });
+  }
+
+  private executeRemoveIntern(internAllocationId: string): void {
     this.selectedInterns = this.selectedInterns.filter((intern) => intern.internAllocationId !== internAllocationId);
 
     if (this.selectedInternAllocationId === internAllocationId) {

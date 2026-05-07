@@ -1,0 +1,144 @@
+:host {
+  display: block;
+}
+
+.metric-card {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  background: white;
+  border: 1px solid #edf2f7;
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  min-height: 110px;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 6px; height: 100%;
+    background: #e2e8f0;
+    transition: all 0.3s ease;
+  }
+
+  &:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border-color: rgba(59, 130, 246, 0.2);
+    
+    .metric-card__icon-wrap {
+      transform: scale(1.1) rotate(5deg);
+    }
+  }
+
+  /* Tones & Gradients - Enhancing visibility and impact */
+  &[data-tone='blue'] {
+    background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+    &::before { background: #3b82f6; width: 6px; }
+    .metric-card__icon-wrap { background: #3b82f6; color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+    .metric-card__label { color: #1e40af; }
+  }
+  &[data-tone='teal'] {
+    background: linear-gradient(135deg, #ffffff 0%, #f0fdfa 100%);
+    &::before { background: #14b8a6; width: 6px; }
+    .metric-card__icon-wrap { background: #14b8a6; color: white; box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4); }
+    .metric-card__label { color: #0f766e; }
+  }
+  &[data-tone='green'] {
+    background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+    &::before { background: #10b981; width: 6px; }
+    .metric-card__icon-wrap { background: #10b981; color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
+    .metric-card__label { color: #047857; }
+  }
+  &[data-tone='orange'] {
+    background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+    &::before { background: #f59e0b; width: 6px; }
+    .metric-card__icon-wrap { background: #f59e0b; color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); }
+    .metric-card__label { color: #b45309; }
+  }
+  &[data-tone='red'] {
+    background: linear-gradient(135deg, #ffffff 0%, #fff1f2 100%);
+    &::before { background: #f43f5e; width: 6px; }
+    .metric-card__icon-wrap { background: #f43f5e; color: white; box-shadow: 0 4px 12px rgba(244, 63, 94, 0.4); }
+    .metric-card__label { color: #be123c; }
+  }
+  &[data-tone='purple'] {
+    background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%);
+    &::before { background: #8b5cf6; width: 6px; }
+    .metric-card__icon-wrap { background: #8b5cf6; color: white; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4); }
+    .metric-card__label { color: #6d28d9; }
+  }
+
+  &__icon-wrap {
+    flex-shrink: 0;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    background: #f8fafc;
+    color: #64748b;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+
+    .material-icons {
+      font-size: 28px;
+    }
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 0.25rem;
+    transition: color 0.3s ease;
+  }
+
+  &__value {
+    font-size: 1.85rem;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.15rem;
+    animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  &__note {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569; /* Darkened for visibility */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  &__delta {
+    font-weight: 800;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+
+    &--up { color: #047857; background: rgba(16, 185, 129, 0.1); }
+    &--down { color: #be123c; background: rgba(244, 63, 94, 0.1); }
+  }
+}

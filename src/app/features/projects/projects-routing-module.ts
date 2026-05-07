@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { projectManagementAdminGuard } from './guards/admin-projects.guard';
+import { projectDraftGuard } from './guards/project-draft.guard';
 import { ProjectList } from './pages/project-list/project-list';
 import { ProjectDetail } from './pages/project-detail/project-detail';
 import { ProjectForm } from './pages/project-form/project-form';
@@ -19,6 +20,7 @@ const routes: Routes = [
   {
     path: 'new',
     canActivate: [projectManagementAdminGuard],
+    canDeactivate: [projectDraftGuard],
     component: ProjectCreatePage,
     resolve: {
       refs: projectReferencesResolver,

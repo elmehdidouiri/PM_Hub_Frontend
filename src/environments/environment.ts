@@ -3,6 +3,5 @@ export const environment = {
   apiUrl: '/api',
   backendUrl: 'https://localhost:7081',
   tokenKey: 'pmhub_token',
-  refreshTokenKey: 'pmhub_refresh_token',
-  userKey: 'pmhub_user'
+  refreshTokenKey: 'pmhub_refresh_token'
 };

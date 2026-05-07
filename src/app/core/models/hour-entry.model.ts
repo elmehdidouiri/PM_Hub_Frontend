@@ -1,6 +1,4 @@
-/**
- * DTOs aligned with POST/PUT /api/hour-entries (OpenAPI).
- */
+ 
 
 export enum BookingType {
   Normal = 0,
@@ -22,6 +20,12 @@ export enum DateSelectionMode {
 
 export interface InternSupervisionDto {
   internAllocationId: string;
+  hours: number;
+}
+
+export interface DetailInternSupervisionDto {
+  internId: string;
+  internName: string;
   hours: number;
 }
 
@@ -73,7 +77,10 @@ export interface HourEntryPremiumApproveDto {
 /** Response item for GET /hour-entries/my, /my/date, /my/month, /project/{id} — extend if the API returns more fields */
 export interface HourEntryDto {
   id: string;
+  userId?: string;
+  userFullName?: string;
   projectId?: string;
+  projectName?: string;
   allocationType?: number;
   projectType?: number;
   bookingType?: number;
@@ -85,7 +92,18 @@ export interface HourEntryDto {
   rAndDHours?: number;
   workshopHours?: number;
   otherHours?: number;
+  internManagementHours?: number;
+  totalHours?: number;
+  hourlyRate?: number;
+  totalCost?: number;
+  currency?: string;
+  isPremium?: boolean;
+  premiumReason?: string | null;
+  premiumApprovalStatus?: string | null;
   notes?: string | null;
+  supervisedInterns?: DetailInternSupervisionDto[];
+  createdAt?: string;
+  updatedAt?: string | null;
 }
 
 export interface HourEntryMyProjectDto {
@@ -102,14 +120,48 @@ export interface ProjectInternAllocationDto {
 }
 
 export interface HourEntryDashboardMonthlyDto {
-  targetHours: number;
+  year?: number;
+  month?: number;
+  monthName?: string;
   loggedHours: number;
+  targetHours: number;
   variance: number;
+  totalCost?: number;
+  workingDays?: number;
+  dailyTarget?: number;
+  daysLeft?: number;
+  dailyNeeded?: number;
+  progress?: number;
+  premiumHours?: number;
+  premiumPendingHours?: number;
+  totalExecutionHours?: number;
+  totalSupervisionHours?: number;
+  totalProcessHours?: number;
+  totalManagementHours?: number;
+  totalRAndDHours?: number;
+  totalWorkshopHours?: number;
+  totalOtherHours?: number;
   totalInternManagementHours: number;
+  entries?: HourEntryDto[];
+  isOnTrack?: boolean;
+  status?: string;
 }
 
 export interface MonthlyHoursDashboardDto {
+  year: number;
   month: number;
+  monthName: string;
+  loggedHours: number;
+  targetHours: number;
+  variance: number;
+  totalCost: number;
+  workingDays: number;
+  dailyTarget: number;
+  daysLeft: number;
+  dailyNeeded: number;
+  progress: number;
+  premiumHours: number;
+  premiumPendingHours: number;
   totalExecutionHours: number;
   totalSupervisionHours: number;
   totalProcessHours: number;
@@ -118,10 +170,26 @@ export interface MonthlyHoursDashboardDto {
   totalWorkshopHours: number;
   totalOtherHours: number;
   totalInternManagementHours: number;
+  entries: HourEntryDto[];
+  isOnTrack: boolean;
+  status: string;
 }
 
 export interface YtdDashboardDto {
+  companyYear: number;
+  fiscalYearLabel: string;
+  ytdHours: number;
+  expectedHours: number;
+  variance: number;
+  projectedYearEnd: number;
+  monthlyRecommendation: number;
+  ytdCost: number;
+  premiumHours: number;
+  premiumApprovedCost: number;
+  premiumPendingHours: number;
   monthlyBreakdown: MonthlyHoursDashboardDto[];
+  completionPercentage: number;
+  performanceStatus: string;
 }
 
 export function resolveMyProjectOption(row: unknown): { projectId: string; label: string } | null {

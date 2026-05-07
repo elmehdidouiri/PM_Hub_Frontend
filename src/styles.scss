@@ -8,6 +8,27 @@
    theme so Material fields/buttons render correctly. */
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 
+/* Global Reset & Compatibility */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Standard 'appearance' for form controls (compatibility) */
+input, button, textarea {
+  appearance: auto;
+  -webkit-appearance: auto;
+}
+
+/* Custom selects explicitly opt-out of browser appearance */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* @theme is for Tailwind CSS v4 */
+/* stylelint-disable-next-line at-rule-no-unknown */
 @theme {
   --font-sans: 'Roboto', 'Helvetica Neue', sans-serif;
   --color-brand-50: #fff5ec;
@@ -28,17 +49,24 @@
   --shadow-shell: 0 18px 40px rgba(52, 37, 27, 0.08);
 }
 
-/* Global Styles */
-* {
+/* html, body styles move down */
+
+html,
+body,
+app-root,
+.app-root-shell,
+.app-shell,
+.app-layout,
+.app-layout__body {
+  width: 100% !important;
+  max-width: 100% !important;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 html,
 body {
   height: 100%;
-  max-width: 100%;
   overflow-x: hidden;
 }
 
@@ -357,4 +385,42 @@ a {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba($orange-crisp, 0.42);
+}
+
+/* ── Dashboard Filter: mat-select panel overlay ── */
+.flt-panel {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.12) !important;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  margin-top: 6px;
+  min-width: 160px !important;
+
+  .mat-mdc-option {
+    min-height: 38px;
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: #334155;
+    padding: 0 14px;
+    letter-spacing: 0.01em;
+    transition: background 0.15s ease;
+
+    &:hover:not(.mdc-list-item--disabled) {
+      background: rgba(235, 135, 8, 0.06);
+    }
+
+    &.mdc-list-item--selected:not(.mdc-list-item--disabled) {
+      background: rgba(235, 135, 8, 0.1);
+      color: #EB8708;
+      font-weight: 800;
+
+      .mdc-list-item__primary-text {
+        color: #EB8708;
+      }
+    }
+  }
+
+  .mat-mdc-option .mdc-list-item__primary-text {
+    font-family: 'Inter', 'Roboto', sans-serif;
+  }
 }

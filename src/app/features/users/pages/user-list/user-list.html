@@ -6,16 +6,7 @@
        <p>Manage collaborators, permissions and user lifecycle from a single workspace.</p>
     </div>
 
-    <div class="header-actions">
-      <a class="refresh-action refresh-action--link" routerLink="/users/new">
-        <mat-icon>person_add</mat-icon>
-        <span>Add user</span>
-      </a>
-      <button type="button" class="refresh-action" (click)="refreshUsers()" [disabled]="isRefreshing">
-        <mat-icon>{{ isRefreshing ? 'hourglass_top' : 'refresh' }}</mat-icon>
-        <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh list' }}</span>
-      </button>
-    </div>
+    
   </header>
 
   <section class="toolbar-card pm-surface">

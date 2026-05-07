@@ -11,6 +11,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { MatDialogModule } from '@angular/material/dialog';
 
 import { SharedModule } from '../../shared/shared.module';
 import { HoursRoutingModule } from './hours-routing-module';
@@ -32,6 +33,7 @@ import { HourSummary } from './pages/hour-summary/hour-summary';
     MatCheckboxModule,
     MatDatepickerModule,
     MatNativeDateModule,
+    MatDialogModule,
     HoursRoutingModule,
   ],
 })

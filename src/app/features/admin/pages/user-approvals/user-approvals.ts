@@ -1,4 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import { finalize } from 'rxjs/operators';
 
 import { AuthApprovalsApiService, PendingUserDto } from '../../../../core/services/auth-approvals-api.service';
@@ -13,6 +15,7 @@ import { NotificationService } from '../../../../core/services/notification.serv
 export class UserApprovalsPage implements OnInit {
   private readonly api = inject(AuthApprovalsApiService);
   private readonly notifications = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
   private readonly cdr = inject(ChangeDetectorRef);
 
   pendingUsers: PendingUserDto[] = [];
@@ -42,7 +45,25 @@ export class UserApprovalsPage implements OnInit {
   }
 
   reject(user: PendingUserDto): void {
-    this.processAction(user, false);
+    const data: ConfirmationDialogData = {
+      title: 'Reject Registration',
+      message: `Are you sure you want to reject the registration request from ${user.fullName || user.email}?`,
+      icon: 'person_remove',
+      saveLabel: 'Reject Request',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === 'save') {
+        this.processAction(user, false);
+      }
+    });
   }
 
   refresh(): void {

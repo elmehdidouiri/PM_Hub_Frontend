@@ -54,8 +54,15 @@ $sidebar-transition: all 0.25s cubic-bezier(0.3, 0, 0, 1);
       transition: all 0.25s cubic-bezier(0.3, 0, 0, 1);
     }
 
-    &:hover mat-icon { background: rgba($orange-crisp, 0.12); color: $orange-crisp; }
-    &--active mat-icon { background: rgba($orange-crisp, 0.14); color: $orange-crisp; }
+    &:hover mat-icon {
+      background: rgba($orange-crisp, 0.12);
+      color: $orange-crisp;
+    }
+
+    &--active mat-icon {
+      background: rgba($orange-crisp, 0.14);
+      color: $orange-crisp;
+    }
   }
 
   .sidebar__brand {
@@ -85,7 +92,7 @@ $sidebar-transition: all 0.25s cubic-bezier(0.3, 0, 0, 1);
   margin: -1.25rem -0.5rem 0;
   padding: 0 1.25rem;
   height: 80px;
-  background: $orange-crisp;
+  background: #E98300;
   color: white;
   border-bottom: none;
   box-shadow: none;
@@ -134,7 +141,9 @@ $sidebar-transition: all 0.25s cubic-bezier(0.3, 0, 0, 1);
   transition: all 0.25s cubic-bezier(0.3, 0, 0, 1);
   z-index: 10;
 
-  mat-icon { font-size: 1.1rem; }
+  mat-icon {
+    font-size: 1.1rem;
+  }
 
   &:hover {
     background: rgba($orange-crisp, 0.08);
@@ -211,12 +220,12 @@ $sidebar-transition: all 0.25s cubic-bezier(0.3, 0, 0, 1);
   grid-template-rows: 0fr;
   opacity: 0;
   padding-left: 2.25rem;
-  transition: grid-template-rows 0.25s cubic-bezier(0.3, 0, 0, 1), 
-              opacity 0.25s cubic-bezier(0.3, 0, 0, 1),
-              padding 0.25s cubic-bezier(0.3, 0, 0, 1);
+  transition: grid-template-rows 0.25s cubic-bezier(0.3, 0, 0, 1),
+    opacity 0.25s cubic-bezier(0.3, 0, 0, 1),
+    padding 0.25s cubic-bezier(0.3, 0, 0, 1);
   overflow: hidden;
 
-  & > div {
+  &>div {
     min-height: 0;
   }
 }
