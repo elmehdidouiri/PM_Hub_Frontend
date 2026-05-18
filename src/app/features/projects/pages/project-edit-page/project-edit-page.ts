@@ -1,5 +1,5 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { FormArray, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { NotificationService } from '../../../../core/services/notification.service';
@@ -81,9 +81,9 @@ export class ProjectEditPage implements OnInit {
     { value: ProjectManagementType.Other,                 label: 'Other' },
   ];
 
-  readonly phaseOptions = Object.values(ProjectPhase).filter((v) => typeof v === 'number');
-  readonly statusOptions = Object.values(ProjectStatus).filter((v) => typeof v === 'number');
-  readonly processStatusOptions = Object.values(ProcessStatus).filter((v) => typeof v === 'number');
+  readonly phaseOptions = Object.values(ProjectPhase).filter((v): v is ProjectPhase => typeof v === 'number');
+  readonly statusOptions = Object.values(ProjectStatus).filter((v): v is ProjectStatus => typeof v === 'number');
+  readonly processStatusOptions = Object.values(ProcessStatus).filter((v): v is ProcessStatus => typeof v === 'number');
 
   constructor(
     private readonly fb: FormBuilder,
@@ -97,6 +97,7 @@ export class ProjectEditPage implements OnInit {
     this.memberDraft = this.fb.group({
       userId: this.fb.nonNullable.control('', Validators.required),
       role: this.fb.nonNullable.control('', Validators.required),
+      roleId: this.fb.nonNullable.control(''),
     });
 
     this.budgetDraft = this.fb.group({
@@ -118,6 +119,7 @@ export class ProjectEditPage implements OnInit {
     }
     this.initForms();
     this.loadDeliverables();
+    this.memberDraft.controls['userId'].valueChanges.subscribe((userId) => this.syncMemberRole(userId));
   }
 
   initForms(): void {
@@ -138,6 +140,7 @@ export class ProjectEditPage implements OnInit {
       technologyIds: [this.project.technologies?.map(l => this.findReferenceId('technologies', l)) || []],
       solutionDomainIds: [this.project.solutionDomains?.map(l => this.findReferenceId('solutionDomains', l)) || []],
     });
+    this.identityForm.controls['projectManagerId'].valueChanges.subscribe((pmUserId) => this.onProjectManagerChange(pmUserId));
 
     // ── Execution State (Status & Phase) ──
     this.statusForm = this.fb.group({
@@ -145,7 +148,7 @@ export class ProjectEditPage implements OnInit {
       phase: [this.project.phase, Validators.required],
       processStatus: [this.project.processStatus],
       progressPercentage: [this.project.progressPercentage || 0, [Validators.min(0), Validators.max(100)]]
-    });
+    }, { validators: this.phaseStatusValidator });
 
     // ── Timeline & Effort ──
     this.timelineForm = this.fb.group({
@@ -188,9 +191,10 @@ export class ProjectEditPage implements OnInit {
 
     // ── Team Members ──
     this.teamForm = this.fb.group({
-      teamMembers: this.fb.array((this.project.members || []).map(m => this.fb.group({
+      teamMembers: this.fb.array((this.project.members || []).filter((m) => m.userId !== this.project.projectManagerId).map(m => this.fb.group({
         userId: [m.userId, Validators.required],
-        role: [m.roleName, Validators.required]
+        role: [m.roleName, Validators.required],
+        roleId: [m.roleId || '']
       })))
     });
 
@@ -284,6 +288,9 @@ export class ProjectEditPage implements OnInit {
     const form = this.getFormBySection(section);
     if (form && form.invalid) {
       form.markAllAsTouched();
+      if (section === 'status' && form.errors?.['invalidPhaseStatus']) {
+        this.notificationService.showWarning(this.phaseStatusError());
+      }
       return;
     }
 
@@ -344,7 +351,7 @@ export class ProjectEditPage implements OnInit {
       ...financial,
       ...context,
       strategicCriteria: strategic,
-      teamMembers: team.teamMembers,
+      teamMembers: (team.teamMembers || []).filter((member: { userId?: string }) => member.userId !== identity.projectManagerId),
       budgetItems: budget.budgetItems,
       kpIs: kpi.kpis,
       internMembers: this.parseJsonList(collections.internMembers),
@@ -370,10 +377,26 @@ export class ProjectEditPage implements OnInit {
   // ── Array CRUD ──
   addTeamMember(): void {
     if (this.memberDraft.invalid) return;
+    if (this.isProjectManager(this.memberDraft.get('userId')?.value)) {
+      this.notificationService.showWarning('The project manager is managed separately from team members.');
+      return;
+    }
     this.teamMembers.push(this.fb.group(this.memberDraft.getRawValue()));
-    this.memberDraft.reset();
+    this.memberDraft.reset({ userId: '', role: '', roleId: '' });
   }
   removeTeamMember(i: number): void { this.teamMembers.removeAt(i); }
+
+  onProjectManagerChange(pmUserId: string | null): void {
+    this.removeProjectManagerFromTeam(pmUserId);
+    if (this.isProjectManager(this.memberDraft.get('userId')?.value)) {
+      this.memberDraft.reset({ userId: '', role: '', roleId: '' });
+    }
+  }
+
+  isProjectManager(userId: string | null | undefined): boolean {
+    const pmUserId = this.identityForm?.get('projectManagerId')?.value;
+    return !!userId && !!pmUserId && userId === pmUserId;
+  }
 
   addBudgetItem(): void {
     if (this.budgetDraft.invalid) return;
@@ -444,12 +467,72 @@ export class ProjectEditPage implements OnInit {
   public getPhaseLabel(p: ProjectDto): string { return ProjectPhase[p.phase] || 'Unknown'; }
   public getEnumLabel(val: any, enumObj: any): string { return enumObj[val] || val; }
 
+  public isStatusAllowedForPhase(status: ProjectStatus, phase = this.statusForm?.get('phase')?.value): boolean {
+    if (phase === ProjectPhase.Pipeline) {
+      return status === ProjectStatus.Planned;
+    }
+
+    return true;
+  }
+
+  public phaseStatusError(): string {
+    if (!this.statusForm?.errors?.['invalidPhaseStatus']) {
+      return '';
+    }
+
+    return 'Pipeline projects must use the Planned status before they can be saved.';
+  }
+
   public getUserLabel(userId: string): string {
     const user = this.references.users.find(u => u.id === userId);
     return user ? user.label : userId;
   }
 
+  private syncMemberRole(userId: string): void {
+    const selectedUser = this.references.users.find((user) => user.id === userId);
+    this.memberDraft.get('role')?.setValue(selectedUser?.roleName || '');
+    this.memberDraft.get('roleId')?.setValue(selectedUser?.roleId || this.roleIdForUser(userId));
+  }
+
+  private roleIdForUser(userId: string): string {
+    const selectedUser = this.references.users.find((user) => user.id === userId);
+    if (!selectedUser) {
+      return '';
+    }
+
+    if (selectedUser.roleId) {
+      return selectedUser.roleId;
+    }
+
+    const roleName = (selectedUser.roleName || '').toLowerCase();
+    return this.references.roles.find((role) => role.label.toLowerCase() === roleName)?.id || '';
+  }
+
+  private removeProjectManagerFromTeam(pmUserId: string | null): void {
+    if (!pmUserId || !this.teamForm) {
+      return;
+    }
+
+    for (let index = this.teamMembers.length - 1; index >= 0; index--) {
+      if (this.teamMembers.at(index).get('userId')?.value === pmUserId) {
+        this.teamMembers.removeAt(index);
+        this.teamMembers.markAsDirty();
+      }
+    }
+  }
+
   backToDetails(): void {
     this.router.navigate(['/projects', this.project.id]);
+  }
+
+  private phaseStatusValidator(group: AbstractControl): { invalidPhaseStatus: true } | null {
+    const phase = group.get('phase')?.value as ProjectPhase | null;
+    const status = group.get('status')?.value as ProjectStatus | null;
+
+    if (phase === ProjectPhase.Pipeline && status !== null && status !== ProjectStatus.Planned) {
+      return { invalidPhaseStatus: true };
+    }
+
+    return null;
   }
 }

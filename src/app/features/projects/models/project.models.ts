@@ -357,6 +357,23 @@ export interface ProjectSummaryDto {
   progressPercentage: number | null;
   projectManagementType: ProjectManagementType;
   projectManagementTypeLabel?: string;
+  progress?: number | null;
+}
+
+export interface GroupedDistributionItem {
+  label: string;
+  id: string;
+  count: number;
+  projects: ProjectSummaryDto[];
+}
+
+export interface DashboardGroupedDistributionDto {
+  projectManagement: GroupedDistributionItem[];
+  status: GroupedDistributionItem[];
+  phases: GroupedDistributionItem[];
+  businessUnits: GroupedDistributionItem[];
+  departments: GroupedDistributionItem[];
+  plants: GroupedDistributionItem[];
 }
 
 export interface ProjectReferenceData {
@@ -560,6 +577,7 @@ export interface ProjectFilterParams {
   ProjectManagementType?: number;
   DepartmentId?: string;
   BusinessUnitId?: string;
+  PlantId?: string;
   ProjectManagerId?: string;
   PageNumber?: number;
   PageSize?: number;

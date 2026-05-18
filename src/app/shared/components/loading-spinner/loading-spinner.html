@@ -1,1 +1,9 @@
-<p>loading-spinner works!</p>
+<div class="loader-overlay" [class.full-page]="fullPage" role="status" aria-live="polite">
+  <div class="loader-content">
+    <div class="spinner-container" aria-hidden="true">
+      <div class="spinner-ring"></div>
+      <div class="spinner-core"></div>
+    </div>
+    <p class="loader-text">{{ message }}</p>
+  </div>
+</div>

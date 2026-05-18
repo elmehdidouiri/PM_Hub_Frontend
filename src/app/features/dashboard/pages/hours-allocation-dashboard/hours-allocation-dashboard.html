@@ -1,0 +1,369 @@
+<section class="allocation-page">
+  <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
+
+  <ng-container *ngIf="!isLoading">
+    <!-- APP STANDARD HEADER -->
+    <header class="allocation-header">
+      <div>
+        <span class="header-eyebrow">
+          <mat-icon>analytics</mat-icon>
+          Reporting
+        </span>
+        <h1>Hours Allocation</h1>
+        <p>Visualize and analyze time allocation and team productivity at a glance.</p>
+      </div>
+
+      <button class="reminder-button" type="button" [disabled]="isSendingReminders" (click)="sendReminders()">
+        <mat-icon>notifications_active</mat-icon>
+        {{ isSendingReminders ? 'Sending...' : 'Send Reminders' }}
+      </button>
+    </header>
+
+    <!-- INTELLIGENT FILTER SYSTEM -->
+    <section class="filter-container">
+      <div class="filter-bar">
+        <div class="filter-field">
+          <label><mat-icon>person</mat-icon> User</label>
+          <select [(ngModel)]="selectedUserId" (ngModelChange)="reload()">
+            <option [ngValue]="null">All users</option>
+            <option *ngFor="let user of filters.users" [ngValue]="user.id">{{ user.label }}</option>
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label><mat-icon>folder</mat-icon> Project</label>
+          <select [(ngModel)]="selectedProjectId" (ngModelChange)="reload()">
+            <option [ngValue]="null">All projects</option>
+            <option *ngFor="let project of filters.projects" [ngValue]="project.id">{{ project.label }}</option>
+          </select>
+        </div>
+
+        <div class="quick-select-group">
+          <span>Period</span>
+          <div class="buttons">
+            <button type="button" [class.active]="selectedQuickSelect === 'month'" (click)="selectQuick('month')">Month</button>
+            <button type="button" [class.active]="selectedQuickSelect === 'year'" (click)="selectQuick('year')">Year</button>
+            <button type="button" [class.active]="selectedQuickSelect === 'ytd'" (click)="selectQuick('ytd')">YTD</button>
+          </div>
+        </div>
+
+        <div class="filter-field">
+          <label><mat-icon>event_available</mat-icon> From</label>
+          <input type="date" [(ngModel)]="fromDate" (ngModelChange)="reload()" />
+        </div>
+
+        <div class="filter-field">
+          <label><mat-icon>event_busy</mat-icon> To</label>
+          <input type="date" [(ngModel)]="toDate" (ngModelChange)="reload()" />
+        </div>
+
+        <div class="filter-actions">
+          <button type="button" class="advanced-filters-toggle" [class.active]="showAdvancedFilters" (click)="showAdvancedFilters = !showAdvancedFilters">
+            <mat-icon>{{ showAdvancedFilters ? 'expand_less' : 'tune' }}</mat-icon>
+            {{ showAdvancedFilters ? 'Less' : 'More' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- ADVANCED FILTERS PANEL -->
+      <div class="advanced-filters-panel" *ngIf="showAdvancedFilters">
+        <div class="filter-field">
+          <label>Team Role</label>
+          <select [(ngModel)]="selectedRoleId" (ngModelChange)="reload()">
+            <option [ngValue]="null">All roles</option>
+            <option *ngFor="let role of filters.roles" [ngValue]="role.id">{{ role.label }}</option>
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label>Analysis Mode</label>
+          <select [(ngModel)]="selectedAnalysis" (ngModelChange)="reload()">
+            <option value="resourcesCapacity">Capacity</option>
+            <option value="workedDays">Worked days</option>
+            <option value="allocationDetails">Allocation details</option>
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label>Specific Year</label>
+          <select [(ngModel)]="selectedYear" (ngModelChange)="onYearChanged()">
+            <option *ngFor="let year of years" [ngValue]="year">{{ year }}</option>
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label>Specific Month</label>
+          <select [(ngModel)]="selectedMonth" (ngModelChange)="onMonthChanged()">
+            <option *ngFor="let month of months" [ngValue]="month.value">{{ month.label }}</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- MESSAGES -->
+    <div class="message message--error" *ngIf="errorMessage">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ errorMessage }}</span>
+    </div>
+    <div class="message message--success" *ngIf="successMessage">
+      <mat-icon>check_circle</mat-icon>
+      <span>{{ successMessage }}</span>
+    </div>
+
+    <ng-container *ngIf="dashboard as data">
+      <!-- SUMMARY METRICS -->
+      <section class="summary-grid">
+        <article class="summary-card" *ngFor="let card of summaryCards" [attr.data-tone]="card.tone">
+          <div class="summary-card__icon">
+            <mat-icon>{{ card.icon }}</mat-icon>
+          </div>
+          <div>
+            <span>{{ card.label }}</span>
+            <strong>{{ card.value }}</strong>
+            <small>{{ card.note }}</small>
+          </div>
+        </article>
+      </section>
+
+      <!-- DETAILED TABLE -->
+      <section class="panel">
+        <header class="panel__header">
+          <div>
+            <mat-icon>table_chart</mat-icon>
+            <strong>Detailed Allocations - {{ selectedYear }}</strong>
+          </div>
+          <div class="panel__chips">
+            <span><mat-icon>schedule</mat-icon> {{ formatHours(totalDetailedHours) }}</span>
+            <span><mat-icon>assignment</mat-icon> {{ data.details.length }} rows</span>
+          </div>
+        </header>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>User</th>
+                <th>Project</th>
+                <th>Type</th>
+                <th>Execution</th>
+                <th>Tech Lead</th>
+                <th>Process</th>
+                <th>Project Mgmt</th>
+                <th>R&amp;D</th>
+                <th>Workshop</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of data.details; trackBy: trackByDate">
+                <td>{{ formatDate(row.date) }}</td>
+                <td><mat-icon>account_circle</mat-icon>{{ row.userName }}</td>
+                <td>{{ row.projectName }}</td>
+                <td><span class="soft-pill">{{ row.type || 'Daily' }}</span></td>
+                <td>{{ formatNumber(row.executionHours) }}</td>
+                <td><span class="badge">{{ formatNumber(row.techLeadHours) }}</span></td>
+                <td>{{ formatNumber(row.processHours) }}</td>
+                <td>{{ formatNumber(row.projectManagementHours) }}</td>
+                <td>{{ formatNumber(row.researchAndDevHours) }}</td>
+                <td><span class="badge">{{ formatNumber(row.workshopHours) }}</span></td>
+                <td><span class="total-badge">{{ formatHours(row.totalHours) }}</span></td>
+              </tr>
+              <tr *ngIf="!data.details.length">
+                <td colspan="11" class="empty">No data found for this period.</td>
+              </tr>
+            </tbody>
+            <tfoot *ngIf="data.details.length">
+              <tr>
+                <td colspan="10"><strong>GRAND TOTAL</strong></td>
+                <td><span class="total-badge">{{ formatHours(totalDetailedHours) }}</span></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      <!-- MONTHLY BREAKDOWN -->
+      <section class="panel">
+        <header class="panel__header">
+          <div>
+            <mat-icon>calendar_view_month</mat-icon>
+            <strong>Monthly Breakdown</strong>
+          </div>
+        </header>
+
+        <div class="month-grid">
+          <article class="month-card" *ngFor="let month of data.monthlyBreakdown; trackBy: trackByMonth">
+            <span>{{ month.monthName }}</span>
+            <strong>{{ formatHours(month.totalHours) }}</strong>
+            <div class="progress-bar">
+              <i [style.width.%]="monthWidth(month.totalHours)"></i>
+            </div>
+            <small>{{ formatPercent(month.utilizationPercentage) }} Utilization</small>
+          </article>
+        </div>
+      </section>
+
+      <!-- HOURS BY USER -->
+      <section class="panel">
+        <header class="panel__header">
+          <div>
+            <mat-icon>groups</mat-icon>
+            <strong>Hours by User</strong>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Department</th>
+                <th>Allocated</th>
+                <th>Avail.</th>
+                <th>Utilization</th>
+                <th>Execution</th>
+                <th>Project Mgmt</th>
+                <th>R&amp;D</th>
+                <th>Projects</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of data.hoursByUser; trackBy: trackById">
+                <td><mat-icon>account_circle</mat-icon>{{ row.userName }}</td>
+                <td><span class="role-pill">{{ row.role }}</span></td>
+                <td>{{ row.department }}</td>
+                <td><span class="badge">{{ formatNumber(row.allocatedHours) }}h</span></td>
+                <td><span class="green-pill">{{ formatNumber(row.availableHours) }}h</span></td>
+                <td>
+                  <div class="mini-progress">
+                    <i [style.width.%]="row.utilizationPercentage" [style.background]="row.utilizationPercentage > 90 ? '#ef4444' : '#10b981'"></i>
+                  </div>
+                </td>
+                <td>{{ formatNumber(row.executionHours) }}</td>
+                <td>{{ formatNumber(row.projectManagementHours) }}</td>
+                <td>{{ formatNumber(row.researchAndDevHours) }}</td>
+                <td><span class="soft-pill">{{ row.projectCount }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- HOURS BY PROJECT -->
+      <section class="panel">
+        <header class="panel__header">
+          <div>
+            <mat-icon>folder</mat-icon>
+            <strong>Hours by Project</strong>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Total Hours</th>
+                <th>PM Hours</th>
+                <th>Team Hours</th>
+                <th>Team Members</th>
+                <th>Allocations</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of data.hoursByProject; trackBy: trackById">
+                <td><mat-icon>folder_open</mat-icon>{{ row.projectName }}</td>
+                <td><span class="total-badge">{{ formatNumber(row.totalHours) }}h</span></td>
+                <td><span class="badge">{{ formatNumber(row.projectManagerHours) }}h</span></td>
+                <td>{{ formatNumber(row.teamHours) }}h</td>
+                <td><span class="soft-pill">{{ row.teamMembers }}</span></td>
+                <td><span class="badge">{{ row.allocations }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <!-- HOURS BY ROLE -->
+      <section class="panel">
+        <header class="panel__header">
+          <div>
+            <mat-icon>work</mat-icon>
+            <strong>Hours by Role</strong>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>Total Hours</th>
+                <th>Members</th>
+                <th>Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of data.hoursByRole; trackBy: trackById">
+                <td><span class="role-pill">{{ row.role }}</span></td>
+                <td><span class="badge">{{ formatNumber(row.totalHours) }}h</span></td>
+                <td><span class="soft-pill">{{ row.teamMembers }}</span></td>
+                <td>
+                  <span class="percent-badge">
+                    {{ formatPercent(row.percentage) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- HOURS BY TEAM -->
+      <section class="panel">
+        <header class="panel__header">
+          <div>
+            <mat-icon>groups_2</mat-icon>
+            <strong>Team Performance</strong>
+          </div>
+          <div class="panel__chips">
+            <span><mat-icon>schedule</mat-icon> {{ formatHours(data.summary.totalHours) }}</span>
+            <span><mat-icon>calendar_today</mat-icon> {{ data.summary.workedDays }} worked days</span>
+          </div>
+        </header>
+        
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Project</th>
+                <th>Total Hours</th>
+                <th>Worked Days</th>
+                <th>Allocations</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of data.hoursByTeam; trackBy: trackById">
+                <td>
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <mat-icon>account_circle</mat-icon>
+                    {{ row.memberName }}
+                  </div>
+                </td>
+                <td><mat-icon>folder_open</mat-icon> {{ row.projectName }}</td>
+                <td><span class="total-badge" style="padding: 0.25rem 0.6rem; font-size: 0.8rem;">{{ formatNumber(row.totalHours) }}h</span></td>
+                <td><span class="day-pill">{{ row.workedDays }} days</span></td>
+                <td><span class="badge">{{ row.allocationCount }}</span></td>
+              </tr>
+              <tr *ngIf="!data.hoursByTeam.length">
+                <td colspan="5" class="empty">No team data found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </ng-container>
+  </ng-container>
+
+  <!-- REFRESH OVERLAY -->
+  <app-loading-spinner *ngIf="isRefreshing" [fullPage]="false"></app-loading-spinner>
+</section>

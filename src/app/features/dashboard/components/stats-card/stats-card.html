@@ -1,1 +1,10 @@
-<p>stats-card works!</p>
+<article class="stats-card">
+  <div class="stats-card__icon">
+    <mat-icon>{{ icon }}</mat-icon>
+  </div>
+  <div class="stats-card__content">
+    <span>{{ title }}</span>
+    <strong>{{ value }}</strong>
+    <p *ngIf="subtitle">{{ subtitle }}</p>
+  </div>
+</article>

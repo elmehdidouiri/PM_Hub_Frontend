@@ -8,11 +8,11 @@ import { catchError, finalize, of } from 'rxjs';
 import {
   AllocationFrequency,
   BookingType,
+  CategoryWork,
   CreateHourEntryDto,
   DateSelectionMode,
   InternSupervisionDto,
   ProjectInternAllocationDto,
-  ProjectManagementType,
   resolveMyProjectOption,
 } from '../../../../core/models';
 import { NotificationService } from '../../../../core/services/notification.service';
@@ -49,11 +49,12 @@ export class HourEntry implements OnInit {
   ];
 
   readonly categoryOptions = [
-    { value: ProjectManagementType.DigitalOperation,      label: 'Digital Operation' },
-    { value: ProjectManagementType.DigitalSolution,       label: 'Digital Solution' },
-    { value: ProjectManagementType.Infrastructure,        label: 'Infrastructure' },
-    { value: ProjectManagementType.ProcessSimplification, label: 'Process Simplification' },
-    { value: ProjectManagementType.Other,                 label: 'Other' },
+    { value: CategoryWork.Project,      label: 'Project' },
+    { value: CategoryWork.Holiday,       label: 'Holiday' },
+    { value: CategoryWork.Other,        label: 'Other' },
+    { value: CategoryWork.MonthlyMeeting, label: 'Monthly Meeting' },
+    { value: CategoryWork.Workshop,     label: 'Workshop' },
+
   ];
 
   readonly dateSelectionMode = DateSelectionMode;
@@ -86,7 +87,7 @@ export class HourEntry implements OnInit {
     selectedDatesText: [''],
     rangeStartDate: [''],
     rangeEndDate: [''],
-    category: [ProjectManagementType.DigitalOperation, Validators.required],
+    category: [CategoryWork.Project, Validators.required],
     activityNote: [''],
     bookingType: [BookingType.Normal, Validators.required],
     executionHours: [0, [Validators.required, Validators.min(0)]],
@@ -97,12 +98,13 @@ export class HourEntry implements OnInit {
     workshopHours: [0, [Validators.required, Validators.min(0)]],
     otherActivitiesHours: [0, [Validators.required, Validators.min(0)]],
     internManagementHours: [0, [Validators.required, Validators.min(0)]],
-    simpleTotalHours: [0, [Validators.min(0)]],
+    simpleTotalHours: [0, [Validators.required, Validators.min(0)]],
     notes: [''],
   });
 
   ngOnInit(): void {
     this.form.valueChanges.subscribe(() => {
+      this.syncProjectValidation();
       this.syncWeeklyMode();
       this.computeTotals();
     });
@@ -113,9 +115,7 @@ export class HourEntry implements OnInit {
 
   /** Returns true when full project-work form should be shown */
   get isProjectWorkMode(): boolean {
-    const cat = this.form.controls.category.value;
-    return cat === ProjectManagementType.DigitalOperation ||
-           cat === ProjectManagementType.ProcessSimplification;
+    return this.form.controls.category.value === CategoryWork.Project;
   }
 
   get filteredDateModeOptions() {
@@ -209,8 +209,11 @@ export class HourEntry implements OnInit {
     const rangeStartDate = isWeekRange ? this.toIsoDate(v.rangeStartDate) : undefined;
     const rangeEndDate = isWeekRange ? this.toIsoDate(v.rangeEndDate) : undefined;
 
+    const isProjectWork = this.isProjectWorkMode;
+    const activityNote = v.activityNote?.trim() ? v.activityNote.trim() : null;
+
     const payload: CreateHourEntryDto = {
-      projectId: v.projectId || undefined,
+      projectId: isProjectWork ? v.projectId : null,
       allocationFrequency: v.allocationFrequency,
       dateSelectionMode: v.dateSelectionMode!,
       selectedDates,
@@ -218,17 +221,21 @@ export class HourEntry implements OnInit {
       rangeEndDate,
       category: v.category,
       bookingType: v.bookingType,
-      executionHours: v.executionHours,
-      technicalSupervisionHours: v.technicalSupervisionHours,
-      processRelatedHours: v.processRelatedHours,
-      projectManagementHours: v.projectManagementHours,
-      researchAndDevHours: v.researchAndDevHours,
-      workshopHours: v.workshopHours,
-      otherActivitiesHours: v.otherActivitiesHours,
-      internManagementHours: v.internManagementHours,
-      supervisedInterns: this.selectedInterns
-        .filter((intern) => intern.hours > 0)
-        .map((intern) => ({ internAllocationId: intern.internAllocationId, hours: intern.hours })),
+      totalHours: isProjectWork ? this.totalHours : v.simpleTotalHours,
+      activityNote,
+      executionHours: isProjectWork ? v.executionHours : 0,
+      technicalSupervisionHours: isProjectWork ? v.technicalSupervisionHours : 0,
+      processRelatedHours: isProjectWork ? v.processRelatedHours : 0,
+      projectManagementHours: isProjectWork ? v.projectManagementHours : 0,
+      researchAndDevHours: isProjectWork ? v.researchAndDevHours : 0,
+      workshopHours: isProjectWork ? v.workshopHours : 0,
+      otherActivitiesHours: isProjectWork ? v.otherActivitiesHours : 0,
+      internManagementHours: isProjectWork ? v.internManagementHours : 0,
+      supervisedInterns: isProjectWork
+        ? this.selectedInterns
+            .filter((intern) => intern.hours > 0)
+            .map((intern) => ({ internAllocationId: intern.internAllocationId, hours: intern.hours }))
+        : [],
       notes: v.notes?.trim() ? v.notes.trim() : null,
     };
 
@@ -253,7 +260,7 @@ export class HourEntry implements OnInit {
             return;
           }
           this.zone.run(() => {
-            this.notifications.showSuccess('Hours saved for the selected project.');
+            this.notifications.showSuccess('Hours saved successfully.');
             this.resetForm();
             this.cdr.markForCheck();
           });
@@ -436,7 +443,9 @@ export class HourEntry implements OnInit {
   }
 
   private validateForm(): boolean {
-    const validBase = !this.form.invalid && !!this.projectOptions.length;
+    const validBase = this.isProjectWorkMode
+      ? !this.form.invalid && !!this.projectOptions.length
+      : !this.form.invalid;
     const values = this.form.getRawValue();
     const selectedDates = this.buildSelectedDates(values);
     const validDates = this.hasValidDateSelection(values.dateSelectionMode, selectedDates);
@@ -444,6 +453,27 @@ export class HourEntry implements OnInit {
     this.totalOver24 = this.totalHours > 24;
 
     return validBase && validDates && !this.totalOver24;
+  }
+
+  private syncProjectValidation(): void {
+    const projectControl = this.form.controls.projectId;
+
+    if (this.isProjectWorkMode) {
+      projectControl.setValidators(Validators.required);
+    } else {
+      projectControl.clearValidators();
+      if (projectControl.value) {
+        projectControl.setValue('', { emitEvent: false });
+      }
+      if (this.selectedInterns.length || this.selectedInternAllocationId || this.internDraftHours) {
+        this.selectedInterns = [];
+        this.selectedInternAllocationId = '';
+        this.internDraftHours = 0;
+        this.editingInternAllocationId = null;
+      }
+    }
+
+    projectControl.updateValueAndValidity({ emitEvent: false });
   }
 
   private syncWeeklyMode(): void {
@@ -494,7 +524,7 @@ export class HourEntry implements OnInit {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}T00:00:00Z`;
+    return `${year}-${month}-${day}`;
   }
 
   private toIsoDate(value: Date | string | null | undefined): string {
@@ -502,7 +532,7 @@ export class HourEntry implements OnInit {
 
     if (value instanceof Date) {
       if (Number.isNaN(value.getTime())) return '';
-      return new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate())).toISOString();
+      return this.formatDate(value);
     }
 
     const raw = value.trim();
@@ -510,7 +540,7 @@ export class HourEntry implements OnInit {
     const normalized = raw.includes('T') ? raw : `${raw}T00:00:00Z`;
     const date = new Date(normalized);
     if (Number.isNaN(date.getTime())) return '';
-    return date.toISOString();
+    return this.formatDate(date);
   }
 
   private hasValidDateSelection(mode: DateSelectionMode | null, selectedDates: string[]): boolean {
@@ -550,7 +580,7 @@ export class HourEntry implements OnInit {
       selectedDatesText: '',
       rangeStartDate: '',
       rangeEndDate: '',
-      category: ProjectManagementType.DigitalOperation,
+      category: CategoryWork.Project,
       activityNote: '',
       bookingType: BookingType.Normal,
       executionHours: 0,

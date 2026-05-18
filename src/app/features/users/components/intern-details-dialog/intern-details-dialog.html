@@ -10,10 +10,7 @@
   </header>
 
   <div class="dialog-content">
-    <div class="loader-state" *ngIf="isLoading()">
-      <div class="spinner"></div>
-      <p>Loading allocation details...</p>
-    </div>
+    <app-loading-spinner *ngIf="isLoading()"></app-loading-spinner>
 
     <div class="error-state" *ngIf="error()">
       <mat-icon>error_outline</mat-icon>

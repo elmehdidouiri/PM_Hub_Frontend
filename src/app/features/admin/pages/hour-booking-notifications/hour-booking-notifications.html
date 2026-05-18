@@ -1,0 +1,138 @@
+<section class="notifications-page pm-page-enter">
+  <header class="notifications-header pm-surface">
+    <div class="notifications-header__copy">
+      <span class="eyebrow">Administration</span>
+      <h1>Booking Notifications</h1>
+      <p>Send targeted email reminders for missing bookings, monthly targets and inactive users.</p>
+    </div>
+
+    <button type="button" class="refresh-action" (click)="refresh()" [disabled]="isLoading">
+      <mat-icon [class.spinning]="isLoading">refresh</mat-icon>
+      <span>{{ isLoading ? 'Loading...' : 'Refresh' }}</span>
+    </button>
+  </header>
+
+  <section class="audience-tabs pm-surface">
+    <button
+      type="button"
+      class="audience-tab"
+      *ngFor="let audience of audiences"
+      [class.audience-tab--active]="activeType === audience.type"
+      (click)="selectAudience(audience.type)">
+      <mat-icon>{{ audience.icon }}</mat-icon>
+      <span>{{ audience.label }}</span>
+      <strong>{{ audience.users.length }}</strong>
+    </button>
+  </section>
+
+  <section class="toolbar-card pm-surface" *ngIf="!isLoading">
+    <div class="toolbar-card__search">
+      <mat-icon>search</mat-icon>
+      <input
+        type="text"
+        [(ngModel)]="searchTerm"
+        placeholder="Search by name, email, role or department" />
+      <button type="button" class="clear-search" *ngIf="searchTerm" (click)="searchTerm = ''" aria-label="Clear search">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="toolbar-card__stats">
+      <div class="stat-pill stat-pill--primary">
+        <strong>{{ activeAudience.users.length }}</strong>
+        <span>{{ activeAudience.label }}</span>
+      </div>
+      <div class="stat-pill">
+        <strong>{{ totalUsers }}</strong>
+        <span>Total alerts</span>
+      </div>
+    </div>
+  </section>
+
+  <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
+
+  <div class="state-card state-card--error pm-surface" *ngIf="!isLoading && activeAudience.errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <div>
+      <strong>Notifications could not be loaded</strong>
+      <p>{{ activeAudience.errorMessage }}</p>
+    </div>
+    <button type="button" class="inline-action" (click)="refresh()">Try again</button>
+  </div>
+
+  <div
+    class="state-card state-card--empty pm-surface"
+    *ngIf="!isLoading && !activeAudience.errorMessage && activeAudience.users.length === 0">
+    <mat-icon>check_circle</mat-icon>
+    <div>
+      <strong>No users to notify</strong>
+      <p>{{ activeAudience.description }}</p>
+    </div>
+  </div>
+
+  <div
+    class="state-card state-card--empty pm-surface"
+    *ngIf="!isLoading && !activeAudience.errorMessage && activeAudience.users.length > 0 && filteredUsers.length === 0">
+    <mat-icon>filter_alt_off</mat-icon>
+    <div>
+      <strong>No matching result</strong>
+      <p>Adjust your search to find a user in this audience.</p>
+    </div>
+    <button type="button" class="inline-action" (click)="searchTerm = ''">Clear search</button>
+  </div>
+
+  <section
+    class="notifications-table-card pm-surface"
+    *ngIf="!isLoading && !activeAudience.errorMessage && filteredUsers.length > 0">
+    <div class="table-shell">
+      <table class="notifications-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Last booking</th>
+            <th>Monthly target</th>
+            <th>Inactive</th>
+            <th class="actions-col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of filteredUsers">
+            <td data-label="User">
+              <div class="user-cell">
+                <div class="user-cell__avatar">{{ getInitials(user) }}</div>
+                <div class="user-cell__copy">
+                  <strong>{{ user.fullName }}</strong>
+                  <a [href]="'mailto:' + user.email">{{ user.email || '-' }}</a>
+                </div>
+              </div>
+            </td>
+            <td data-label="Role">
+              <span class="table-badge">{{ user.roleName || 'Unknown' }}</span>
+              <small>{{ user.departmentName || 'No department' }}</small>
+            </td>
+            <td data-label="Last booking">{{ formatDate(user.lastBookingDate) }}</td>
+            <td data-label="Monthly target">
+              <span>{{ user.bookedHours }}h / {{ user.monthlyTargetHours }}h</span>
+              <small *ngIf="user.missingHours > 0">{{ user.missingHours }}h missing</small>
+            </td>
+            <td data-label="Inactive">
+              <span>{{ user.inactiveDays || 0 }} days</span>
+              <small>{{ formatDate(user.lastActivityDate) }}</small>
+            </td>
+            <td data-label="Action" class="actions-col">
+              <button
+                type="button"
+                class="send-action"
+                (click)="sendReminder(user)"
+                [disabled]="sendingKey !== null || !user.userId">
+                <mat-icon>{{ isSending(user) ? 'hourglass_top' : 'outgoing_mail' }}</mat-icon>
+                <span>{{ isSending(user) ? 'Sending...' : 'Send reminder' }}</span>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>

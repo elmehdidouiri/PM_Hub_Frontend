@@ -1,127 +1,115 @@
-<section class="users-list-page pm-page-grid pm-page-enter">
-  <header class="page-header pm-surface">
-    <div class="page-header__copy">
-       <span class="eyebrow">Team</span>
-       <h1>Collaborator Directory</h1>
-       <p>Manage collaborators, permissions and user lifecycle from a single workspace.</p>
+<section class="user-list-container space-y-6 pm-page-enter">
+  <!-- Premium Header -->
+  <header class="pm-page-header">
+    <div class="pm-page-header__main">
+      <div class="pm-page-header__logo">
+        <mat-icon>people_outline</mat-icon>
+      </div>
+      <div>
+        <span class="pm-page-header__eyebrow">Collaborators</span>
+        <h1 class="pm-page-header__title">Collaborator Directory</h1>
+        <p class="pm-page-header__desc">Manage team members, permissions and user lifecycles across the platform.</p>
+      </div>
     </div>
-
     
+    <button type="button" class="pm-btn-secondary" (click)="refreshUsers()">
+      <mat-icon>refresh</mat-icon>
+      <span>Refresh Registry</span>
+    </button>
   </header>
 
-  <section class="toolbar-card pm-surface">
-    <div class="toolbar-card__search">
-      <mat-icon>search</mat-icon>
+  <!-- Control Bar -->
+  <section class="pm-control-bar">
+    <div class="pm-search-wrapper">
+      <mat-icon class="pm-search-icon">search</mat-icon>
       <input
         type="text"
         [ngModel]="searchTerm"
         (ngModelChange)="onSearchTermChange($event)"
-        placeholder="Search by name, email or role" />
-      <button type="button" class="clear-search" *ngIf="searchTerm" (click)="clearSearch()" aria-label="Clear search">
+        class="pm-search-input"
+        placeholder="Search by name, email or role..." />
+      <button type="button" class="pm-search-clear" *ngIf="searchTerm" (click)="clearSearch()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
 
-    <div class="toolbar-card__stats">
-      <div class="stat-pill stat-pill--primary">
-        <strong>{{ users.length }}</strong>
-        <span>Total users</span>
-      </div>
-      <div class="stat-pill" *ngIf="searchTerm">
-        <strong>{{ filteredUsers.length }}</strong>
-        <span>Matching results</span>
+    <div class="pm-active-stats">
+      <div class="pm-active-stats__copy">
+        <span class="pm-active-stats__label">Active Directory</span>
+        <strong class="pm-active-stats__count">{{ filteredUsers.length }} <span class="pm-active-stats__total">/ {{ users.length }}</span></strong>
       </div>
     </div>
   </section>
 
-  <div class="state-card state-card--loading pm-surface" *ngIf="isLoading">
-    <mat-icon>hourglass_top</mat-icon>
+  <!-- States -->
+  <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
+  
+  <div class="pm-surface p-12 flex flex-col items-center justify-center text-center gap-4 border-error/10 bg-error/5" *ngIf="!isLoading && errorMessage">
+    <mat-icon class="!text-4xl text-error/40">cloud_off</mat-icon>
     <div>
-      <strong>Loading users</strong>
-      <p>Fetching the latest users from <code>/api/users</code>.</p>
+      <h3 class="text-lg font-black text-error/80">Connection Lost</h3>
+      <p class="text-sm text-error/60">{{ errorMessage }}</p>
     </div>
+    <button type="button" class="pm-btn-primary !bg-error !shadow-error/20" (click)="refreshUsers()">Reconnect Registry</button>
   </div>
 
-  <div class="state-card state-card--error pm-surface" *ngIf="!isLoading && errorMessage">
-    <mat-icon>error_outline</mat-icon>
-    <div>
-      <strong>Users could not be loaded</strong>
-      <p>{{ errorMessage }}</p>
-    </div>
-    <button type="button" class="inline-action" (click)="refreshUsers()">Try again</button>
-  </div>
-
-  <div class="state-card state-card--empty pm-surface" *ngIf="!isLoading && !errorMessage && !hasUsers">
-    <mat-icon>person_off</mat-icon>
-    <div>
-      <strong>No users found</strong>
-      <p>The users endpoint returned no data yet.</p>
-    </div>
-  </div>
-
-  <div class="state-card state-card--empty pm-surface" *ngIf="!isLoading && !errorMessage && hasUsers && !hasFilteredUsers">
-    <mat-icon>filter_alt_off</mat-icon>
-    <div>
-      <strong>No matching result</strong>
-      <p>Adjust your search to find the user you are looking for.</p>
-    </div>
-    <button type="button" class="inline-action" (click)="clearSearch()">Clear search</button>
-  </div>
-
-  <section class="table-card pm-surface" *ngIf="!isLoading && !errorMessage && hasFilteredUsers">
-    <div class="table-shell">
-      <table class="users-table">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th class="actions-col">Actions</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr *ngFor="let user of filteredUsers; trackBy: trackByUserId">
-            <td data-label="User">
-              <div class="user-cell">
-                <div class="user-cell__avatar">{{ getDisplayName(user).charAt(0) }}</div>
-                <div class="user-cell__copy">
-                  <strong>{{ getDisplayName(user) }}</strong>
-                </div>
+  <!-- Data Table -->
+  <section class="pm-table-container" *ngIf="!isLoading && !errorMessage && hasFilteredUsers">
+    <table>
+      <thead>
+        <tr>
+          <th>Collaborator</th>
+          <th>Account Email</th>
+          <th>Role / Permission</th>
+          <th class="text-right">Action Hub</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let user of filteredUsers; trackBy: trackByUserId">
+          <td>
+            <div class="flex items-center gap-4">
+              <div class="pm-avatar-badge">
+                {{ getDisplayName(user).charAt(0) }}
               </div>
-            </td>
-            <td data-label="Email">{{ user.email || '-' }}</td>
-            <td data-label="Role">
-              <span class="table-badge">{{ user.roleName || 'Unknown' }}</span>
-            </td>
-            <td data-label="Actions" class="actions-col">
-              <div class="row-actions">
-                <a
-                  class="action-btn action-btn--view"
-                  [routerLink]="['/users', user.id || user.userId]"
-                  aria-label="View user">
-                  <mat-icon>visibility</mat-icon>
-                </a>
-                <a
-                  class="action-btn action-btn--edit"
-                  [routerLink]="['/users', user.id || user.userId, 'edit']"
-                  aria-label="Edit user">
-                  <mat-icon>edit</mat-icon>
-                </a>
-                <button
-                  type="button"
-                  class="action-btn action-btn--delete"
-                  (click)="deleteUser(user)"
-                  [disabled]="deletingUserId === (user.id || user.userId)"
-                  aria-label="Delete user">
-                  <mat-icon>{{ deletingUserId === (user.id || user.userId) ? 'hourglass_top' : 'delete' }}</mat-icon>
-                </button>
+              <div class="flex flex-col">
+                <span class="font-extrabold text-navy-500 group-hover:text-navy-700 transition-colors">{{ getDisplayName(user) }}</span>
+                <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Active Member</span>
               </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+            </div>
+          </td>
+          <td><span class="text-xs font-medium text-slate-500">{{ user.email || '-' }}</span></td>
+          <td>
+            <span class="pm-badge pm-badge--primary">
+              {{ user.roleName || 'Unknown' }}
+            </span>
+          </td>
+          <td class="text-right">
+            <div class="flex justify-end gap-2 opacity-0 transition-opacity">
+              <a [routerLink]="['/users', user.id || user.userId]" class="pm-action-btn" title="View Profile">
+                <mat-icon>visibility</mat-icon>
+              </a>
+              <a [routerLink]="['/users', user.id || user.userId, 'edit']" class="pm-action-btn pm-action-btn--indigo" title="Modify Permissions">
+                <mat-icon>shield_person</mat-icon>
+              </a>
+              <button type="button" (click)="deleteUser(user)" [disabled]="deletingUserId === (user.id || user.userId)" class="pm-action-btn pm-action-btn--danger" title="Revoke Access">
+                <mat-icon>{{ deletingUserId === (user.id || user.userId) ? 'sync' : 'delete' }}</mat-icon>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </section>
+
+  <!-- Empty States -->
+  <div class="pm-surface p-12 flex flex-col items-center justify-center text-center gap-4" *ngIf="!isLoading && hasUsers && !hasFilteredUsers">
+    <div class="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+      <mat-icon class="!text-4xl">search_off</mat-icon>
+    </div>
+    <div>
+      <h3 class="text-lg font-black text-navy-500">No matching collaborators</h3>
+      <p class="text-sm text-slate-400">Refine your search parameters or clear filters.</p>
+    </div>
+    <button type="button" class="pm-btn-secondary" (click)="clearSearch()">Reset Search</button>
+  </div>
 </section>
-

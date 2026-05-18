@@ -1,1 +1,15 @@
-<p>page-header works!</p>
+<header class="page-header">
+  <div class="page-header__icon" aria-hidden="true">
+    <mat-icon>{{ icon }}</mat-icon>
+  </div>
+
+  <div class="page-header__copy">
+    <span class="page-header__eyebrow" *ngIf="eyebrow">{{ eyebrow }}</span>
+    <h1>{{ title }}</h1>
+    <p *ngIf="description">{{ description }}</p>
+  </div>
+
+  <div class="page-header__actions">
+    <ng-content></ng-content>
+  </div>
+</header>

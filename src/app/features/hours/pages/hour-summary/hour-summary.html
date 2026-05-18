@@ -59,14 +59,7 @@
     </button>
   </section>
 
-  <section class="summary-state pm-surface" *ngIf="isLoading">
-    <mat-progress-spinner diameter="52" mode="indeterminate"></mat-progress-spinner>
-    <div>
-      <strong>Loading your hour insights</strong>
-      <p>We are preparing your monthly dashboard and project analytics.</p>
-    </div>
-  </section>
-
+  <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
   <section class="summary-state summary-state--error pm-surface" *ngIf="!isLoading && summaryError">
     <mat-icon>error_outline</mat-icon>
     <div>

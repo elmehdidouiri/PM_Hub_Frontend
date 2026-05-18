@@ -1,496 +1,905 @@
-import { ChangeDetectorRef, Component, NgZone, OnInit, inject, ElementRef, HostListener } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { MatIconModule } from '@angular/material/icon';
-import { MatSelectModule } from '@angular/material/select';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
-
-import { User } from '../../../../core/models';
-import { AuthService } from '../../../../core/services/auth';
-import { DepartmentsApiService } from '../../../../core/services/departments-api.service';
-import { PlantsApiService } from '../../../../core/services/plants-api.service';
-import { HourEntriesApiService } from '../../../../core/services/hour-entries-api.service';
-import { RolesApiService } from '../../../../core/services/roles-api.service';
-import { BusinessUnitsApiService } from '../../../../core/services/business-units-api.service';
-import {
-  DashboardPerformanceProjectDto,
-} from '../../../projects/models';
-import { ProjectService } from '../../../projects/services/project';
-import { 
-  DashboardCalculationService, 
-  ChartBar as IChartBar, 
-  BiTrendPoint, 
-  BiAlertItem, 
-  MetricCard as IMetricCard 
-} from '../../services/dashboard-calculation.service';
-import { DashboardFilterService, FilterTicket } from '../../services/dashboard-filter.service';
-
-// Import Standalone Components
-import { MetricCardComponent } from '../../components/metric-card/metric-card.component';
-import { ChartBarComponent } from '../../components/chart-bar/chart-bar.component';
-
-@Component({
-  selector: 'app-dashboard-home',
-  standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    MatIconModule,
-    MatSelectModule,
-    MatTooltipModule,
-    MetricCardComponent,
-    ChartBarComponent,
-  ],
-  templateUrl: './dashboard-home.html',
-  styleUrls: ['./dashboard-home.scss'],
-})
-export class DashboardHome implements OnInit {
-  private readonly authService = inject(AuthService);
-  private readonly projectService = inject(ProjectService);
-  private readonly hourEntriesApi = inject(HourEntriesApiService);
-  private readonly rolesApi = inject(RolesApiService);
-  private readonly departmentsApi = inject(DepartmentsApiService);
-  private readonly businessUnitsApi = inject(BusinessUnitsApiService);
-  private readonly plantsApi = inject(PlantsApiService);
-  private readonly calc = inject(DashboardCalculationService);
-  private readonly filterService = inject(DashboardFilterService);
-  private readonly zone = inject(NgZone);
-  private readonly cdr = inject(ChangeDetectorRef);
-  private readonly elementRef = inject(ElementRef);
-
-  readonly user: User | null = this.authService.getCurrentUser();
-  private readonly projectNameById = new Map<string, string>();
-  private readonly departmentIdByName = new Map<string, string>();
-  private readonly businessUnitIdByName = new Map<string, string>();
-  private readonly plantIdByName = new Map<string, string>();
-
-  // --- UI State ---
-  public isLoading = true;
-  public errorMessage = '';
-  public periodPickerOpen = false;
-  public capacityMax = 2500;
-
-  // --- Data Models ---
-  public filterState = this.filterService.defaultFilterState();
-  public performanceMetrics: IMetricCard[] = [];
-  public financialMetrics: IMetricCard[] = [];
-  public userMetrics: IMetricCard[] = [];
-  
-  public projectStatusBars: IChartBar[] = [];
-  public topProjectBars: IChartBar[] = [];
-  public hoursStageBars: IChartBar[] = [];
-  public premiumHoursBars: IChartBar[] = [];
-  public personalProjects: DashboardPerformanceProjectDto[] = [];
-  public highRiskProjects: any[] = [];
-  
-  public workloadDepartmentBars: IChartBar[] = [];
-  public workloadBusinessUnitBars: IChartBar[] = [];
-  public workloadRoleBars: IChartBar[] = [];
-  public userStatusBars: IChartBar[] = [];
-  public costSavingDepartmentBars: IChartBar[] = [];
-  public costSavingBusinessUnitBars: IChartBar[] = [];
-  
-  public effortDistribution: IChartBar[] = [];
-  public monthlyEffortTrend: any[] = [];
-  public monthlyWorkloadTrend: any[] = [];
-  public performanceTrend: BiTrendPoint[] = [];
-  public biAlerts: BiAlertItem[] = [];
-  public delayRateBars: IChartBar[] = [];
-  public projectsByPlantBars: IChartBar[] = [];
-  public projectsByBUBars: IChartBar[] = [];
-  
-  public businessStats: any = null;
-  public totalHoursYtd: number = 0;
-  public annualGoalProgress: number = 0;
-  public aboveTargetCount: number = 0;
-  public belowTargetCount: number = 0;
-
-  // --- Filter Options ---
-  public businessUnitTickets: FilterTicket[] = [];
-  public plantTickets: FilterTicket[] = [];
-  public departmentTickets: FilterTicket[] = [];
-  public statusTickets: FilterTicket[] = [];
-  public phaseTickets: FilterTicket[] = [];
-  public yearTickets: FilterTicket[] = [];
-  
-  readonly monthOptions = [
-    { id: 10, label: 'October' }, { id: 11, label: 'November' }, { id: 12, label: 'December' },
-    { id: 1, label: 'January' }, { id: 2, label: 'February' }, { id: 3, label: 'March' },
-    { id: 4, label: 'April' }, { id: 5, label: 'May' }, { id: 6, label: 'June' },
-    { id: 7, label: 'July' }, { id: 8, label: 'August' }, { id: 9, label: 'September' },
-  ];
-
-  readonly yearOptions: number[] = Array.from({ length: 6 }, (_, i) => {
-    const now = new Date();
-    const fiscalYear = now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear();
-    return fiscalYear - i;
-  });
-
-  readonly projectStatusOptions = DashboardFilterService.PROJECT_STATUS_OPTIONS;
-  readonly projectPhaseOptions = DashboardFilterService.PROJECT_PHASE_OPTIONS;
-  readonly processStatusOptions = DashboardFilterService.PROCESS_STATUS_OPTIONS;
-
-  // --- Accessors ---
-  get selectedYear() { return this.filterState.selectedYear; }
-  set selectedYear(v) { this.filterState.selectedYear = v; }
-  get selectedMonth() { return this.filterState.selectedMonth; }
-  set selectedMonth(v) { this.filterState.selectedMonth = v; }
-  get selectedProjectStatus() { return this.filterState.selectedProjectStatus; }
-  set selectedProjectStatus(v) { this.filterState.selectedProjectStatus = v; }
-  get selectedProjectPhase() { return this.filterState.selectedProjectPhase; }
-  set selectedProjectPhase(v) { this.filterState.selectedProjectPhase = v; }
-  get selectedDepartment() { return this.filterState.selectedDepartment; }
-  set selectedDepartment(v) { this.filterState.selectedDepartment = v; }
-  get selectedBusinessUnit() { return this.filterState.selectedBusinessUnit; }
-  set selectedBusinessUnit(v) { this.filterState.selectedBusinessUnit = v; }
-  get selectedPlant() { return this.filterState.selectedPlant; }
-  set selectedPlant(v) { this.filterState.selectedPlant = v; }
-
-  get hasActiveFilters() { return this.filterService.hasAnyFilterSelected(this.filterState); }
-
-  public getShortLabel(tickets: any[], selectedId: string, fallback: string): string {
-    if (!selectedId || selectedId === 'all') return fallback;
-    const ticket = tickets.find(t => t.id === selectedId);
-    if (!ticket) return fallback;
-    
-    let label = ticket.label;
-    // Remove common prefixes to save space
-    if (label.toUpperCase().startsWith('BU ')) label = label.substring(3);
-    if (label.toUpperCase().startsWith('PLANT ')) label = label.substring(6);
-    if (label.toUpperCase().startsWith('DEPARTEMENT ')) label = label.substring(12);
-    if (label.toUpperCase().startsWith('DEPT ')) label = label.substring(5);
-    
-    return label.trim();
-  }
-
-  get performanceScore() { return this.deliveryBars.find(b => b.label === 'OTD')?.value ?? 0; }
-  
-  private deliveryBars: IChartBar[] = [];
-
-  get periodLabel(): string {
-    if (this.selectedYear && this.selectedMonth) {
-      const m = this.monthOptions.find(mo => mo.id === this.selectedMonth);
-      return `${m?.label.slice(0, 3) ?? ''} ${this.selectedYear}`;
-    }
-    return this.selectedYear ? `${this.selectedYear}` : 'All Periods';
-  }
-
-  ngOnInit(): void {
-    this.loadFilterOptions();
-  }
-
-  // --- Filter Actions ---
-  public onFiltersChanged(): void {
-    this.loadProjectDimensionTickets();
-    this.loadDashboard();
-  }
-
-  public clearAllFilters(): void {
-    this.filterState = this.filterService.defaultFilterState();
-    this.onFiltersChanged();
-  }
-
-  public pickYear(year: number): void {
-    this.selectedYear = year;
-    this.selectedMonth = null; // Allow filtering by year only
-    this.onFiltersChanged();
-  }
-
-  public pickMonth(monthId: number): void {
-    this.selectedMonth = this.selectedMonth === monthId ? null : monthId;
-    this.onFiltersChanged();
-  }
-
-  public clearPeriod(): void {
-    this.selectedYear = null;
-    this.selectedMonth = null;
-    this.onFiltersChanged();
-    this.periodPickerOpen = false;
-  }
-
-  public togglePeriodPicker(event: Event): void {
-    event.stopPropagation();
-    this.periodPickerOpen = !this.periodPickerOpen;
-  }
-
-  @HostListener('document:click', ['$event'])
-  public onDocumentClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    // Check if click happened outside the period filter container
-    if (this.periodPickerOpen && !target.closest('.flt--period')) {
-      this.periodPickerOpen = false;
-    }
-  }
-
-  // --- Data Loading ---
-  private loadFilterOptions(): void {
-    forkJoin({
-      roles: this.rolesApi.getRoles().pipe(catchError(() => of([]))),
-      departments: this.departmentsApi.listDepartments().pipe(catchError(() => of([]))),
-      businessUnits: this.businessUnitsApi.listItems().pipe(catchError(() => of([]))),
-      plants: this.plantsApi.listItems().pipe(catchError(() => of([]))),
-    }).subscribe(({ departments, businessUnits, plants }) => {
-      this.zone.run(() => {
-        this.departmentIdByName.clear();
-        departments.forEach((d: any) => this.departmentIdByName.set(d.name.trim(), d.id));
-        this.businessUnitIdByName.clear();
-        businessUnits.forEach((bu: any) => this.businessUnitIdByName.set(bu.name.trim(), bu.id));
-        this.plantIdByName.clear();
-        plants.forEach((p: any) => this.plantIdByName.set(p.name.trim(), p.id));
-        
-        // Chain these to ensure maps are populated
-        this.loadProjectDimensionTickets();
-        this.loadDashboard();
-      });
-    });
-  }
-
-  private loadProjectDimensionTickets(): void {
-    const isAdmin = this.user?.isAdmin;
-    const params = this.filterService.buildParams(this.filterState);
-    
-    // Build ProjectFilterParams from dashboard filter params to apply active filters
-    const projectFilter: any = {
-      pageSize: 500,
-      pageNumber: 1,
-    };
-    if (params.businessUnitId) projectFilter['BusinessUnitId'] = params.businessUnitId;
-    if (params.departmentId) projectFilter['DepartmentId'] = params.departmentId;
-    if (params.projectStatus !== undefined) projectFilter['Status'] = params.projectStatus;
-    if (params.projectPhase) projectFilter['Phase'] = params.projectPhase;
-
-    forkJoin({
-      projects: this.projectService.getProjectsPaged(projectFilter).pipe(
-        map(r => r.data || []),
-        catchError(() => of([]))
-      ),
-      myProjects: !isAdmin ? this.hourEntriesApi.getMyProjects().pipe(catchError(() => of([]))) : of(null)
-    }).subscribe(({ projects, myProjects }) => {
-      this.zone.run(() => {
-        const allProjects = Array.isArray(projects) ? projects : [];
-        let filteredProjects = allProjects;
-        if (myProjects && Array.isArray(myProjects)) {
-          const myProjectIds = new Set(myProjects.map((p: any) => p.projectId || p.id).filter((id: any) => !!id));
-          filteredProjects = allProjects.filter((p: any) => myProjectIds.has(p.id));
-        }
-
-        this.projectNameById.clear();
-        allProjects.forEach((p: any) => {
-          if (p.id && p.name) this.projectNameById.set(p.id, p.name);
-        });
-
-        this.businessUnitTickets = this.filterService.buildBusinessUnitTickets(filteredProjects, this.businessUnitIdByName);
-        this.plantTickets = this.filterService.buildPlantTickets(filteredProjects, this.plantIdByName);
-        this.departmentTickets = this.filterService.buildDepartmentTickets(filteredProjects, this.departmentIdByName);
-        this.statusTickets = this.filterService.buildStatusTickets(filteredProjects);
-        this.phaseTickets = this.filterService.buildPhaseTickets(filteredProjects);
-        this.yearTickets = this.filterService.buildYearTickets(filteredProjects);
-        this.cdr.markForCheck();
-      });
-    });
-  }
-
-  public loadDashboard(): void {
-    this.isLoading = true;
-    this.errorMessage = '';
-    const params = this.filterService.buildParams(this.filterState);
-
-    forkJoin({
-      adminExtended: this.user?.isAdmin ? this.projectService.getAdminDashboardExtended(params).pipe(catchError(() => of(null))) : of(null),
-      adminBi: this.user?.isAdmin ? this.projectService.getAdminDashboardBi(params).pipe(catchError(() => of(null))) : of(null),
-      projectDashboard: this.user?.isAdmin ? of(null) : this.projectService.getUserDashboardOverview(params).pipe(catchError(() => of(null))),
-      performanceDashboard: this.user?.isAdmin ? of(null) : this.projectService.getUserDashboardPerformance(params).pipe(catchError(() => of(null))),
-      hourYtd: this.user?.isAdmin && this.selectedYear ? this.hourEntriesApi.getDashboardYtd(this.selectedYear).pipe(catchError(() => of(null))) : of(null),
-    }).subscribe({
-      next: (data) => {
-        this.zone.run(() => {
-          this.processDashboardData(data);
-          this.isLoading = false;
-          this.cdr.markForCheck();
-        });
-      },
-      error: () => {
-        this.zone.run(() => {
-          this.errorMessage = 'Unable to load dashboard analytics right now.';
-          this.isLoading = false;
-          this.cdr.markForCheck();
-        });
-      }
-    });
-  }
-
-  private processDashboardData(data: any): void {
-    const { adminExtended, adminBi, projectDashboard, performanceDashboard, hourYtd } = data;
-    
-    let dashboard = adminExtended 
-      ? this.calc.dashboardExtendedToOverview(adminExtended) 
-      : (adminBi ? this.calc.dashboardBiToOverview(adminBi) : projectDashboard);
-    
-    if (!dashboard) return;
-
-    const summary = dashboard.summary;
-    const charts = dashboard.charts;
-    this.annualGoalProgress = summary.annualGoalProgressPercentage || 0;
-
-    // Project Status & Distribution
-    this.projectStatusBars = this.calc.withPercent(this.calc.toEntries(charts.projectsByStatus));
-    if (!this.projectStatusBars.length) this.projectStatusBars = this.calc.withPercent(this.calc.toEntries(charts.projectsByPhase));
-    
-    this.topProjectBars = this.calc.withPercent(this.calc.toProjectEntries(charts.topProjectsByHours, this.projectNameById));
-    this.deliveryBars = this.calc.withScorePercent(this.calc.firstNonEmptyEntries(this.calc.toEntries(charts.deliveryMetrics), [
-      { label: 'OTD', value: summary.averageOtd },
-      { label: 'Effectiveness', value: summary.averageEffectiveness },
-    ]));
-
-    // Admin Specifics
-    if (adminExtended) {
-      const workload = adminExtended.workload || {};
-      const business = adminExtended.business || {};
-      const health = adminExtended.portfolioHealth || {};
-      const users = adminExtended.users || {};
-      
-      // Map available workload data from JSON
-      this.workloadDepartmentBars = this.calc.withPercent(this.calc.toEntries(workload.categoryBreakdown || workload.workloadByDepartment));
-      this.workloadBusinessUnitBars = this.calc.withPercent(this.calc.toEntries(workload.hoursByStage || workload.workloadByBusinessUnit));
-      
-      this.costSavingDepartmentBars = this.calc.withPercent(business.costSavingByDepartment || []);
-      this.costSavingBusinessUnitBars = this.calc.withPercent(business.costSavingByBusinessUnit || []);
-      
-      // Performance Trend (Admin BI)
-      this.performanceTrend = this.calc.toPerformanceTrend(health.performanceTrend || []);
-      this.monthlyWorkloadTrend = this.calc.toMonthlyWorkloadTrend(workload.monthlyHoursByCategory || []);
-      
-      this.businessStats = business;
-      this.biAlerts = this.calc.toAlerts(adminExtended.alerts || []);
-      
-      if (users.usersByRole) {
-        this.workloadRoleBars = this.calc.withPercent(users.usersByRole.map((r: any) => ({
-          label: r.roleName || 'N/A',
-          value: r.value
-        })));
-      }
-
-      this.userStatusBars = this.calc.withPercent([
-        { label: 'Active', value: users.activeUsers || 0 },
-        { label: 'Pending', value: users.pendingApprovalUsers || 0 },
-        { label: 'Inactive', value: users.inactiveUsers || 0 }
-      ]);
-
-      const maxH = Math.max(...this.monthlyWorkloadTrend.map(m => m.total), 100);
-      this.capacityMax = Math.ceil(maxH / 100) * 110;
-
-      // Hide portfolio tiles for Admin as per request
-      this.personalProjects = []; 
-      this.topProjectBars = this.calc.withPercent(this.calc.toProjectEntries(adminExtended.topProjects || [], this.projectNameById));
-    }
-    
-    if (adminBi) {
-      const charts = adminBi.charts || {};
-      this.delayRateBars = this.calc.withPercent(this.calc.toEntries(charts.delayRate));
-      this.projectsByPlantBars = this.calc.withPercent(this.calc.toEntries(charts.projectsByPlant));
-      this.projectsByBUBars = this.calc.withPercent(this.calc.toEntries(charts.projectsByBusinessUnit));
-      this.highRiskProjects = (charts.riskMatrix || []).slice(0, 5);
-
-      // Sync filter counts from BI data for better accuracy (Array format: [{label, value}])
-      this.syncTicketCounts(this.businessUnitTickets, charts.projectsByBusinessUnit);
-      this.syncTicketCounts(this.plantTickets, charts.projectsByPlant);
-      this.syncTicketCounts(this.statusTickets, charts.projectsByStatus);
-      this.syncTicketCounts(this.phaseTickets, charts.projectsByPhase);
-      if (charts.projectsByDepartment) {
-        this.syncTicketCounts(this.departmentTickets, charts.projectsByDepartment);
-      }
-    }
-
-    // User Performance
-    if (performanceDashboard) {
-      const result = this.calc.computeMonthlyEffortDistribution(
-        performanceDashboard.charts.monthlyHoursByCategory,
-        Number(performanceDashboard.summary.ytdLoggedHours || 0),
-        this.calc.toEntries(performanceDashboard.charts.hoursByCategory)
-      );
-      this.effortDistribution = result.effortDistribution;
-      this.monthlyEffortTrend = result.monthlyEffortTrend;
-      this.totalHoursYtd = result.totalHoursYtd;
-      this.personalProjects = performanceDashboard.topProjects || [];
-      this.hoursStageBars = this.calc.withPercent(this.calc.toEntries(performanceDashboard.charts.hoursByStage));
-      this.premiumHoursBars = this.calc.withPercent(this.calc.toEntries(performanceDashboard.charts.premiumHours));
-      this.applyUserMetrics(performanceDashboard);
-    } else if (hourYtd) {
-      const result = this.calc.computeEffortDistribution(hourYtd);
-      this.effortDistribution = result.effortDistribution;
-      this.monthlyEffortTrend = result.monthlyEffortTrend;
-      this.totalHoursYtd = result.totalHoursYtd;
-      this.annualGoalProgress = hourYtd.completionPercentage || 0;
-    }
-
-    // Financial KPIs (Row 2) - Merged from businessStats if available
-    const budgetValue = this.businessStats ? `${this.calc.formatMetric(this.businessStats.totalBudget)} DH` : '801,485,000 DH';
-    const budgetNote = this.businessStats ? `${this.businessStats.budgetConsumptionPercentage}% Consumed` : '0% Consumed';
-    const savingsValue = this.businessStats ? `${this.calc.formatMetric(this.businessStats.totalCostSaving)} DH` : '2,570,000 DH';
-    const savingsNote = 'ROI Verified';
-    const digitalValue = this.businessStats ? `${this.calc.formatMetric(this.businessStats.totalDigitalContribution)} DH` : '735,470 DH';
-    const digitalNote = 'Value Added';
-
-    this.aboveTargetCount = summary.doneProjectsAboveTarget || 0;
-    this.belowTargetCount = summary.doneProjectsBelowTarget || 0;
-
-    // Performance KPIs (Row 1-3) - Adjusted for prominent headers
-    this.performanceMetrics = [
-      { label: 'Projects', value: `${summary.totalProjects}`, note: 'Active Portfolio', icon: 'inventory_2', tone: 'blue' },
-      { label: 'Tracked hours', value: this.calc.formatMetric(summary.totalTrackedHours), note: 'Logged time', icon: 'schedule', tone: 'teal' },
-      { label: 'OTD', value: `${summary.averageOtd}%`, note: `Target: 95%`, icon: 'verified', tone: summary.averageOtd > 90 ? 'green' : 'orange' },
-      { label: 'Efficiency', value: `${(summary.averageEffectiveness || 0).toFixed(1)}%`, note: `vs Previous`, icon: 'auto_graph', tone: 'orange' },
-      
-      { label: 'Delayed', value: `${summary.delayedProjects}`, note: 'Critical delays', icon: 'timer_off', tone: summary.delayedProjects > 0 ? 'red' : 'green' },
-      { label: 'Premium', value: this.calc.formatMetric((adminExtended?.workload?.premiumApprovedHours || 0) + (adminExtended?.workload?.premiumPendingHours || 0)), note: `${this.calc.formatMetric(adminExtended?.workload?.premiumPendingHours || 0)}h Pending`, icon: 'stars', tone: 'orange' },
-      
-      { label: 'Users', value: `${adminExtended?.users?.activeUsers || 0}`, note: `${adminExtended?.users?.pendingApprovalUsers || 0} Pending`, icon: 'group', tone: 'blue' },
-      { label: 'Goal Progress', value: `${this.annualGoalProgress.toFixed(1)}%`, note: 'Annual Target', icon: 'flag', tone: 'purple' },
-      
-    ];
-
-    this.financialMetrics = [
-      { label: 'Total Budget', value: budgetValue, note: budgetNote, icon: 'account_balance_wallet', tone: 'blue' },
-      { label: 'Cost Savings', value: savingsValue, note: savingsNote, icon: 'trending_up', tone: 'green' },
-      { label: 'Digital Value', value: digitalValue, note: digitalNote, icon: 'devices', tone: 'teal' }
-    ];
-  }
-
-  private applyUserMetrics(p: any): void {
-    const s = p.summary;
-    this.userMetrics = [
-      { label: 'My Efficiency', value: this.calc.formatPercent(s.utilizationRate), note: `${this.calc.formatMetric(s.averageHoursPerLoggedDay)}h/day`, icon: 'speed', tone: 'green' },
-      { label: 'My Hours', value: this.calc.formatMetric(s.totalLoggedHours), note: `${this.calc.formatMetric(s.ytdLoggedHours)}h YTD`, icon: 'schedule', tone: 'teal' },
-      { label: 'Utilization', value: this.calc.formatPercent(s.utilizationRate), note: `${this.calc.formatMetric(s.expectedHours)}h expected`, icon: 'data_usage', tone: 'blue' },
-      { label: 'Contribution', value: this.calc.formatMetric(s.projectsWithLoggedHours), note: `${s.assignedProjects} projects`, icon: 'workspaces', tone: 'orange' },
-    ];
-    this.annualGoalProgress = s.annualGoalProgressPercentage || 0;
-  }
-
-  private syncTicketCounts(tickets: FilterTicket[], data: any): void {
-    if (!data || !tickets) return;
-    
-    // Normalize data to a Map (handle both {label:val} and [{label,value}])
-    const countMap = new Map<string, number>();
-    
-    if (Array.isArray(data)) {
-      data.forEach(item => {
-        const lbl = (item.label || '').trim();
-        if (lbl) countMap.set(lbl, Number(item.value ?? item.count ?? 0));
-      });
-    } else if (typeof data === 'object') {
-      Object.entries(data).forEach(([lbl, val]) => {
-        countMap.set(lbl.trim(), Number(val));
-      });
-    }
-    
-    tickets.forEach(ticket => {
-      const lbl = (ticket.label || '').trim();
-      ticket.count = countMap.get(lbl) || 0;
-    });
-  }
-
-  public getCatColor(label: string) { return this.calc.getCatColor(label); }
-}
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { forkJoin, Observable, of } from 'rxjs';
+import { catchError, finalize, map } from 'rxjs/operators';
+import { LoadingSpinner } from '../../../../shared/components/loading-spinner/loading-spinner';
+
+
+import { User } from '../../../../core/models';
+import { AuthService } from '../../../../core/services/auth';
+import { BusinessUnitsApiService } from '../../../../core/services/business-units-api.service';
+import { DepartmentsApiService } from '../../../../core/services/departments-api.service';
+import { PlantsApiService } from '../../../../core/services/plants-api.service';
+import { ProjectService } from '../../../projects/services/project';
+import { DashboardFilterParams, DashboardGroupedDistributionDto } from '../../../projects/models';
+import {
+  DashboardFilterService,
+  DashboardFilterState,
+  FilterTicket,
+} from '../../services/dashboard-filter.service';
+
+type FilterKind =
+  | 'businessUnit'
+  | 'department'
+  | 'plant'
+  | 'projectManagement'
+  | 'phase'
+  | 'status';
+
+interface DashboardMetric {
+  label: string;
+  value: string;
+  note: string;
+  icon: string;
+  tone: 'blue' | 'green' | 'orange' | 'red';
+}
+
+interface FilterSection {
+  kind: FilterKind;
+  title: string;
+  icon: string;
+  tickets: FilterTicket[];
+  selectedId: string;
+}
+
+interface DashboardStatsSnapshot {
+  totalProjects: number;
+  averageOtd: number;
+  averageEffectiveness: number;
+  delayedProjects: number;
+  aboveTargetCount: number;
+  belowTargetCount: number;
+}
+
+
+
+@Component({
+  selector: 'app-dashboard-home',
+  standalone: true,
+  imports: [CommonModule, MatIconModule, MatTooltipModule, LoadingSpinner],
+  templateUrl: './dashboard-home.html',
+  styleUrls: ['./dashboard-home.scss', './dashboard-home-flat.scss'],
+})
+export class DashboardHome implements OnInit {
+  private readonly authService = inject(AuthService);
+  private readonly businessUnitsApi = inject(BusinessUnitsApiService);
+  private readonly departmentsApi = inject(DepartmentsApiService);
+  private readonly plantsApi = inject(PlantsApiService);
+  private readonly projectService = inject(ProjectService);
+  private readonly filterService = inject(DashboardFilterService);
+  private readonly cdr = inject(ChangeDetectorRef);
+
+  readonly user: User | null = this.authService.getCurrentUser();
+  readonly filterCardLimit = 8;
+  readonly currentYear = new Date().getFullYear();
+  readonly currentMonth = new Date().getMonth() + 1;
+
+  filterState: DashboardFilterState = this.filterService.defaultFilterState();
+
+  isLoading = true;
+  isRefreshing = false;
+  hasLoadedDashboard = false;
+  errorMessage = '';
+
+  totalProjects = 0;
+  averageOtd = 0;
+  averageEffectiveness = 0;
+  aboveTargetCount = 0;
+  belowTargetCount = 0;
+  delayedProjects = 0;
+
+  businessUnitTickets: FilterTicket[] = [];
+  departmentTickets: FilterTicket[] = [];
+  plantTickets: FilterTicket[] = [];
+  projectManagementTickets: FilterTicket[] = [];
+  phaseTickets: FilterTicket[] = [];
+  statusTickets: FilterTicket[] = [];
+  projects: any[] = [];
+
+  /**
+   * The currently active ticket for drill-down view.
+   * If null, we show the general project list from the latest paged query.
+   */
+  activeDrillDownTicket: FilterTicket | null = null;
+  activeDrillDownSection: FilterSection | null = null;
+
+
+  private readonly departmentIdByName = new Map<string, string>();
+  private readonly businessUnitIdByName = new Map<string, string>();
+  private readonly plantIdByName = new Map<string, string>();
+
+  get hasActiveFilters(): boolean {
+    return this.filterService.hasAnyFilterSelected(this.filterState);
+  }
+
+  get canRestoreFilters(): boolean {
+    const defaultState = this.filterService.defaultFilterState();
+
+    return Object.keys(defaultState).some((key) => {
+      const filterKey = key as keyof DashboardFilterState;
+      return this.filterState[filterKey] !== defaultState[filterKey];
+    });
+  }
+
+  get periodLabel(): string {
+    if (this.filterState.selectedStartDate && this.filterState.selectedEndDate) {
+      return `${this.formatDateLabel(this.filterState.selectedStartDate)} - ${this.formatDateLabel(this.filterState.selectedEndDate)}`;
+    }
+
+    if (this.filterState.selectedStartDate) {
+      return `From ${this.formatDateLabel(this.filterState.selectedStartDate)}`;
+    }
+
+    if (this.filterState.selectedEndDate) {
+      return `Until ${this.formatDateLabel(this.filterState.selectedEndDate)}`;
+    }
+
+    return 'All dates';
+  }
+
+  get metrics(): DashboardMetric[] {
+    return [
+      {
+        label: 'Projects',
+        value: `${this.totalProjects}`,
+        note: 'Projects matching the active filters',
+        icon: 'inventory_2',
+        tone: 'blue',
+      },
+      {
+        label: 'OTD',
+        value: `${this.formatPercent(this.averageOtd)}`,
+        note: 'On-time delivery for the selected scope',
+        icon: 'verified',
+        tone: this.averageOtd >= 90 ? 'green' : 'orange',
+      },
+      {
+        label: 'Effectiveness',
+        value: `${this.formatPercent(this.averageEffectiveness)}`,
+        note: 'Execution effectiveness for the selected scope',
+        icon: 'auto_graph',
+        tone: this.averageEffectiveness >= 90 ? 'green' : 'orange',
+      },
+      {
+        label: 'Delayed',
+        value: `${this.delayedProjects}`,
+        note: 'Projects requiring attention',
+        icon: 'timer_off',
+        tone: this.delayedProjects > 0 ? 'red' : 'green',
+      },
+    ];
+  }
+
+  getToneColor(tone: string): string {
+    switch (tone) {
+      case 'green': return '#10b981';
+      case 'orange': return '#f59e0b';
+      case 'red': return '#ef4444';
+      case 'blue': return '#3b82f6';
+      default: return '#64748b';
+    }
+  }
+
+  get filterSections(): FilterSection[] {
+    return [
+      {
+        kind: 'projectManagement',
+        title: 'Project Management',
+        icon: 'manage_accounts',
+        tickets: this.projectManagementTickets.filter((ticket) => ticket.id !== 'all'),
+        selectedId: this.filterState.selectedProjectManagementType,
+      },
+      {
+        kind: 'status',
+        title: 'Project Status',
+        icon: 'radio_button_checked',
+        tickets: this.statusTickets.filter((ticket) => ticket.id !== 'all'),
+        selectedId: this.filterState.selectedProjectStatus,
+      },
+      {
+        kind: 'phase',
+        title: 'Project Phases',
+        icon: 'layers',
+        tickets: this.phaseTickets.filter((ticket) => ticket.id !== 'all'),
+        selectedId: this.filterState.selectedProjectPhase,
+      },
+      {
+        kind: 'businessUnit',
+        title: 'Business Units',
+        icon: 'corporate_fare',
+        tickets: this.businessUnitTickets,
+        selectedId: this.filterState.selectedBusinessUnit,
+      },
+      {
+        kind: 'department',
+        title: 'Departments',
+        icon: 'business',
+        tickets: this.departmentTickets,
+        selectedId: this.filterState.selectedDepartment,
+      },
+      {
+        kind: 'plant',
+        title: 'Plants',
+        icon: 'factory',
+        tickets: this.plantTickets,
+        selectedId: this.filterState.selectedPlant,
+      },
+    ];
+  }
+
+  ngOnInit(): void {
+    this.loadReferenceData();
+  }
+
+  selectFilterCard(kind: FilterKind, id: string): void {
+    if (this.isLoading || this.isRefreshing) {
+      return;
+    }
+
+    const nextId = this.getSelectedId(kind) === id ? 'all' : id;
+
+    switch (kind) {
+      case 'businessUnit':
+        this.filterState.selectedBusinessUnit = nextId;
+        break;
+      case 'department':
+        this.filterState.selectedDepartment = nextId;
+        break;
+      case 'plant':
+        this.filterState.selectedPlant = nextId;
+        break;
+      case 'projectManagement':
+        this.filterState.selectedProjectManagementType = nextId;
+        break;
+      case 'phase':
+        this.filterState.selectedProjectPhase = nextId;
+        break;
+      case 'status':
+        this.filterState.selectedProjectStatus = nextId;
+        break;
+    }
+
+    this.loadDashboard();
+  }
+
+  clearAllFilters(): void {
+    if (this.isLoading || this.isRefreshing) {
+      return;
+    }
+
+    this.filterState = this.filterService.defaultFilterState();
+    this.loadDashboard();
+  }
+
+  toggleDrillDown(section: FilterSection, ticket: FilterTicket): void {
+    if (this.activeDrillDownTicket?.id === ticket.id && this.activeDrillDownSection?.kind === section.kind) {
+      this.activeDrillDownTicket = null;
+      this.activeDrillDownSection = null;
+    } else {
+      this.activeDrillDownTicket = ticket;
+      this.activeDrillDownSection = section;
+    }
+    this.cdr.markForCheck();
+  }
+
+  get projectsToDisplay(): any[] {
+    if (this.activeDrillDownTicket?.projects) {
+      return this.activeDrillDownTicket.projects;
+    }
+    return this.projects;
+  }
+
+  selectCurrentMonth(): void {
+    if (this.isLoading || this.isRefreshing) {
+      return;
+    }
+
+    this.filterState.selectedYear = this.currentYear;
+    this.filterState.selectedMonth = this.currentMonth;
+    this.filterState.selectedStartDate = this.toDateInputValue(new Date(this.currentYear, this.currentMonth - 1, 1));
+    this.filterState.selectedEndDate = this.toDateInputValue(new Date(this.currentYear, this.currentMonth, 0));
+    this.loadDashboard();
+  }
+
+  selectAllDates(): void {
+    if (this.isLoading || this.isRefreshing) {
+      return;
+    }
+
+    this.filterState.selectedYear = null;
+    this.filterState.selectedMonth = null;
+    this.filterState.selectedStartDate = null;
+    this.filterState.selectedEndDate = null;
+    this.loadDashboard();
+  }
+
+  updateDateFilter(kind: 'start' | 'end', event: Event): void {
+    if (this.isLoading || this.isRefreshing) {
+      return;
+    }
+
+    const input = event.target as HTMLInputElement;
+    const value = input.value || null;
+
+    if (kind === 'start') {
+      this.filterState.selectedStartDate = value;
+    } else {
+      this.filterState.selectedEndDate = value;
+    }
+
+    this.syncCalendarPeriod();
+    this.loadDashboard();
+  }
+
+  trackByTicketId(_: number, ticket: FilterTicket): string {
+    return ticket.id;
+  }
+
+  trackByProjectId(_: number, project: any): string {
+    return project.id;
+  }
+
+  getTicketIcon(kind: FilterKind, ticket: FilterTicket): string {
+    const label = ticket.label.trim().toLowerCase();
+
+    if (kind === 'businessUnit') {
+      if (label.includes('digital') || label.includes('innovation')) return 'tips_and_updates';
+      if (label.includes('informatique') || label.includes('it') || label.includes('system')) return 'dns';
+      if (label.includes('marketing')) return 'campaign';
+      if (label.includes('manufacturing') || label.includes('production')) return 'precision_manufacturing';
+      if (label.includes('finance')) return 'account_balance';
+      if (label.includes('quality')) return 'verified';
+      if (label.includes('supply') || label.includes('logistic')) return 'local_shipping';
+      if (label.includes('hr') || label.includes('human')) return 'groups';
+      return 'domain';
+    }
+
+    if (kind === 'department') {
+      if (label.includes('informatique') || label.includes('it')) return 'computer';
+      if (label.includes('finance')) return 'payments';
+      if (label.includes('marketing')) return 'campaign';
+      if (label.includes('engineering') || label.includes('technique')) return 'engineering';
+      if (label.includes('manufacturing') || label.includes('production')) return 'factory';
+      if (label.includes('quality')) return 'workspace_premium';
+      if (label.includes('maintenance')) return 'handyman';
+      if (label.includes('purchase') || label.includes('achat')) return 'shopping_cart';
+      if (label.includes('logistic') || label.includes('supply')) return 'inventory_2';
+      return 'account_tree';
+    }
+
+    if (kind === 'plant') {
+      if (label.includes('plant') || label.includes('site')) return 'factory';
+      if (label.includes('office') || label.includes('hq')) return 'business';
+      if (label.includes('warehouse')) return 'warehouse';
+      return 'location_on';
+    }
+
+    if (kind === 'projectManagement') {
+      if (label.includes('digital operation')) return 'settings_suggest';
+      if (label.includes('digital solution')) return 'hub';
+      if (label.includes('infrastructure')) return 'lan';
+      if (label.includes('process')) return 'schema';
+      if (label.includes('other')) return 'more_horiz';
+      return 'engineering';
+    }
+
+    if (kind === 'phase') {
+      if (label.includes('pipeline')) return 'filter_alt';
+      if (label.includes('pre')) return 'manage_search';
+      if (label.includes('initiation')) return 'rocket_launch';
+      if (label.includes('plan')) return 'event_note';
+      if (label.includes('execution')) return 'play_circle';
+      if (label.includes('monitor')) return 'monitoring';
+      if (label.includes('closing')) return 'task_alt';
+      return 'timeline';
+    }
+
+    if (kind === 'status') {
+      if (label.includes('ongoing')) return 'autorenew';
+      if (label.includes('hold')) return 'pause_circle';
+      if (label.includes('done') || label.includes('complete')) return 'check_circle';
+      if (label.includes('planned')) return 'calendar_month';
+      return 'flag';
+    }
+
+    return 'label';
+  }
+
+  private loadReferenceData(): void {
+    this.isLoading = true;
+    this.errorMessage = '';
+
+    forkJoin({
+      departments: this.departmentsApi.listDepartments().pipe(catchError(() => of([]))),
+      businessUnits: this.businessUnitsApi.listItems().pipe(catchError(() => of([]))),
+      plants: this.plantsApi.listItems().pipe(catchError(() => of([]))),
+    }).subscribe({
+      next: ({ departments, businessUnits, plants }) => {
+        this.departmentIdByName.clear();
+        departments.forEach((department: any) => this.departmentIdByName.set(department.name.trim(), department.id));
+
+        this.businessUnitIdByName.clear();
+        businessUnits.forEach((businessUnit: any) =>
+          this.businessUnitIdByName.set(businessUnit.name.trim(), businessUnit.id)
+        );
+
+        this.plantIdByName.clear();
+        plants.forEach((plant: any) => this.plantIdByName.set(plant.name.trim(), plant.id));
+
+        this.loadDashboard();
+      },
+      error: () => {
+        this.isLoading = false;
+        this.errorMessage = 'Unable to load dashboard filters.';
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  private loadDashboard(): void {
+    const isInitialLoad = !this.hasLoadedDashboard;
+    this.isLoading = isInitialLoad;
+    this.isRefreshing = !isInitialLoad;
+    this.errorMessage = '';
+
+    const dashboardParams = this.filterService.buildParams(this.filterState);
+    const projectParams = this.buildProjectParams(dashboardParams);
+    forkJoin({
+      projectsPage: this.projectService.getProjectsPaged(projectParams).pipe(catchError(() => of(null))),
+      dashboard: this.loadDashboardSummary(dashboardParams).pipe(catchError(() => of(null))),
+      dashboardBi: this.loadDashboardBi(dashboardParams).pipe(catchError(() => of(null))),
+      groupedDistribution: this.user?.isAdmin 
+        ? this.projectService.getAdminDashboardGroupedDistribution(dashboardParams).pipe(catchError(() => of(null)))
+        : of(null),
+    })
+      .pipe(
+        finalize(() => {
+          this.isRefreshing = false;
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe(({ projectsPage, dashboard, dashboardBi, groupedDistribution }) => {
+        this.projects = projectsPage?.data ?? [];
+        this.totalProjects = projectsPage?.totalCount ?? this.projects.length;
+        this.rebuildFilterTickets(this.projects);
+        
+        // Reset drill-down if the ticket is no longer available or counts changed
+        this.activeDrillDownTicket = null;
+        this.activeDrillDownSection = null;
+
+        if (!dashboard) {
+          this.errorMessage = 'Unable to load dashboard stats right now.';
+          this.isLoading = false;
+          return;
+        }
+
+        const stats = this.extractDashboardStats(dashboard.raw ?? dashboard, this.totalProjects);
+        this.totalProjects = stats.totalProjects;
+        this.averageOtd = stats.averageOtd;
+        this.averageEffectiveness = stats.averageEffectiveness;
+        this.delayedProjects = stats.delayedProjects;
+        this.aboveTargetCount = stats.aboveTargetCount;
+        this.belowTargetCount = stats.belowTargetCount;
+
+        // Apply counts from BI/Extended if available
+        this.syncTicketCountsFromDashboard(dashboard.raw ?? dashboard);
+        if (dashboardBi) {
+          this.syncTicketCountsFromDashboard(dashboardBi.raw ?? dashboardBi);
+        }
+
+        // Override/supplement with high-precision counts from the new grouped distribution endpoint
+        if (groupedDistribution) {
+          this.syncTicketCountsFromGroupedDistribution(groupedDistribution);
+        }
+
+        this.hasLoadedDashboard = true;
+        this.isLoading = false;
+      });
+  }
+
+  private loadDashboardSummary(params: DashboardFilterParams) {
+    if (this.user?.isAdmin) {
+      return this.projectService.getAdminDashboardExtended(params).pipe(
+        map((dashboard: any) => ({
+          summary: dashboard?.summary ?? {},
+          raw: dashboard,
+        }))
+      );
+    }
+
+    return this.projectService.getUserDashboardOverview(params).pipe(
+      map((dashboard: any) => ({
+        summary: dashboard?.summary ?? {},
+        raw: dashboard,
+      }))
+    );
+  }
+
+  private loadDashboardBi(params: DashboardFilterParams): Observable<{ raw: any } | null> {
+    if (!this.user?.isAdmin) {
+      return of(null);
+    }
+
+    return this.projectService.getAdminDashboardBi(params).pipe(
+      map((dashboard: any) => ({
+        raw: dashboard,
+      }))
+    );
+  }
+
+  private extractDashboardStats(rawDashboard: any, projectCountFallback: number): DashboardStatsSnapshot {
+    const summary = rawDashboard?.summary ?? rawDashboard ?? {};
+    const health = rawDashboard?.portfolioHealth ?? rawDashboard?.health ?? {};
+    const kpis = rawDashboard?.kpis ?? {};
+    const charts = rawDashboard?.charts ?? {};
+    const deliveryMetrics = this.asLabelValueArray(charts.deliveryMetrics ?? health.deliveryMetrics ?? kpis.deliveryMetrics);
+
+    const otdFromDelivery = this.findMetricValue(deliveryMetrics, ['otd', 'on time delivery', 'on-time delivery']);
+    const effectivenessFromDelivery = this.findMetricValue(deliveryMetrics, ['effectiveness', 'efficiency']);
+
+    return {
+      totalProjects: this.firstNumber(
+        [
+          summary.totalProjects,
+          summary.TotalProjects,
+          health.totalProjects,
+          health.TotalProjects,
+          kpis.totalProjects,
+          kpis.TotalProjects,
+          projectCountFallback,
+        ],
+        projectCountFallback
+      ),
+      averageOtd: this.firstNumber(
+        [
+          summary.averageOtd,
+          summary.averageOTD,
+          summary.AverageOtd,
+          summary.AverageOTD,
+          health.averageOtd,
+          health.averageOTD,
+          health.AverageOtd,
+          health.AverageOTD,
+          kpis.averageOtd,
+          kpis.averageOTD,
+          kpis.otd,
+          otdFromDelivery,
+        ],
+        0
+      ),
+      averageEffectiveness: this.firstNumber(
+        [
+          summary.averageEffectiveness,
+          summary.AverageEffectiveness,
+          summary.effectiveness,
+          health.averageEffectiveness,
+          health.AverageEffectiveness,
+          health.effectiveness,
+          kpis.averageEffectiveness,
+          kpis.effectiveness,
+          effectivenessFromDelivery,
+        ],
+        0
+      ),
+      delayedProjects: this.firstNumber(
+        [
+          summary.delayedProjects,
+          summary.DelayedProjects,
+          health.delayedProjects,
+          health.DelayedProjects,
+          rawDashboard?.risks?.delayedProjects,
+        ],
+        0
+      ),
+      aboveTargetCount: this.firstNumber(
+        [
+          summary.doneProjectsAboveTarget,
+          summary.DoneProjectsAboveTarget,
+          summary.projectsAboveTarget,
+          health.doneProjectsAboveTarget,
+          kpis.doneProjectsAboveTarget,
+        ],
+        0
+      ),
+      belowTargetCount: this.firstNumber(
+        [
+          summary.doneProjectsBelowTarget,
+          summary.DoneProjectsBelowTarget,
+          summary.projectsBelowTarget,
+          health.doneProjectsBelowTarget,
+          kpis.doneProjectsBelowTarget,
+        ],
+        0
+      ),
+    };
+  }
+
+  private asLabelValueArray(source: unknown): Array<{ label: string; value: number }> {
+    if (Array.isArray(source)) {
+      return source
+        .map((item) => {
+          const row = item as Record<string, unknown>;
+          return {
+            label: String(row['label'] ?? row['name'] ?? row['key'] ?? '').trim(),
+            value: Number(row['value'] ?? row['count'] ?? 0),
+          };
+        })
+        .filter((item) => item.label && Number.isFinite(item.value));
+    }
+
+    if (source && typeof source === 'object') {
+      return Object.entries(source as Record<string, unknown>).map(([label, value]) => ({
+        label,
+        value: Number(value ?? 0),
+      }));
+    }
+
+    return [];
+  }
+
+  private findMetricValue(metrics: Array<{ label: string; value: number }>, labels: string[]): number | undefined {
+    const normalizedLabels = labels.map((label) => label.toLowerCase());
+    const found = metrics.find((metric) => normalizedLabels.includes(metric.label.trim().toLowerCase()));
+    return found?.value;
+  }
+
+  private firstNumber(values: unknown[], fallback: number): number {
+    for (const value of values) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return fallback;
+  }
+
+  private syncTicketCountsFromDashboard(rawDashboard: any): void {
+    const charts = rawDashboard?.charts ?? rawDashboard?.portfolioHealth ?? {};
+
+    this.syncTicketCounts(this.businessUnitTickets, this.firstChart(charts, [
+      'projectsByBusinessUnit',
+      'projectsByBU',
+      'businessUnitProjects',
+      'projectsByBusinessUnits',
+    ]));
+    this.syncTicketCounts(this.departmentTickets, this.firstChart(charts, [
+      'projectsByDepartment',
+      'departmentProjects',
+      'projectsByDepartments',
+    ]));
+    this.syncTicketCounts(this.plantTickets, this.firstChart(charts, [
+      'projectsByPlant',
+      'plantProjects',
+      'projectsByPlants',
+    ]));
+    this.syncTicketCounts(this.statusTickets, this.firstChart(charts, [
+      'projectsByStatus',
+      'statusProjects',
+    ]));
+    this.syncTicketCounts(this.phaseTickets, this.firstChart(charts, [
+      'projectsByPhase',
+      'phaseProjects',
+    ]));
+    this.syncTicketCounts(this.projectManagementTickets, this.firstChart(charts, [
+      'projectsByProjectManagementType',
+      'projectsByProjectManagement',
+      'projectManagementTypeProjects',
+      'projectsByManagementType',
+    ]));
+  }
+
+  /**
+   * High-precision sync using the new Grouped Distribution endpoint.
+   * This endpoint is designed specifically to match the dashboard's filtering logic.
+   */
+  private syncTicketCountsFromGroupedDistribution(data: DashboardGroupedDistributionDto): void {
+    if (!data) return;
+
+    this.syncGroupedItems(this.businessUnitTickets, data.businessUnits);
+    this.syncGroupedItems(this.departmentTickets, data.departments);
+    this.syncGroupedItems(this.plantTickets, data.plants);
+    this.syncGroupedItems(this.statusTickets, data.status);
+    this.syncGroupedItems(this.phaseTickets, data.phases);
+    this.syncGroupedItems(this.projectManagementTickets, data.projectManagement);
+  }
+
+  private syncGroupedItems(tickets: FilterTicket[], source: any[]): void {
+    if (!source || !tickets.length) return;
+
+    const itemsById = new Map<string, any>();
+    const itemsByLabel = new Map<string, any>();
+
+    source.forEach(item => {
+      if (item.id) itemsById.set(String(item.id).toLowerCase(), item);
+      if (item.label) itemsByLabel.set(this.normalizeCountLabel(item.label), item);
+    });
+
+    tickets.forEach(ticket => {
+      // 1. Try matching by ID first (most precise)
+      let sourceItem = itemsById.get(String(ticket.id).toLowerCase());
+      
+      // 2. Fallback to label matching
+      if (!sourceItem) {
+        sourceItem = itemsByLabel.get(this.normalizeCountLabel(ticket.label));
+      }
+
+      if (sourceItem) {
+        ticket.count = sourceItem.count ?? 0;
+        ticket.projects = sourceItem.projects ?? [];
+      }
+    });
+
+    // Update 'All' ticket if it exists and synchronize total projects
+    const allTicket = tickets.find(t => t.id === 'all');
+    if (allTicket) {
+      const total = source.reduce((sum, item) => sum + (item.count || 0), 0);
+      allTicket.count = total;
+      
+      // Update the main totalProjects metric if we are syncing statuses or phases
+      // (which should represent the total project count)
+      if (tickets === this.statusTickets || tickets === this.phaseTickets) {
+        this.totalProjects = total;
+      }
+    }
+  }
+
+  private firstChart(source: Record<string, unknown>, keys: string[]): unknown {
+    for (const key of keys) {
+      if (source?.[key] !== undefined && source?.[key] !== null) {
+        return source[key];
+      }
+    }
+
+    return null;
+  }
+
+  private syncTicketCounts(tickets: FilterTicket[], source: unknown): void {
+    const chartItems = this.asLabelValueArray(source);
+    if (!chartItems.length || !tickets.length) {
+      return;
+    }
+
+    const countsByLabel = new Map<string, number>();
+    chartItems.forEach((item) => countsByLabel.set(this.normalizeCountLabel(item.label), item.value));
+
+    tickets.forEach((ticket) => {
+      const count = countsByLabel.get(this.normalizeCountLabel(ticket.label));
+      if (count !== undefined) {
+        ticket.count = count;
+      }
+    });
+  }
+
+  private normalizeCountLabel(label: string): string {
+    return label
+      .trim()
+      .toLowerCase()
+      .replace(/^bu\s+/i, '')
+      .replace(/^plant\s+/i, '')
+      .replace(/^departement\s+/i, '')
+      .replace(/^department\s+/i, '')
+      .replace(/^dept\s+/i, '')
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, '');
+  }
+
+  private rebuildFilterTickets(projects: any[]): void {
+    this.businessUnitTickets = this.filterService.buildBusinessUnitTickets(projects, this.businessUnitIdByName);
+    this.departmentTickets = this.filterService.buildDepartmentTickets(projects, this.departmentIdByName);
+    this.plantTickets = this.filterService.buildPlantTickets(projects, this.plantIdByName);
+    this.projectManagementTickets = this.filterService.buildProjectManagementTypeTickets(projects);
+    this.phaseTickets = this.filterService.buildPhaseTickets(projects);
+    this.statusTickets = this.filterService.buildStatusTickets(projects);
+  }
+
+  private buildProjectParams(params: DashboardFilterParams): any {
+    const projectParams: any = {
+      pageNumber: 1,
+      pageSize: 500,
+    };
+
+    if (params.businessUnitId) projectParams.BusinessUnitId = params.businessUnitId;
+    if (params.departmentId) projectParams.DepartmentId = params.departmentId;
+    if (params.plantId) projectParams.PlantId = params.plantId;
+    if (params.year) projectParams.year = params.year;
+    if (params.month) projectParams.month = params.month;
+    if (params.ytd) projectParams.ytd = params.ytd;
+    if (params.startDate) projectParams.startDate = params.startDate;
+    if (params.endDate) projectParams.endDate = params.endDate;
+    if (params.projectManagementType !== undefined) {
+      projectParams.ProjectManagementType = Number(params.projectManagementType);
+    }
+    if (params.projectStatus !== undefined) {
+      projectParams.Status = Number(params.projectStatus);
+    }
+    if (this.filterState.selectedProjectPhase !== 'all') {
+      projectParams.Phase = this.projectPhaseIdToNumber(this.filterState.selectedProjectPhase);
+    }
+
+    return projectParams;
+  }
+
+  private getSelectedId(kind: FilterKind): string {
+    switch (kind) {
+      case 'businessUnit':
+        return this.filterState.selectedBusinessUnit;
+      case 'department':
+        return this.filterState.selectedDepartment;
+      case 'plant':
+        return this.filterState.selectedPlant;
+      case 'projectManagement':
+        return this.filterState.selectedProjectManagementType;
+      case 'phase':
+        return this.filterState.selectedProjectPhase;
+      case 'status':
+        return this.filterState.selectedProjectStatus;
+    }
+  }
+
+  private projectPhaseIdToNumber(phaseId: string): number {
+    const map: Record<string, number> = {
+      pipeline: 0,
+      preprocess: 1,
+      initiation: 2,
+      planification: 3,
+      execution: 4,
+      monitoring: 5,
+      closing: 6,
+    };
+
+    return map[phaseId] ?? Number(phaseId);
+  }
+
+  private formatPercent(value: number): string {
+    return `${Number(value || 0).toFixed(1)}%`;
+  }
+
+  private syncCalendarPeriod(): void {
+    if (!this.filterState.selectedStartDate && !this.filterState.selectedEndDate) {
+      this.filterState.selectedYear = null;
+      this.filterState.selectedMonth = null;
+      return;
+    }
+
+    if (!this.filterState.selectedStartDate || !this.filterState.selectedEndDate) {
+      this.filterState.selectedYear = null;
+      this.filterState.selectedMonth = null;
+      return;
+    }
+
+    const start = new Date(`${this.filterState.selectedStartDate}T00:00:00`);
+    const end = new Date(`${this.filterState.selectedEndDate}T00:00:00`);
+    const sameYear = start.getFullYear() === end.getFullYear();
+    const sameMonth = start.getMonth() === end.getMonth();
+    const isFirstDay = start.getDate() === 1;
+    const isLastDay = end.getDate() === new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+
+    this.filterState.selectedYear = sameYear ? start.getFullYear() : null;
+    this.filterState.selectedMonth = sameYear && sameMonth && isFirstDay && isLastDay ? start.getMonth() + 1 : null;
+  }
+
+  private formatDateLabel(value: string): string {
+    const date = new Date(`${value}T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat('en', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
+  }
+
+  private toDateInputValue(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+}

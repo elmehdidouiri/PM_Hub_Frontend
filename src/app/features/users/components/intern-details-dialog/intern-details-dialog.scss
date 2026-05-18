@@ -19,7 +19,7 @@
   align-items: center;
 
   .header-main {
-    h2 { margin: 0; color: #1e293b; font-size: 1.25rem; font-weight: 900; }
+    h2 { margin: 0; color: #1e293b; font-size: 1.25rem; font-weight: 700; }
     p { margin: 0.25rem 0 0; color: #64748b; font-size: 0.9rem; font-weight: 600; }
   }
 
@@ -55,7 +55,7 @@
   .alloc-title {
     .alloc-tag {
       font-size: 0.65rem;
-      font-weight: 900;
+      font-weight: 700;
       color: #3b82f6;
       background: rgba(59, 130, 246, 0.1);
       padding: 0.2rem 0.6rem;
@@ -74,7 +74,7 @@
       flex-direction: column;
       align-items: flex-end;
       .lbl { font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
-      strong { font-size: 1.1rem; color: #1e293b; font-weight: 900; }
+      strong { font-size: 1.1rem; color: #1e293b; font-weight: 700; }
     }
   }
 }
@@ -117,13 +117,13 @@
     gap: 0.25rem;
     
     label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
-    span { font-size: 0.95rem; font-weight: 900; color: #1e293b; }
+    span { font-size: 0.95rem; font-weight: 700; color: #1e293b; }
     .over-budget { color: #ef4444; }
   }
 }
 
 .hour-entries-section {
-  h4 { font-size: 0.9rem; font-weight: 900; color: #1e293b; margin: 0 0 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  h4 { font-size: 0.9rem; font-weight: 700; color: #1e293b; margin: 0 0 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
 }
 
 .mini-table {

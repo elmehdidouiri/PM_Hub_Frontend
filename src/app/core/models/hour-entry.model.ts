@@ -39,7 +39,9 @@ export interface CreateHourEntryDto {
   rangeEndDate?: string;
 
   category: number;
-  projectId?: string;
+  projectId?: string | null;
+  totalHours?: number;
+  activityNote?: string | null;
 
   executionHours: number;
   technicalSupervisionHours: number;

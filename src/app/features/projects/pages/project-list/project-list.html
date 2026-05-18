@@ -73,13 +73,7 @@
     </div>
   </section>
 
-  <div class="state-card state-card--loading pm-surface" *ngIf="isLoading">
-    <mat-icon>hourglass_top</mat-icon>
-    <div>
-      <strong>Loading projects</strong>
-      <p>We are retrieving the latest project data from PMHUB.</p>
-    </div>
-  </div>
+  <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
 
   <div class="state-card state-card--error pm-surface" *ngIf="!isLoading && errorMessage">
     <mat-icon>error_outline</mat-icon>
@@ -115,7 +109,7 @@
         <thead>
           <tr>
             <th>Projet</th>
-            <th>Département</th>
+            <th>D�partement</th>
             <th>Type</th>
             <th>Phase</th>
             <th>Status</th>
@@ -133,7 +127,7 @@
                 <strong>{{ project.name }}</strong>
                </div>
             </td>
-            <td data-label="Département">{{ project.departmentName }}</td>
+            <td data-label="D�partement">{{ project.departmentName }}</td>
             <td data-label="Type">
               <div class="type-cell">
                 <span class="type-primary">{{ project.managementTypeLabel }}</span>

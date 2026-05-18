@@ -1,334 +1,148 @@
-<!-- Full Page Modern Loader -->
-<div class="full-page-loader" *ngIf="isLoading">
-  <div class="loader-content">
-    <div class="premium-spinner">
-      <div class="inner-spin"></div>
-    </div>
-    <div class="loader-text-group">
-      <h2 class="loader-title">Intelligence Executive</h2>
-      <p class="loader-subtitle">Chargement des données analytiques en cours...</p>
-    </div>
-  </div>
-</div>
+<div class="dashboard-page pm-page-enter">
+  <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
+
+  <ng-container *ngIf="hasLoadedDashboard">
+    <div class="dashboard-content" [class.dashboard-content--refreshing]="isRefreshing">
+      <header class="page-header dashboard-hero">
+        <div class="dashboard-hero__copy">
 
-<div class="dashboard-container pm-page-enter" [class.content-hidden]="isLoading">
-  <!-- Centered Page Title -->
-  <div class="page-title-block">
-     <h1>Executive Business Intelligence</h1>
-    <p>Portfolio-wide performance and operational health metrics</p>
-  </div>
+          <span class="dashboard-hero__eyebrow">PMHUB Analytics</span>
+          <h1>Performance Intelligence</h1>
+          <p>Portfolio-wide OTD, effectiveness and resource utilization analytics.</p>
 
-  <!-- Filter Bar + Target Badges -->
-  <header class="dashboard-top-nav">
-    <div class="header-controls">
-      <section class="filter-bar-compact glass-card" [class.filter-bar--active]="hasActiveFilters">
-        <div class="filters-row">
-          <div class="flt" [class.flt--on]="selectedBusinessUnit !== 'all'" (click)="businessUnitPicker.open()">
-            <mat-icon>corporate_fare</mat-icon>
-            <mat-select #businessUnitPicker [(value)]="selectedBusinessUnit" (selectionChange)="onFiltersChanged()" (click)="$event.stopPropagation()" panelClass="flt-panel" [disableOptionCentering]="true">
-              <mat-select-trigger>{{ getShortLabel(businessUnitTickets, selectedBusinessUnit, 'All BU') }}</mat-select-trigger>
-              <mat-option value="all">All BU</mat-option>
-              <mat-option *ngFor="let bu of businessUnitTickets" [value]="bu.id">
-                {{ bu.label }} ({{ bu.count }})
-              </mat-option>
-            </mat-select>
-            <mat-icon class="flt__arrow">expand_more</mat-icon>
+          <div class="dashboard-hero__meta">
+
+            <span>
+
+              <mat-icon>calendar_month</mat-icon>
+
+              {{ periodLabel }}
+
+            </span>
+
+            <span>
+
+              <mat-icon>filter_alt</mat-icon>
+
+              {{ hasActiveFilters ? 'Filtered portfolio view' : 'All portfolio segments' }}
+
+            </span>
+
           </div>
+        </div>
+
+        <button class="pm-btn-secondary" type="button" [disabled]="isRefreshing || !canRestoreFilters" (click)="clearAllFilters()">
+          <mat-icon>restart_alt</mat-icon>
+          Reset Environment
+        </button>
+      </header>
 
-          <!-- Department -->
-          <div class="flt" [class.flt--on]="selectedDepartment !== 'all'" (click)="deptPicker.open()">
-            <mat-icon>business</mat-icon>
-            <mat-select #deptPicker [(value)]="selectedDepartment" (selectionChange)="onFiltersChanged()" (click)="$event.stopPropagation()" panelClass="flt-panel" [disableOptionCentering]="true">
-              <mat-select-trigger>{{ getShortLabel(departmentTickets, selectedDepartment, 'All Dept') }}</mat-select-trigger>
-              <mat-option value="all">All Dept</mat-option>
-              <mat-option *ngFor="let dept of departmentTickets" [value]="dept.id">
-                {{ dept.label }} ({{ dept.count }})
-              </mat-option>
-            </mat-select>
-            <mat-icon class="flt__arrow">expand_more</mat-icon>
-          </div>
+      <section class="dashboard-alert" *ngIf="errorMessage">
 
-          <!-- Plant -->
-          <div class="flt" [class.flt--on]="selectedPlant !== 'all'" (click)="plantPicker.open()">
-            <mat-icon>factory</mat-icon>
-            <mat-select #plantPicker [(value)]="selectedPlant" (selectionChange)="onFiltersChanged()" (click)="$event.stopPropagation()" panelClass="flt-panel" [disableOptionCentering]="true">
-              <mat-select-trigger>{{ getShortLabel(plantTickets, selectedPlant, 'All Plants') }}</mat-select-trigger>
-              <mat-option value="all">All Plants</mat-option>
-              <mat-option *ngFor="let p of plantTickets" [value]="p.id">
-                {{ p.label }} ({{ p.count }})
-              </mat-option>
-            </mat-select>
-            <mat-icon class="flt__arrow">expand_more</mat-icon>
-          </div>
+        <mat-icon>error_outline</mat-icon>
 
-          <div class="flt-sep"></div>
+        <span>{{ errorMessage }}</span>
 
-          <!-- Phase -->
-          <div class="flt" [class.flt--on]="selectedProjectPhase !== 'all'" (click)="phasePicker.open()">
-            <mat-icon>layers</mat-icon>
-            <mat-select #phasePicker [(value)]="selectedProjectPhase" (selectionChange)="onFiltersChanged()" (click)="$event.stopPropagation()" panelClass="flt-panel" [disableOptionCentering]="true">
-              <mat-select-trigger>{{ getShortLabel(phaseTickets, selectedProjectPhase, 'All Phases') }}</mat-select-trigger>
-              <mat-option value="all">All Phases</mat-option>
-              <mat-option *ngFor="let opt of phaseTickets.slice(1)" [value]="opt.id">
-                {{ opt.label }} ({{ opt.count }})
-              </mat-option>
-            </mat-select>
-            <mat-icon class="flt__arrow">expand_more</mat-icon>
-          </div>
-
-          <!-- Status -->
-          <div class="flt" [class.flt--on]="selectedProjectStatus !== 'all'" (click)="statusPicker.open()">
-            <mat-icon>radio_button_checked</mat-icon>
-            <mat-select #statusPicker [(value)]="selectedProjectStatus" (selectionChange)="onFiltersChanged()" (click)="$event.stopPropagation()" panelClass="flt-panel" [disableOptionCentering]="true">
-              <mat-select-trigger>{{ getShortLabel(statusTickets, selectedProjectStatus, 'All Status') }}</mat-select-trigger>
-              <mat-option value="all">All Status</mat-option>
-              <mat-option *ngFor="let opt of statusTickets.slice(1)" [value]="opt.id">
-                {{ opt.label }} ({{ opt.count }})
-              </mat-option>
-            </mat-select>
-            <mat-icon class="flt__arrow">expand_more</mat-icon>
-          </div>
-
-          <div class="flt-sep"></div>
-
-          <!-- Period Picker -->
-          <div class="flt flt--period" [class.flt--on]="selectedYear || selectedMonth" (click)="togglePeriodPicker($event)">
-            <mat-icon>calendar_today</mat-icon>
-            <span class="flt__label">{{ periodLabel }}</span>
-            <mat-icon class="flt__arrow">expand_more</mat-icon>
-
-            <div class="period-picker" *ngIf="periodPickerOpen" (click)="$event.stopPropagation()">
-              <div class="period-picker__hint">FISCAL YEAR (OCT-SEP)</div>
-              <div class="period-picker__years">
-                <button class="pp-year pp-year--all" [class.pp-year--active]="!selectedYear" (click)="clearPeriod()">All Periods</button>
-                <button *ngFor="let y of yearOptions" class="pp-year" [class.pp-year--active]="selectedYear === y" (click)="pickYear(y)">{{ y }}</button>
-              </div>
-              <div class="pp-sep" *ngIf="selectedYear"></div>
-              <div class="period-picker__months" [class.period-picker__months--visible]="selectedYear">
-                <button *ngFor="let m of monthOptions" class="pp-month" [class.pp-month--active]="selectedMonth === m.id" (click)="pickMonth(m.id)">{{ m.label | slice:0:3 }}</button>
-              </div>
-            </div>
-          </div>
-
-          <button class="filter-reset-icon" *ngIf="hasActiveFilters" (click)="clearAllFilters()" matTooltip="Reset All">
-            <mat-icon>refresh</mat-icon>
-          </button>
-        </div>
       </section>
-
-      <!-- Target Badges (same row as filters) -->
-      <div class="header-status-badges" *ngIf="!isLoading">
-        <div class="status-badge status-badge--success" matTooltip="Projects exceeding OTD target">
-          <mat-icon>trending_up</mat-icon>
-          <div class="status-badge__info">
-            <span class="sb-val">{{ aboveTargetCount }}</span>
-            <span class="sb-lbl">Above Target</span>
-          </div>
-        </div>
-        <div class="status-badge status-badge--danger" matTooltip="Projects requiring audit/correction">
-          <mat-icon>trending_down</mat-icon>
-          <div class="status-badge__info">
-            <span class="sb-val">{{ belowTargetCount }}</span>
-            <span class="sb-lbl">Below Target</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Analytics Section -->
-  <section class="analytics-section" *ngIf="!isLoading && !errorMessage">
-    <!-- ADMIN BI VIEW -->
-    <ng-container *ngIf="user?.isAdmin; else userView">
-      <!-- KPI Grid -->
-      <div class="bento-grid">
-        <pm-metric-card *ngFor="let m of performanceMetrics" 
-          [label]="m.label" [value]="m.value" [note]="m.note" 
-          [icon]="m.icon" [tone]="m.tone" [delta]="m.delta">
-        </pm-metric-card>
-      </div>
-
-      <!-- Financial Row (Row 2) -->
-      <div class="grid-layout" *ngIf="financialMetrics.length">
-        <pm-metric-card *ngFor="let m of financialMetrics" 
-          [label]="m.label" [value]="m.value" [note]="m.note" 
-          [icon]="m.icon" [tone]="m.tone">
-        </pm-metric-card>
-      </div>
-
-      <!-- Primary BI Charts -->
-      <div class="grid-layout">
-        <pm-chart-bar title="Workload by Category" icon="account_tree" [data]="workloadDepartmentBars" [color]="'#3b82f6'"></pm-chart-bar>
-        <pm-chart-bar title="Workload by Stage" icon="layers" [data]="workloadBusinessUnitBars" [color]="'#2dd4bf'"></pm-chart-bar>
-        <pm-chart-bar title="Workload by Role" icon="people" [data]="workloadRoleBars" [color]="'#a855f7'"></pm-chart-bar>
-        <pm-chart-bar title="User Status" icon="group" [data]="userStatusBars" [color]="'#6366f1'"></pm-chart-bar>
-        <pm-chart-bar title="Top Projects (Hours)" icon="leaderboard" [data]="topProjectBars" [color]="'#f59e0b'"></pm-chart-bar>
-        <pm-chart-bar title="Delay Distribution" icon="history_toggle_off" [data]="delayRateBars" [color]="'#f43f5e'"></pm-chart-bar>
-      </div>
-
-      <!-- Performance & Capacity -->
-      <div class="grid-layout" *ngIf="performanceTrend.length">
-        <!-- Performance Trend (Legacy Inline SVG for now as it's complex) -->
-        <div class="chart-container glass-card">
-          <div class="chart-header">
-            <h3>Portfolio Performance Trend</h3>
-            <div class="trend-legend" style="display: flex; gap: 1rem; font-size: 0.75rem;">
-              <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%;"></span> OTD</span>
-              <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></span> Eff.</span>
-            </div>
-          </div>
-          <div class="trend-grid" style="display: flex; align-items: flex-end; height: 180px; gap: 8px; padding-top: 2rem;">
-            <div class="trend-col" *ngFor="let p of performanceTrend" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;">
-              <div class="trend-bars" style="width: 100%; display: flex; gap: 2px; align-items: flex-end; height: 140px;">
-                <div class="t-bar" [style.height.%]="p.otd" style="flex: 1; background: #3b82f6; border-radius: 2px 2px 0 0;"></div>
-                <div class="t-bar" [style.height.%]="p.effectiveness" style="flex: 1; background: #f59e0b; border-radius: 2px 2px 0 0;"></div>
-              </div>
-              <span style="font-size: 0.65rem; color: #64748b;">{{ p.label }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Capacity Analysis -->
-        <div class="chart-container glass-card">
-          <div class="chart-header"><h3>Monthly Capacity</h3><mat-icon>speed</mat-icon></div>
-          <div class="capacity-grid" style="display: flex; align-items: flex-end; height: 180px; gap: 12px; padding-top: 2rem;">
-            <div class="cap-col" *ngFor="let m of monthlyWorkloadTrend" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;">
-              <div class="cap-bar-wrap" style="width: 12px; height: 140px; background: #f1f5f9; border-radius: 6px; position: relative; overflow: hidden;">
-                <div class="cap-fill" [style.height.%]="(m.total / capacityMax * 100)" style="width: 100%; background: #3b82f6; position: absolute; bottom: 0;"></div>
-              </div>
-              <span style="font-size: 0.65rem; color: #64748b;">{{ m.monthName.slice(0,3) }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Action Items & Alerts -->
-      <div class="admin-actions-grid">
-        <!-- Alerts -->
-        <div class="chart-container glass-card">
-          <div class="chart-header">
-            <h3>Active Alerts</h3>
-            <mat-icon>notifications_active</mat-icon>
-          </div>
-          <div class="bi-alerts">
-            <div class="bi-alert" *ngFor="let alert of biAlerts" 
-                 [style.border-left-color]="alert.severity === 'warning' ? '#f59e0b' : '#3b82f6'">
-              <div class="bi-alert__content">
-                <strong>{{ alert.title }}</strong>
-                <p>{{ alert.message }}</p>
-              </div>
-            </div>
-            <div class="empty-state-bi" *ngIf="!biAlerts.length">
-              <mat-icon>check_circle_outline</mat-icon>
-              <span>No active alerts</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Placeholder for another BI element like 'Top Projects by Risk' or similar -->
-        <div class="chart-container glass-card">
-          <div class="chart-header">
-            <h3>Risk Assessment</h3>
-            <mat-icon>warning</mat-icon>
-          </div>
-          <div class="risk-list" style="display: flex; flex-direction: column; gap: 12px; padding-top: 0.5rem;">
-            <div *ngFor="let p of highRiskProjects" class="risk-item" style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border-radius: 8px; background: #fff1f2; border-left: 4px solid #f43f5e;">
-              <div style="flex: 1;">
-                <div style="font-size: 0.85rem; font-weight: 800; color: #9f1239;">{{ p.projectName }}</div>
-                <div style="font-size: 0.7rem; color: #e11d48;">{{ p.delayDays }} days delay • Score: {{ p.riskScore }}</div>
-              </div>
-              <span class="status-tag" [attr.data-status]="p.status?.toLowerCase()">{{ p.status }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </ng-container>
-
-    <!-- USER PERSONAL VIEW -->
-    <ng-template #userView>
-      <div class="bento-grid">
-        <pm-metric-card label="OTD Delivery" [value]="performanceScore.toFixed(1) + '%'" note="Target achieved" icon="timer" [progress]="performanceScore"></pm-metric-card>
-        <pm-metric-card label="Logged Hours" [value]="totalHoursYtd | number" [note]="annualGoalProgress.toFixed(1) + '% of annual goal'" icon="schedule" [progress]="annualGoalProgress"></pm-metric-card>
-        <pm-metric-card *ngFor="let m of userMetrics" [label]="m.label" [value]="m.value" [note]="m.note" [icon]="m.icon" [tone]="m.tone"></pm-metric-card>
-      </div>
-
-      <div class="grid-layout">
-        <pm-chart-bar title="Project Status" icon="analytics" [data]="projectStatusBars"></pm-chart-bar>
-        <pm-chart-bar title="Hours by Stage" icon="stacked_bar_chart" [data]="hoursStageBars" color="#3b82f6"></pm-chart-bar>
-        <pm-chart-bar title="Top Projects" icon="leaderboard" [data]="topProjectBars"></pm-chart-bar>
-        
-        <!-- Yearly Effort Distribution -->
-        <div class="chart-container glass-card">
-          <div class="chart-header"><h3>Effort Distribution</h3><mat-icon>pie_chart</mat-icon></div>
-          <div class="distribution-list">
-            <div class="dist-item" *ngFor="let cat of effortDistribution">
-              <div class="dist-info">
-                <span class="dist-color" [style.background-color]="getCatColor(cat.label)"></span>
-                <span class="dist-name">{{ cat.label }}</span>
-                <span class="dist-pct">{{ cat.percent }}%</span>
-              </div>
-              <div class="dist-track"><div class="dist-fill" [style.width.%]="cat.percent" [style.background-color]="getCatColor(cat.label)"></div></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Monthly Trend -->
-      <div class="chart-container glass-card" style="margin-bottom: 2rem;" *ngIf="monthlyEffortTrend.length">
-        <div class="chart-header">
-          <div><h3>Monthly Workload Analysis</h3><p>Effort distribution across work streams</p></div>
-          <mat-icon>show_chart</mat-icon>
-        </div>
-        <div class="stack-chart">
-          <div class="stack-col" *ngFor="let m of monthlyEffortTrend">
-            <div class="stack-bar-wrap">
-              <div class="stack-bar">
-                <div class="stack-segment" *ngFor="let cat of m.categories" 
-                  [style.height.%]="cat.percent" [style.background-color]="cat.color"
-                  [attr.title]="cat.label + ': ' + cat.percent + '%'"></div>
-              </div>
-            </div>
-            <span class="stack-month">{{ m.monthName }}</span>
-          </div>
-        </div>
-      </div>
-    </ng-template>
-  </section>
-
-  <!-- Portfolio Overview -->
-  <section class="personal-projects-section" *ngIf="!isLoading && !errorMessage && personalProjects.length">
-    <div class="section-title-group">
-      <h2>{{ user?.isAdmin ? 'Enterprise Portfolio Overview' : 'My Portfolio Overview' }}</h2>
-      <p>{{ user?.isAdmin ? 'Tracking performance and delivery across the organization' : 'Tracking progress and budget for your active assignments' }}</p>
-    </div>
-    <div class="project-tiles">
-      <div class="project-tile glass-card" *ngFor="let project of personalProjects">
-        <div class="tile-header">
-          <div class="phase-badge">{{ project.phase }}</div>
-          <span class="status-dot" [attr.data-status]="project.status.toLowerCase()"></span>
-        </div>
-        <h3 class="tile-title">{{ project.projectName }}</h3>
-        
-        <div class="tile-stats">
-          <div class="t-stat"><span class="t-label">Hours</span><span class="t-val">{{ project.totalHours | number:'1.0-1' }}h</span></div>
-          <div class="t-stat"><span class="t-label">Cost</span><span class="t-val">{{ project.totalCost | number:'1.0-0' }} DH</span></div>
-          <div class="t-stat"><span class="t-label">Due Date</span><span class="t-val">{{ project.estimatedDueDate | date:'MMM yyyy' }}</span></div>
-        </div>
-
-        <div class="tile-progress">
-          <div class="progress-text"><span>Progress</span><strong>{{ project.projectProgressPercentage }}%</strong></div>
-          <div class="progress-bar-wrap"><div class="progress-bar" [style.width.%]="project.projectProgressPercentage"></div></div>
-        </div>
-      </div>
-    </div>
-  </section>
-</div>
-
-<ng-template #errorMessageBlock>
-  <div class="empty-state error-state">
-    <mat-icon>error_outline</mat-icon>
-    <p>{{ errorMessage }}</p>
-    <button (click)="loadDashboard()" class="btn-retry">Retry Loading</button>
-  </div>
-</ng-template>
-
+
+      <section class="period-bar pm-glass">
+        <div class="period-bar__dates">
+          <mat-icon>analytics</mat-icon>
+          <input type="date" class="pm-input" [value]="filterState.selectedStartDate || ''" (change)="updateDateFilter('start', $event)" [disabled]="isRefreshing" />
+          <span>to</span>
+          <input type="date" class="pm-input" [value]="filterState.selectedEndDate || ''" (change)="updateDateFilter('end', $event)" [disabled]="isRefreshing" />
+        </div>
+
+        <div class="period-bar__modes">
+          <button
+            type="button"
+            [class.period-bar__mode--active]="filterState.selectedYear === currentYear && filterState.selectedMonth === currentMonth"
+            (click)="selectCurrentMonth()"
+            [disabled]="isRefreshing">
+            Month-to-Date
+          </button>
+          <button
+            type="button"
+            [class.period-bar__mode--active]="filterState.selectedYear === null && filterState.selectedMonth === null"
+            (click)="selectAllDates()"
+            [disabled]="isRefreshing">
+            Global History
+          </button>
+        </div>
+      </section>
+
+      <section class="metric-grid" aria-label="Dashboard metrics">
+        <article class="dashboard-metric pm-surface" *ngFor="let metric of metrics; let i = index" [style.--metric-tone]="getToneColor(metric.tone)" [style.--metric-delay.ms]="i * 65">
+          <span class="dashboard-metric__line"></span>
+          <div class="dashboard-metric__head">
+            <span class="dashboard-metric__icon">
+              <mat-icon>{{ metric.icon }}</mat-icon>
+            </span>
+            <span class="dashboard-metric__label">
+              {{ metric.label }}
+              <small>Real-time metric</small>
+            </span>
+          </div>
+          <strong>{{ metric.value }}</strong>
+          <p>{{ metric.note }}</p>
+          <mat-icon class="dashboard-metric__watermark">{{ metric.icon }}</mat-icon>
+        </article>
+      </section>
+
+      <section class="target-grid" aria-label="Target thresholds">
+        <article class="target-card target-card--success">
+          <span><mat-icon>verified</mat-icon></span>
+          <div>
+            <strong>{{ aboveTargetCount }}</strong>
+            <small>Segments</small>
+            <p>Superior Efficiency Index</p>
+          </div>
+        </article>
+        <article class="target-card target-card--danger">
+          <span><mat-icon>warning</mat-icon></span>
+          <div>
+            <strong>{{ belowTargetCount }}</strong>
+            <small>Segments</small>
+            <p>Attention Required Threshold</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="filter-sections" aria-label="Dashboard filters">
+        <article *ngFor="let section of filterSections" class="filter-section">
+          <header class="pm-section-title">
+            <div>
+              <mat-icon>{{ section.icon }}</mat-icon>
+              <h2>{{ section.title }}</h2>
+            </div>
+            <span>{{ section.tickets.length }} options</span>
+          </header>
+
+          <div class="filter-ticket-grid">
+            <button
+              type="button"
+              class="filter-ticket"
+              *ngFor="let ticket of section.tickets.slice(0, filterCardLimit)"
+              [class.filter-ticket--active]="section.selectedId === ticket.id"
+              (click)="selectFilterCard(section.kind, ticket.id)"
+              [disabled]="isRefreshing">
+              <span class="filter-ticket__top">
+                <mat-icon>{{ getTicketIcon(section.kind, ticket) }}</mat-icon>
+                <strong>{{ ticket.count }}</strong>
+              </span>
+              <span class="filter-ticket__label">{{ ticket.label }}</span>
+              <small>Projects</small>
+
+              <button *ngIf="ticket.projects?.length" class="filter-ticket__drill-down" (click)="$event.stopPropagation(); toggleDrillDown(section, ticket)">
+                <mat-icon>list</mat-icon>
+              </button>
+            </button>
+          </div>
+        </article>
+      </section>
+
+    </div>
+
+    <app-loading-spinner *ngIf="isRefreshing" [fullPage]="false"></app-loading-spinner>
+  </ng-container>
+</div>

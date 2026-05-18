@@ -112,9 +112,7 @@
           <p>Browse the current project repository with clearer categories, metadata and quick actions.</p>
         </div>
 
-        <div *ngIf="isLoading" class="files-list files-list--loading">
-          <div class="files-skeleton" *ngFor="let item of [1, 2, 3, 4]"></div>
-        </div>
+        <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
 
         <div *ngIf="!isLoading && !files.length" class="files-empty">
           <mat-icon>folder_copy</mat-icon>

@@ -1,11 +1,11 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { FileManager } from './pages/file-manager/file-manager';
+import { DashboardHome } from '../dashboard/pages/dashboard-home/dashboard-home';
 
 const routes: Routes = [
   {
     path: '',
-    component: FileManager
+    component: DashboardHome
   }
 ];
 

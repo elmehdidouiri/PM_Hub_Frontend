@@ -65,9 +65,9 @@ export class ProjectForm implements OnInit {
     { value: ProjectManagementType.ProcessSimplification, label: 'Process Simplification' },
     { value: ProjectManagementType.Other, label: 'Other' },
   ];
-  readonly phaseOptions = Object.values(ProjectPhase).filter((v) => typeof v === 'number');
-  readonly statusOptions = Object.values(ProjectStatus).filter((v) => typeof v === 'number');
-  readonly processStatusOptions = Object.values(ProcessStatus).filter((v) => typeof v === 'number');
+  readonly phaseOptions = Object.values(ProjectPhase).filter((v): v is ProjectPhase => typeof v === 'number');
+  readonly statusOptions = Object.values(ProjectStatus).filter((v): v is ProjectStatus => typeof v === 'number');
+  readonly processStatusOptions = Object.values(ProcessStatus).filter((v): v is ProcessStatus => typeof v === 'number');
 
   readonly memberDraft: FormGroup;
   readonly budgetDraft: FormGroup;
@@ -122,14 +122,14 @@ export class ProjectForm implements OnInit {
         phase: this.fb.control<ProjectPhase | null>(null, Validators.required),
         status: this.fb.control<ProjectStatus | null>(null, Validators.required),
         description: this.fb.nonNullable.control(''),
-      }),
+      }, { validators: this.phaseStatusValidator }),
       step3: this.fb.group({
         projectManagerId: this.fb.control<string | null>(null),
         sponsor: this.fb.nonNullable.control(''),
         businessUnitIds: this.fb.nonNullable.control<string[]>([], Validators.minLength(1)),
         plantName: this.fb.nonNullable.control(''),
         departmentId: this.fb.nonNullable.control('', Validators.required),
-        costCenter: this.fb.nonNullable.control('', Validators.required),
+        costCenter: this.fb.nonNullable.control(''),
         costSaving: this.fb.control<number | null>(null, Validators.min(0)),
       }),
       step4: this.fb.group({
@@ -137,27 +137,27 @@ export class ProjectForm implements OnInit {
         solutionDomainIds: this.fb.nonNullable.control<string[]>([]),
       }),
       step5: this.fb.group({
-        startDate: this.fb.nonNullable.control('', Validators.required),
+        startDate: this.fb.nonNullable.control(''),
         endDate: this.fb.nonNullable.control(''),
         estimatedDueDate: this.fb.nonNullable.control(''),
         estimatedHours: this.fb.control<number | null>(null, Validators.min(0)),
         actualHours: this.fb.control<number | null>(null, Validators.min(0)),
       }),
       step6: this.fb.group({
-        financialImpact: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(10)]),
-        customerImpact: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(10)]),
-        operationalEfficiency: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(10)]),
-        strategicAlignment: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(10)]),
-        crossFunctionalImpact: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(10)]),
-        innovationDigitalisation: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(10)]),
-        riskMitigationUrgency: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(10)]),
-        sustainabilityESG: this.fb.control<number | null>(null, [Validators.required, Validators.min(0), Validators.max(10)]),
+        financialImpact: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10)]),
+        customerImpact: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10)]),
+        operationalEfficiency: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10)]),
+        strategicAlignment: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10)]),
+        crossFunctionalImpact: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10)]),
+        innovationDigitalisation: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10)]),
+        riskMitigationUrgency: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10)]),
+        sustainabilityESG: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10)]),
       }),
       step7: this.fb.group({
         teamMembers: this.fb.array<FormGroup>([]),
       }),
       step8: this.fb.group({
-        budgetItems: this.fb.array<FormGroup>([], Validators.minLength(1)),
+        budgetItems: this.fb.array<FormGroup>([]),
       }),
       step9: this.fb.group({
         currentState: this.fb.nonNullable.control(''),
@@ -259,6 +259,7 @@ export class ProjectForm implements OnInit {
     this.updateDynamicValidators();
     this.step1Group.controls['projectManagementType'].valueChanges.subscribe(() => this.updateDynamicValidators());
     this.step1Group.controls['projectType'].valueChanges.subscribe(() => this.updateDynamicValidators());
+    this.step3Group.controls['projectManagerId'].valueChanges.subscribe((pmUserId) => this.onProjectManagerChange(pmUserId));
     this.memberDraft.controls['userId'].valueChanges.subscribe((userId) => this.syncMemberRole(userId));
   }
 
@@ -352,6 +353,10 @@ export class ProjectForm implements OnInit {
       this.memberDraft.markAllAsTouched();
       return;
     }
+    if (this.isProjectManager(this.memberDraft.controls['userId'].value)) {
+      this.notificationService.showWarning('The project manager is managed separately from team members.');
+      return;
+    }
     this.teamMembers.push(this.fb.group(this.memberDraft.getRawValue()));
     this.memberDraft.reset({ userId: '', role: '', roleId: '' });
   }
@@ -362,6 +367,18 @@ export class ProjectForm implements OnInit {
 
   removeTeamMember(index: number): void {
     this.teamMembers.removeAt(index);
+  }
+
+  onProjectManagerChange(pmUserId: string | null): void {
+    this.removeProjectManagerFromTeam(pmUserId);
+    if (this.isProjectManager(this.memberDraft.controls['userId'].value)) {
+      this.memberDraft.reset({ userId: '', role: '', roleId: '' });
+    }
+  }
+
+  public isProjectManager(userId: string | null | undefined): boolean {
+    const pmUserId = this.step3Group.controls['projectManagerId'].value;
+    return !!userId && !!pmUserId && userId === pmUserId;
   }
 
   addBudgetItem(): void {
@@ -477,14 +494,15 @@ export class ProjectForm implements OnInit {
         this.notificationService.showWarning('Project end date must be after the start date.');
       } else if (this.wizardForm.errors?.['estimatedDateInvalid']) {
         this.notificationService.showWarning('Estimated due date must be after the start date.');
+      } else if (this.step2Group.errors?.['invalidPhaseStatus']) {
+        this.notificationService.showWarning(this.phaseStatusError());
       } else {
         this.notificationService.showWarning('Please complete all required fields before submitting.');
       }
       return;
     }
 
-    // Fix for NG0100 error: change state in next tick
-    setTimeout(() => {
+     setTimeout(() => {
       this.isSubmitting = true;
     });
 
@@ -494,8 +512,7 @@ export class ProjectForm implements OnInit {
       next: (project) => {
         this.submittedSuccessfully = true;
         this.clearDraft(false);
-        // Upload files if any
-        if (this.projectFiles.length > 0) {
+         if (this.projectFiles.length > 0) {
           const uploadTasks = this.projectFiles.map(fileData =>
             this.projectService.uploadProjectFile(project.id, fileData).pipe(
               catchError(err => {
@@ -550,6 +567,14 @@ export class ProjectForm implements OnInit {
     }
 
     return 'Invalid score.';
+  }
+
+  phaseStatusError(): string {
+    if (!this.step2Group.errors?.['invalidPhaseStatus']) {
+      return '';
+    }
+
+    return 'Pipeline projects must use the Planned status before they can be submitted.';
   }
 
   projectFileTypeError(): string {
@@ -612,10 +637,6 @@ export class ProjectForm implements OnInit {
     const step1 = this.step1Group.getRawValue();
     const step2 = this.step2Group.getRawValue();
     const step3 = this.step3Group.getRawValue();
-    const step4 = this.step4Group.getRawValue();
-    const step5 = this.step5Group.getRawValue();
-    const step6 = this.step6Group.getRawValue();
-    const step9 = this.step9Group.getRawValue();
 
     return {
       projectManagementType: step1.projectManagementType as ProjectManagementType,
@@ -631,43 +652,33 @@ export class ProjectForm implements OnInit {
       departmentId: step3.departmentId,
       costCenter: this.emptyToNull(step3.costCenter),
       costSaving: this.numberOrNull(step3.costSaving),
-      technologyIds: step4.technologyIds ?? [],
-      solutionDomainIds: step4.solutionDomainIds ?? [],
-      startDate: this.toApiDate(step5.startDate) as string,
-      endDate: this.toApiDate(step5.endDate),
-      estimatedDueDate: this.toApiDate(step5.estimatedDueDate),
-      estimatedHours: this.numberOrNull(step5.estimatedHours),
-      actualHours: this.numberOrNull(step5.actualHours),
-      strategicCriteria: {
-        financialImpact: this.numberOrNull(step6.financialImpact),
-        customerImpact: this.numberOrNull(step6.customerImpact),
-        operationalEfficiency: this.numberOrNull(step6.operationalEfficiency),
-        strategicAlignment: this.numberOrNull(step6.strategicAlignment),
-        crossFunctionalImpact: this.numberOrNull(step6.crossFunctionalImpact),
-        innovationDigitalisation: this.numberOrNull(step6.innovationDigitalisation),
-        riskMitigationUrgency: this.numberOrNull(step6.riskMitigationUrgency),
-        sustainabilityESG: this.numberOrNull(step6.sustainabilityESG),
-      },
-      teamMembers: this.teamMembers.getRawValue().map((item) => ({
+      teamMembers: this.teamMembers.getRawValue().filter((item) => !this.isProjectManager(String(item['userId']))).map((item) => ({
         userId: String(item['userId']),
         role: String(item['role']).trim(),
         roleId: String(item['roleId'] || this.roleIdForUser(String(item['userId']))).trim(),
       })),
-      budgetItems: this.budgetItems.getRawValue().map((item) => ({
-        itemName: String(item['itemName']).trim(),
-        pricePerUnit: Number(item['pricePerUnit']),
-        quantity: Number(item['quantity']),
-        costCenter: String(item['costCenter']).trim(),
-      })),
-      currentState: this.emptyToNull(step9.currentState),
-      nextSteps: this.emptyToNull(step9.nextSteps),
-      enhancements: this.emptyToNull(step9.enhancements),
-      codeSourceLink: this.emptyToNull(step9.codeSourceLink),
-      solutionLink: this.emptyToNull(step9.solutionLink),
-      roadblocks: this.roadblocks.getRawValue().map((rb) => rb.trim()).filter(Boolean),
       parentProjectId: this.showParentProject ? step1.parentProjectId || null : null,
       processStatus: this.showProcessStatus ? (step1.processStatus as ProcessStatus | null) : null,
     };
+  }
+
+  isStatusAllowedForPhase(status: ProjectStatus, phase = this.step2Group.controls['phase'].value): boolean {
+    if (phase === ProjectPhase.Pipeline) {
+      return status === ProjectStatus.Planned;
+    }
+
+    return true;
+  }
+
+  private phaseStatusValidator(group: AbstractControl): { invalidPhaseStatus: true } | null {
+    const phase = group.get('phase')?.value as ProjectPhase | null;
+    const status = group.get('status')?.value as ProjectStatus | null;
+
+    if (phase === ProjectPhase.Pipeline && status !== null && status !== ProjectStatus.Planned) {
+      return { invalidPhaseStatus: true };
+    }
+
+    return null;
   }
 
   private syncMemberRole(userId: string): void {
@@ -735,6 +746,7 @@ export class ProjectForm implements OnInit {
 
       this.teamMembers.clear();
       (draft.teamMembers || []).forEach((member) => this.teamMembers.push(this.fb.group(member)));
+      this.removeProjectManagerFromTeam(this.step3Group.controls['projectManagerId'].value, false);
 
       this.budgetItems.clear();
       (draft.budgetItems || []).forEach((item) => this.budgetItems.push(this.fb.group(item)));
@@ -794,6 +806,21 @@ export class ProjectForm implements OnInit {
       next: (users) => (this.projectManagers = users),
       error: () => (this.projectManagers = []),
     });
+  }
+
+  private removeProjectManagerFromTeam(pmUserId: string | null, markDirty = true): void {
+    if (!pmUserId) {
+      return;
+    }
+
+    for (let index = this.teamMembers.length - 1; index >= 0; index--) {
+      if (this.teamMembers.at(index).get('userId')?.value === pmUserId) {
+        this.teamMembers.removeAt(index);
+        if (markDirty) {
+          this.teamMembers.markAsDirty();
+        }
+      }
+    }
   }
 
   private updateDynamicValidators(): void {

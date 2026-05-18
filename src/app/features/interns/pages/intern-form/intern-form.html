@@ -1,145 +1,141 @@
-<section class="intern-form-page pm-page-enter">
-  <header class="intern-hero">
-    <div class="intern-hero__copy">
-      <span class="intern-hero__eyebrow">Intern workspace</span>
-      <h1>{{ pageTitle }}</h1>
-      <p>{{ pageDescription }}</p>
-    </div>
-
-    <div class="intern-hero__meta">
-      <article class="intern-hero__stat">
-        <span class="intern-hero__stat-label">Roles ready</span>
-        <strong>{{ roles.length }}</strong>
-      </article>
-      <article class="intern-hero__stat">
-        <span class="intern-hero__stat-label">Supervisors</span>
-        <strong>{{ supervisors.length }}</strong>
-      </article>
-      <button type="button" class="pm-btn-secondary" (click)="goBack()">
-        <mat-icon>arrow_back</mat-icon>
-        Back to interns
-      </button>
-    </div>
-  </header>
-
-  <div *ngIf="errorMessage" class="intern-alert intern-alert--error">
-    <mat-icon>error</mat-icon>
-    <span>{{ errorMessage }}</span>
-  </div>
-
-  <div class="intern-shell">
-    <section class="intern-panel intern-panel--form">
-      <div class="panel-heading">
-        <h2>Intern identity</h2>
-        <p>Keep the setup simple, clean and easy to maintain for HR and project leads.</p>
-      </div>
-
-      <div *ngIf="isLoading" class="intern-loading">
-        <div class="intern-loading__pulse"></div>
-        <div class="intern-loading__pulse intern-loading__pulse--short"></div>
-        <div class="intern-loading__pulse"></div>
-      </div>
-
-      <form *ngIf="!isLoading" class="intern-form-grid" [formGroup]="form" (ngSubmit)="submit()">
-        <label class="pm-field">
-          <span class="pm-field__label">Intern name</span>
-          <input
-            type="text"
-            formControlName="name"
-            placeholder="Ex. Sara Benali"
-            autocomplete="name"
-          />
-          <small class="pm-field__hint">The name shown in planning, timesheets and project staffing.</small>
-          <small class="pm-field__error" *ngIf="form.controls.name.touched && form.controls.name.invalid">
-            Enter a clear name with at least 2 characters.
-          </small>
-        </label>
-
-        <label class="pm-field">
-          <span class="pm-field__label">Role</span>
-          <select formControlName="roleId">
-            <option value="">Select a role</option>
-            <option *ngFor="let role of roles; trackBy: trackById" [value]="role.id">{{ role.name }}</option>
-          </select>
-          <small class="pm-field__hint">This role appears across reporting and assignment views.</small>
-          <small class="pm-field__error" *ngIf="form.controls.roleId.touched && form.controls.roleId.invalid">
-            Choose the intern's role.
-          </small>
-        </label>
-
-        <label class="pm-field">
-          <span class="pm-field__label">Supervisor</span>
-          <select formControlName="supervisorId">
-            <option value="">Select a supervisor</option>
-            <option
-              *ngFor="let supervisor of supervisors; trackBy: trackById"
-              [value]="supervisor.id || supervisor.userId"
-            >
-              {{ getSupervisorName(supervisor) }}{{ supervisor.email ? ' · ' + supervisor.email : '' }}
-            </option>
-          </select>
-          <small class="pm-field__hint">Pick the person who validates direction and follow-up.</small>
-          <small class="pm-field__error" *ngIf="form.controls.supervisorId.touched && form.controls.supervisorId.invalid">
-            Select a supervisor before saving.
-          </small>
-        </label>
-
-        <div class="intern-form-actions">
-          <button type="button" class="pm-btn-secondary" (click)="goBack()">Cancel</button>
-          <button type="submit" class="pm-btn-primary" [disabled]="!canSubmit">
-            <mat-icon>{{ isEditMode ? 'save' : 'person_add' }}</mat-icon>
-            {{ isSubmitting ? 'Saving...' : isEditMode ? 'Save changes' : 'Create intern' }}
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <aside class="intern-panel intern-panel--preview">
-      <div class="panel-heading">
-        <h2>Live preview</h2>
-        <p>A quick branded summary of how this profile will read inside the platform.</p>
-      </div>
-
-      <article class="intern-preview-card">
-        <div class="intern-preview-card__accent"></div>
-        <div class="intern-preview-card__body">
-          <span class="intern-preview-card__tag">{{ isEditMode ? 'Existing intern' : 'New profile' }}</span>
-          <h3>{{ form.controls.name.value || 'Intern name' }}</h3>
-          <p>{{ selectedRoleLabel }}</p>
-          <div class="intern-preview-card__meta">
-            <span>
-              <mat-icon>badge</mat-icon>
-              {{ selectedRoleLabel }}
-            </span>
-            <span>
-              <mat-icon>supervisor_account</mat-icon>
-              {{ selectedSupervisorLabel }}
-            </span>
-          </div>
-        </div>
-      </article>
-
-      <div class="intern-checklist">
-        <article>
-          <mat-icon>verified_user</mat-icon>
-          <div>
-            <h3>Professional consistency</h3>
-            <p>Role and supervisor metadata stay aligned with the rest of the dashboard experience.</p>
-          </div>
-        </article>
-        <article>
-          <mat-icon>responsive_layout</mat-icon>
-          <div>
-            <h3>Responsive by default</h3>
-            <p>The layout stays readable on mobile, tablet and desktop without collapsing the hierarchy.</p>
-          </div>
-        </article>
-      </div>
-
-      <div *ngIf="currentIntern" class="intern-timestamp">
-        <span>Created {{ currentIntern.createdAt | date: 'mediumDate' }}</span>
-        <span *ngIf="currentIntern.updatedAt">Updated {{ currentIntern.updatedAt | date: 'mediumDate' }}</span>
-      </div>
-    </aside>
-  </div>
-</section>
+<section class="intern-form-page">
+  <header class="intern-hero">
+    <div class="intern-hero__copy">
+      <span class="intern-hero__eyebrow">Intern workspace</span>
+      <h1>{{ pageTitle }}</h1>
+      <p>{{ pageDescription }}</p>
+    </div>
+
+    <div class="intern-hero__meta">
+      <article class="intern-hero__stat">
+        <span class="intern-hero__stat-label">Roles ready</span>
+        <strong>{{ roles.length }}</strong>
+      </article>
+      <article class="intern-hero__stat">
+        <span class="intern-hero__stat-label">Supervisors</span>
+        <strong>{{ supervisors.length }}</strong>
+      </article>
+      <button type="button" class="pm-btn-secondary" (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon>
+        Back to interns
+      </button>
+    </div>
+  </header>
+
+  <div *ngIf="errorMessage" class="intern-alert intern-alert--error">
+    <mat-icon>error</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+
+  <div class="intern-shell">
+    <section class="intern-panel intern-panel--form">
+      <div class="panel-heading">
+        <h2>Intern identity</h2>
+        <p>Keep the setup simple, clean and easy to maintain for HR and project leads.</p>
+      </div>
+
+      <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
+
+      <form *ngIf="!isLoading" class="intern-form-grid" [formGroup]="form" (ngSubmit)="submit()">
+        <label class="pm-field">
+          <span class="pm-field__label">Intern name</span>
+          <input
+            type="text"
+            formControlName="name"
+            placeholder="Ex. Sara Benali"
+            autocomplete="name"
+          />
+          <small class="pm-field__hint">The name shown in planning, timesheets and project staffing.</small>
+          <small class="pm-field__error" *ngIf="form.controls.name.touched && form.controls.name.invalid">
+            Enter a clear name with at least 2 characters.
+          </small>
+        </label>
+
+        <label class="pm-field">
+          <span class="pm-field__label">Role</span>
+          <select formControlName="roleId">
+            <option value="">Select a role</option>
+            <option *ngFor="let role of roles; trackBy: trackById" [value]="role.id">{{ role.name }}</option>
+          </select>
+          <small class="pm-field__hint">This role appears across reporting and assignment views.</small>
+          <small class="pm-field__error" *ngIf="form.controls.roleId.touched && form.controls.roleId.invalid">
+            Choose the intern's role.
+          </small>
+        </label>
+
+        <label class="pm-field">
+          <span class="pm-field__label">Supervisor</span>
+          <select formControlName="supervisorId">
+            <option value="">Select a supervisor</option>
+            <option
+              *ngFor="let supervisor of supervisors; trackBy: trackById"
+              [value]="supervisor.id || supervisor.userId"
+            >
+              {{ getSupervisorName(supervisor) }}{{ supervisor.email ? ' Â· ' + supervisor.email : '' }}
+            </option>
+          </select>
+          <small class="pm-field__hint">Pick the person who validates direction and follow-up.</small>
+          <small class="pm-field__error" *ngIf="form.controls.supervisorId.touched && form.controls.supervisorId.invalid">
+            Select a supervisor before saving.
+          </small>
+        </label>
+
+        <div class="intern-form-actions">
+          <button type="button" class="pm-btn-secondary" (click)="goBack()">Cancel</button>
+          <button type="submit" class="pm-btn-primary" [disabled]="!canSubmit">
+            <mat-icon>{{ isEditMode ? 'save' : 'person_add' }}</mat-icon>
+            {{ isSubmitting ? 'Saving...' : isEditMode ? 'Save changes' : 'Create intern' }}
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="intern-panel intern-panel--preview">
+      <div class="panel-heading">
+        <h2>Live preview</h2>
+        <p>A quick branded summary of how this profile will read inside the platform.</p>
+      </div>
+
+      <article class="intern-preview-card">
+        <div class="intern-preview-card__accent"></div>
+        <div class="intern-preview-card__body">
+          <span class="intern-preview-card__tag">{{ isEditMode ? 'Existing intern' : 'New profile' }}</span>
+          <h3>{{ form.controls.name.value || 'Intern name' }}</h3>
+          <p>{{ selectedRoleLabel }}</p>
+          <div class="intern-preview-card__meta">
+            <span>
+              <mat-icon>badge</mat-icon>
+              {{ selectedRoleLabel }}
+            </span>
+            <span>
+              <mat-icon>supervisor_account</mat-icon>
+              {{ selectedSupervisorLabel }}
+            </span>
+          </div>
+        </div>
+      </article>
+
+      <div class="intern-checklist">
+        <article>
+          <mat-icon>verified_user</mat-icon>
+          <div>
+            <h3>Professional consistency</h3>
+            <p>Role and supervisor metadata stay aligned with the rest of the dashboard experience.</p>
+          </div>
+        </article>
+        <article>
+          <mat-icon>responsive_layout</mat-icon>
+          <div>
+            <h3>Responsive by default</h3>
+            <p>The layout stays readable on mobile, tablet and desktop without collapsing the hierarchy.</p>
+          </div>
+        </article>
+      </div>
+
+      <div *ngIf="currentIntern" class="intern-timestamp">
+        <span>Created {{ currentIntern.createdAt | date: 'mediumDate' }}</span>
+        <span *ngIf="currentIntern.updatedAt">Updated {{ currentIntern.updatedAt | date: 'mediumDate' }}</span>
+      </div>
+    </aside>
+  </div>
+</section>

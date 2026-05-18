@@ -37,7 +37,7 @@
   margin: 0.42rem 0 0;
   color: #201611;
   font-size: clamp(1.3rem, 3.4vw, 1.8rem);
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.2;
 }
 
@@ -60,7 +60,7 @@
   margin: 0;
   color: #241912;
   font-size: clamp(1.05rem, 2.4vw, 1.18rem);
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.25;
 }
 
@@ -243,7 +243,7 @@ small {
 .strategic-score-summary strong {
   color: $orange-deep;
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 ::ng-deep .project-form-page .mat-horizontal-stepper-header-container {

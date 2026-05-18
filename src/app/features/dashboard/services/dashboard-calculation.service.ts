@@ -450,7 +450,20 @@ export class DashboardCalculationService {
       Management: '#8b5cf6', 'R&D': '#ec4899', Workshop: '#14b8a6',
       Other: '#94a3b8', Interns: '#06b6d4',
     };
-    return colorMap[label] || '#cbd5e1';
+    return colorMap[label] || this.getToneColor(label);
+  }
+
+  getToneColor(tone: string): string {
+    const tones: Record<string, string> = {
+      blue: '#3b82f6',
+      teal: '#14b8a6',
+      green: '#10b981',
+      orange: '#f59e0b',
+      red: '#ef4444',
+      purple: '#8b5cf6',
+      slate: '#64748b',
+    };
+    return tones[tone.toLowerCase()] || '#cbd5e1';
   }
 
   getPaletteColor(index: number): string {

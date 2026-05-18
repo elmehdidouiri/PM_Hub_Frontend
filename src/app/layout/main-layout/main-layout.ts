@@ -46,7 +46,17 @@ export class MainLayout implements OnInit {
   profileMenuOpen = false;
 
   readonly navItems: NavItem[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'grid_view', route: '/dashboard', exact: true },
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: 'grid_view',
+      route: '/dashboard',
+      children: [
+        { label: 'Overview', route: '/dashboard', exact: true },
+        { label: 'Analytics', route: '/dashboard/analytics' },
+        { label: 'Hours Allocation', route: '/dashboard/hours-allocation' },
+      ],
+    },
     {
       id: 'projects',
       label: 'Projects',
@@ -75,6 +85,7 @@ export class MainLayout implements OnInit {
       children: [
         { label: 'All Users', route: '/users', exact: true, adminOnly: true },
         { label: 'Approvals', route: '/admin/approvals', adminOnly: true },
+        { label: 'Notifications', route: '/admin/hour-booking-notifications', adminOnly: true },
       ]
     },
     {

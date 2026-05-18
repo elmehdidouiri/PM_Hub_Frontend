@@ -40,3 +40,17 @@ export enum ProcessStatus {
   ImplementedInPDMlink = 5,
   Cancelled = 6,
 }
+export enum CategoryWork {
+ Project = 0,
+
+   
+ Holiday = 1,
+ 
+ Workshop = 2,
+
+ MonthlyMeeting = 3,
+
+
+ Other = 4
+}
+

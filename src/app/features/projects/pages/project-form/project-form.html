@@ -1,490 +1,266 @@
-<form [formGroup]="wizardForm" class="project-form-page pm-page-enter">
-  <div class="page-header">
-    <p class="eyebrow">Projects</p>
-    <h1>Create Project </h1>
-  </div>
-
-  <mat-stepper linear [orientation]="'vertical'">
-    <mat-step [stepControl]="step1Group" [formGroup]="step1Group" label="Step 1: Management & Type">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Management & Type</h2>
-          <p>Select the management model and base project category.</p>
-        </div>
-        <div class="form-grid">
-          <div class="field">
-            <label>Project Management Type *</label>
-            <select formControlName="projectManagementType">
-              <option *ngFor="let option of projectManagementTypeOptions" [ngValue]="option.value">{{ option.label }}
-              </option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Project Type *</label>
-            <select formControlName="projectType">
-              <option value="">Select project type</option>
-              <option *ngFor="let option of projectTypeOptions" [ngValue]="option.value">{{ option.label }}</option>
-            </select>
-          </div>
-          <div class="field" *ngIf="showParentProject">
-            <label>Parent Project *</label>
-            <select formControlName="parentProjectId">
-              <option [ngValue]="null">Select parent project</option>
-              <option *ngFor="let option of references.parentProjects" [value]="option.id">{{ option.label }}</option>
-            </select>
-          </div>
-          <div class="field" *ngIf="showProcessStatus">
-            <label>Process Status *</label>
-            <select formControlName="processStatus">
-              <option [ngValue]="null">Select process status</option>
-              <option *ngFor="let option of processStatusOptions" [ngValue]="option">{{ enumLabel(option, ProcessStatus)
-                }}</option>
-            </select>
-          </div>
-        </div>
-        <div class="action-row">
-          <button mat-flat-button color="primary" matStepperNext [disabled]="step1Group.invalid">Next</button>
-        </div>
-      </div>
-    </mat-step>
-
-    <mat-step [stepControl]="step2Group" [formGroup]="step2Group" label="Step 2: Basic Info">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Basic Info</h2>
-          <p>Capture required identity fields before moving forward.</p>
-        </div>
-        <div class="form-grid">
-          <div class="field span-2">
-            <label>Name *</label>
-            <input type="text" formControlName="name" />
-            <small *ngIf="isInvalid(step2Group.get('name'))">Name is required.</small>
-          </div>
-          <div class="field">
-            <label>Phase *</label>
-            <select formControlName="phase">
-              <option [ngValue]="null">Select phase</option>
-              <option *ngFor="let option of phaseOptions" [ngValue]="option">{{ enumLabel(option, ProjectPhase) }}
-              </option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Status *</label>
-            <select formControlName="status">
-              <option [ngValue]="null">Select status</option>
-              <option *ngFor="let option of statusOptions" [ngValue]="option">{{ enumLabel(option, ProjectStatus) }}
-              </option>
-            </select>
-          </div>
-          <div class="field span-2">
-            <label>Description</label>
-            <textarea rows="3" formControlName="description"></textarea>
-          </div>
-        </div>
-        <div class="action-row">
-          <button mat-stroked-button matStepperPrevious>Back</button>
-          <button mat-flat-button color="primary" matStepperNext [disabled]="step2Group.invalid">Next</button>
-        </div>
-      </div>
-    </mat-step>
-
-    <mat-step [stepControl]="step3Group" [formGroup]="step3Group" label="Step 3: Business Unit">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Business Unit</h2>
-          <p>Link ownership, organization scope, and expected savings.</p>
-        </div>
-        <div class="form-grid">
-          <div class="field">
-            <label>Project Manager</label>
-            <select formControlName="projectManagerId">
-              <option [ngValue]="null">Select project manager</option>
-              <option *ngFor="let manager of projectManagers" [value]="manager.id">{{ manager.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Sponsor</label>
-            <input type="text" formControlName="sponsor" />
-          </div>
-          <div class="field">
-            <label>Business Units</label>
-            <div class="inline-editor">
-              <select [formControl]="businessUnitDraft">
-                <option value="">Select business unit</option>
-                <option *ngFor="let unit of references.businessUnits" [value]="unit.id">{{ unit.label }}</option>
-              </select>
-              <button type="button" mat-stroked-button (click)="addBusinessUnit()">Add</button>
-            </div>
-            <div class="list-grid" *ngIf="selectedBusinessUnits.length > 0">
-              <div class="list-item" *ngFor="let unit of selectedBusinessUnits">
-                <span>{{ unit.label }}</span>
-                <button type="button" mat-button color="warn" (click)="removeBusinessUnit(unit.id)">Remove</button>
-              </div>
-            </div>
-            <small *ngIf="isInvalid(step3Group.get('businessUnitIds'))">At least one business unit is required.</small>
-          </div>
-          <div class="field">
-            <label>Plant Name</label>
-            <select formControlName="plantName">
-              <option value="">Select plant</option>
-              <option *ngFor="let option of references.plants" [value]="option.label">{{ option.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Department *</label>
-            <select formControlName="departmentId">
-              <option value="">Select department</option>
-              <option *ngFor="let option of references.departments" [value]="option.id">{{ option.label }}</option>
-            </select>
-            <small *ngIf="isInvalid(step3Group.get('departmentId'))">Department is required.</small>
-          </div>
-          <div class="field">
-            <label>Cost Center *</label>
-            <input type="text" formControlName="costCenter" />
-            <small *ngIf="isInvalid(step3Group.get('costCenter'))">Cost center is required.</small>
-          </div>
-          <div class="field">
-            <label>Cost Saving</label>
-            <input type="number" min="0" formControlName="costSaving" />
-          </div>
-        </div>
-        <div class="action-row">
-          <button mat-stroked-button matStepperPrevious>Back</button>
-          <button mat-flat-button color="primary" matStepperNext [disabled]="step3Group.invalid">Next</button>
-        </div>
-      </div>
-    </mat-step>
-
-    <mat-step [stepControl]="step4Group" [formGroup]="step4Group" label="Step 4: Technologies">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Technologies</h2>
-          <p>Select applicable technologies and solution domains.</p>
-        </div>
-        <div class="form-grid">
-          <div class="field">
-            <label>Technologies</label>
-            <div class="inline-editor">
-              <select [formControl]="technologyDraft">
-                <option value="">Select technology</option>
-                <option *ngFor="let option of references.technologies" [value]="option.id">{{ option.label }}</option>
-              </select>
-              <button type="button" mat-stroked-button (click)="addTechnology()">Add</button>
-            </div>
-            <div class="list-grid" *ngIf="selectedTechnologies.length > 0">
-              <div class="list-item" *ngFor="let technology of selectedTechnologies">
-                <span>{{ technology.label }}</span>
-                <button type="button" mat-button color="warn" (click)="removeTechnology(technology.id)">Remove</button>
-              </div>
-            </div>
-          </div>
-          <div class="field">
-            <label>Solution Domains</label>
-            <div class="inline-editor">
-              <select [formControl]="solutionDomainDraft">
-                <option value="">Select solution domain</option>
-                <option *ngFor="let option of references.solutionDomains" [value]="option.id">{{ option.label }}</option>
-              </select>
-              <button type="button" mat-stroked-button (click)="addSolutionDomain()">Add</button>
-            </div>
-            <div class="list-grid" *ngIf="selectedSolutionDomains.length > 0">
-              <div class="list-item" *ngFor="let solution of selectedSolutionDomains">
-                <span>{{ solution.label }}</span>
-                <button type="button" mat-button color="warn" (click)="removeSolutionDomain(solution.id)">Remove</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="action-row">
-          <button mat-stroked-button matStepperPrevious>Back</button>
-          <button mat-flat-button color="primary" matStepperNext [disabled]="step4Group.invalid">Next</button>
-        </div>
-      </div>
-    </mat-step>
-
-    <mat-step [stepControl]="step5Group" [formGroup]="step5Group" label="Step 5: Timeline">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Timeline</h2>
-          <p>Plan dates and effort when they are already known.</p>
-        </div>
-        <div class="form-grid">
-          <div class="field">
-            <label>Start Date *</label>
-            <input type="date" formControlName="startDate" />
-            <small *ngIf="isInvalid(step5Group.get('startDate'))">Start date is required.</small>
-          </div>
-          <div class="field">
-            <label>End Date</label>
-            <input type="date" formControlName="endDate" />
-            <small *ngIf="wizardForm.errors?.['endDateInvalid']">End date must be after start date.</small>
-          </div>
-          <div class="field">
-            <label>Estimated Due Date</label>
-            <input type="date" formControlName="estimatedDueDate" />
-            <small *ngIf="wizardForm.errors?.['estimatedDateInvalid']">Estimated due date must be after start
-              date.</small>
-          </div>
-          <div class="field">
-            <label>Estimated Hours</label>
-            <input type="number" min="0" formControlName="estimatedHours" />
-          </div>
-          <div class="field">
-            <label>Actual Hours</label>
-            <input type="number" min="0" formControlName="actualHours" />
-          </div>
-        </div>
-        <div class="action-row">
-          <button mat-stroked-button matStepperPrevious>Back</button>
-          <button mat-flat-button color="primary" matStepperNext [disabled]="step5Group.invalid">Next</button>
-        </div>
-      </div>
-    </mat-step>
-
-    <mat-step [stepControl]="step6Group" [formGroup]="step6Group" label="Step 6: Strategic Criteria">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Strategic Criteria</h2>
-          <p>Rate each criterion from 0 to 10 (backend computes global strategic score).</p>
-        </div>
-
-        <div class="form-grid strategic-grid">
-          <div class="field">
-            <label>Financial Impact (0-10)</label>
-            <input type="number" min="0" max="10" formControlName="financialImpact" />
-            <small *ngIf="strategicCriterionError('financialImpact')">{{ strategicCriterionError('financialImpact') }}</small>
-          </div>
-          <div class="field">
-            <label>Customer Impact (0-10)</label>
-            <input type="number" min="0" max="10" formControlName="customerImpact" />
-            <small *ngIf="strategicCriterionError('customerImpact')">{{ strategicCriterionError('customerImpact') }}</small>
-          </div>
-          <div class="field">
-            <label>Operational Efficiency (0-10)</label>
-            <input type="number" min="0" max="10" formControlName="operationalEfficiency" />
-            <small *ngIf="strategicCriterionError('operationalEfficiency')">{{ strategicCriterionError('operationalEfficiency') }}</small>
-          </div>
-          <div class="field">
-            <label>Strategic Alignment (0-10)</label>
-            <input type="number" min="0" max="10" formControlName="strategicAlignment" />
-            <small *ngIf="strategicCriterionError('strategicAlignment')">{{ strategicCriterionError('strategicAlignment') }}</small>
-          </div>
-          <div class="field">
-            <label>Cross Functional Impact (0-10)</label>
-            <input type="number" min="0" max="10" formControlName="crossFunctionalImpact" />
-            <small *ngIf="strategicCriterionError('crossFunctionalImpact')">{{ strategicCriterionError('crossFunctionalImpact') }}</small>
-          </div>
-          <div class="field">
-            <label>Innovation Digitalisation (0-10)</label>
-            <input type="number" min="0" max="10" formControlName="innovationDigitalisation" />
-            <small *ngIf="strategicCriterionError('innovationDigitalisation')">{{ strategicCriterionError('innovationDigitalisation') }}</small>
-          </div>
-          <div class="field">
-            <label>Risk Mitigation Urgency (0-10)</label>
-            <input type="number" min="0" max="10" formControlName="riskMitigationUrgency" />
-            <small *ngIf="strategicCriterionError('riskMitigationUrgency')">{{ strategicCriterionError('riskMitigationUrgency') }}</small>
-          </div>
-          <div class="field">
-            <label>Sustainability ESG (0-10)</label>
-            <input type="number" min="0" max="10" formControlName="sustainabilityESG" />
-            <small *ngIf="strategicCriterionError('sustainabilityESG')">{{ strategicCriterionError('sustainabilityESG') }}</small>
-          </div>
-        </div>
-        <div class="strategic-score-summary">
-          <div>
-            <span>Total</span>
-            <strong>{{ strategicScoreTotal }} / 80</strong>
-          </div>
-          <div>
-            <span>Average</span>
-            <strong>{{ strategicScoreAverage }} / 10</strong>
-          </div>
-        </div>
-        <div class="action-row">
-          <button mat-stroked-button matStepperPrevious>Back</button>
-          <button mat-flat-button color="primary" matStepperNext [disabled]="step6Group.invalid">Next</button>
-        </div>
-      </div>
-    </mat-step>
-
-    <mat-step [stepControl]="step7Group" [formGroup]="step7Group" label="Step 7: Team Members">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Team Members</h2>
-          <p>Add users and assign their role inside the project.</p>
-        </div>
-        <div class="card draft-card" [formGroup]="memberDraft">
-          <div class="form-grid">
-            <div class="field">
-              <label>User</label>
-              <select formControlName="userId">
-                <option value="">Select user</option>
-                <option *ngFor="let user of references.users" [value]="user.id">{{ user.label }}</option>
-              </select>
-            </div>
-            <div class="field" *ngIf="memberDraft.controls['userId'].value">
-              <label>Role</label>
-              <input type="text" formControlName="role" readonly />
-            </div>
-          </div>
-          <button type="button" mat-stroked-button (click)="addTeamMember()">Add Member</button>
-        </div>
-        <div formArrayName="teamMembers" class="list-grid">
-          <div class="list-item" *ngFor="let member of teamMembers.controls; index as i" [formGroupName]="i">
-            <span>{{ userLabel(member.get('userId')?.value) }} - {{ member.get('role')?.value }}</span>
-            <button type="button" mat-button color="warn" (click)="removeTeamMember(i)">Remove</button>
-          </div>
-        </div>
-        <div class="action-row">
-          <button mat-stroked-button matStepperPrevious>Back</button>
-          <button mat-flat-button color="primary" matStepperNext [disabled]="step7Group.invalid">Next</button>
-        </div>
-      </div>
-    </mat-step>
-
-    <mat-step [stepControl]="step8Group" [formGroup]="step8Group" label="Step 8: Budget">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Budget</h2>
-          <p>Add one or more budget lines with quantity and unit price.</p>
-        </div>
-        <div class="card draft-card" [formGroup]="budgetDraft">
-          <div class="form-grid">
-            <div class="field"><label>Item Name *</label><input type="text" formControlName="itemName" /></div>
-            <div class="field"><label>Price Per Unit *</label><input type="number" min="0"
-                formControlName="pricePerUnit" /></div>
-            <div class="field"><label>Quantity *</label><input type="number" min="1" formControlName="quantity" /></div>
-            <div class="field"><label>Cost Center *</label><input type="text" formControlName="costCenter" /></div>
-          </div>
-          <button type="button" mat-stroked-button (click)="addBudgetItem()">Add Budget Item</button>
-        </div>
-        <div formArrayName="budgetItems" class="list-grid">
-          <div class="list-item" *ngFor="let item of budgetItems.controls; index as i" [formGroupName]="i">
-            <span>{{ item.get('itemName')?.value }} - {{ item.get('pricePerUnit')?.value }} x {{
-              item.get('quantity')?.value }} - {{ item.get('costCenter')?.value }}</span>
-            <button type="button" mat-button color="warn" (click)="removeBudgetItem(i)">Remove</button>
-          </div>
-        </div>
-        <small *ngIf="budgetItems.length === 0">At least one budget item is required.</small>
-        <div class="action-row">
-          <button mat-stroked-button matStepperPrevious>Back</button>
-          <button mat-flat-button color="primary" matStepperNext [disabled]="step8Group.invalid">Next</button>
-        </div>
-      </div>
-    </mat-step>
-
-    <mat-step [stepControl]="step9Group" [formGroup]="step9Group" label="Step 9: Tracking">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Tracking</h2>
-          <p>Finalize project status notes and roadblocks list.</p>
-        </div>
-        <div class="form-grid">
-          <div class="field span-2"><label>Current State</label><textarea rows="2"
-              formControlName="currentState"></textarea></div>
-          <div class="field span-2"><label>Next Steps</label><textarea rows="2" formControlName="nextSteps"></textarea>
-          </div>
-          <div class="field span-2"><label>Enhancements</label><textarea rows="2"
-              formControlName="enhancements"></textarea></div>
-          <div class="field">
-            <label>Code Source Link</label>
-            <input type="url" formControlName="codeSourceLink" />
-          </div>
-          <div class="field">
-            <label>Solution Link</label>
-            <input type="url" formControlName="solutionLink" />
-          </div>
-          <div class="field span-2">
-            <label>Roadblocks</label>
-            <div class="inline-editor">
-              <input type="text" [formControl]="roadblockDraft" placeholder="Add a roadblock item" />
-              <button type="button" mat-stroked-button (click)="addRoadblock()">Add Roadblock</button>
-            </div>
-          </div>
-        </div>
-        <div formArrayName="roadblocks" class="list-grid">
-          <div class="list-item" *ngFor="let roadblock of roadblocks.controls; index as i">
-            <span>{{ roadblock.value }}</span>
-            <button type="button" mat-button color="warn" (click)="removeRoadblock(i)">Remove</button>
-          </div>
-        </div>
-        <div class="action-row">
-          <button mat-stroked-button matStepperPrevious>Back</button>
-          <button mat-flat-button color="primary" matStepperNext [disabled]="step9Group.invalid">Next</button>
-        </div>
-      </div>
-    </mat-step>
-
-    <mat-step [stepControl]="step10Group" [formGroup]="step10Group" label="Step 10: Project Files">
-      <div class="step-layout">
-        <div class="step-title">
-          <h2>Project Files</h2>
-          <p>Attach required documentation and project artifacts.</p>
-        </div>
-
-        <div class="card file-upload-card">
-          <div class="file-draft-grid">
-            <div class="field">
-              <label>Document Type *</label>
-              <select [formControl]="fileTypeDraft">
-                <option [ngValue]="null">Select document type</option>
-                <option *ngFor="let option of projectFileTypeOptions" [ngValue]="option.value"
-                  [disabled]="isProjectFileTypeSelected(option.value)">{{ option.label }}
-                </option>
-              </select>
-              <small *ngIf="projectFileTypeError()">{{ projectFileTypeError() }}</small>
-            </div>
-            <div class="field">
-              <label>File *</label>
-              <div class="file-picker">
-                <input type="file" (change)="onFileSelected($event)" style="display: none" #fileInput />
-                <button type="button" mat-stroked-button (click)="fileInput.click()">Attach File</button>
-                <span>{{ pendingProjectFile?.name || 'No file attached' }}</span>
-              </div>
-            </div>
-            <div class="field span-2">
-              <label>Description</label>
-              <input type="text" [formControl]="fileDescriptionDraft" />
-            </div>
-            <button type="button" mat-stroked-button class="add-file-button" (click)="addProjectFile(fileInput)">
-              Add File
-            </button>
-          </div>
-        </div>
-
-        <div class="list-grid file-list" *ngIf="projectFiles.length > 0">
-          <div class="file-item-row card" *ngFor="let fileData of projectFiles; index as i">
-            <div class="file-info">
-              <mat-icon>insert_drive_file</mat-icon>
-              <div class="file-meta">
-                <span class="file-name">{{ fileData.fileName }}</span>
-                <span class="file-size">{{ (fileData.file.size / 1024).toFixed(2) }} KB</span>
-              </div>
-            </div>
-            <div class="file-settings form-grid">
-              <div class="field">
-                <label>Document Type</label>
-                <span class="file-type-pill">{{ enumLabel(fileData.fileType, ProjectFileType) }}</span>
-              </div>
-              <div class="field">
-                <label>Description</label>
-                <span class="file-description">{{ fileData.description || '-' }}</span>
-              </div>
-            </div>
-            <button type="button" mat-icon-button color="warn" (click)="removeFile(i)" aria-label="Remove file">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </div>
-        </div>
-
-        <div class="action-row">
-          <button mat-stroked-button matStepperPrevious>Back</button>
-          <button type="button" mat-flat-button color="primary" (click)="submitProject()"
-            [disabled]="isSubmitting || wizardForm.invalid">
-            {{ isSubmitting ? 'Creating...' : 'Create Project' }}
-          </button>
-        </div>
-      </div>
-    </mat-step>
-  </mat-stepper>
-</form>
+<form [formGroup]="wizardForm" class="project-form-page pm-page-enter">
+  <div class="page-header">
+    <p class="eyebrow">Projects</p>
+    <h1>Create Project </h1>
+  </div>
+
+  <mat-stepper linear [orientation]="'vertical'">
+    <mat-step [stepControl]="step1Group" [formGroup]="step1Group" label="Step 1: Management & Type">
+      <div class="step-layout">
+        <div class="step-title">
+          <h2>Management & Type</h2>
+          <p>Select the management model and base project category.</p>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Project Management Type *</label>
+            <select formControlName="projectManagementType">
+              <option *ngFor="let option of projectManagementTypeOptions" [ngValue]="option.value">{{ option.label }}
+              </option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Project Type *</label>
+            <select formControlName="projectType">
+              <option value="">Select project type</option>
+              <option *ngFor="let option of projectTypeOptions" [ngValue]="option.value">{{ option.label }}</option>
+            </select>
+          </div>
+          <div class="field" *ngIf="showParentProject">
+            <label>Parent Project *</label>
+            <select formControlName="parentProjectId">
+              <option [ngValue]="null">Select parent project</option>
+              <option *ngFor="let option of references.parentProjects" [value]="option.id">{{ option.label }}</option>
+            </select>
+          </div>
+          <div class="field" *ngIf="showProcessStatus">
+            <label>Process Status *</label>
+            <select formControlName="processStatus">
+              <option [ngValue]="null">Select process status</option>
+              <option *ngFor="let option of processStatusOptions" [ngValue]="option">{{ enumLabel(option, ProcessStatus)
+                }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="action-row">
+          <button mat-flat-button color="primary" matStepperNext [disabled]="step1Group.invalid">Next</button>
+        </div>
+      </div>
+    </mat-step>
+
+    <mat-step [stepControl]="step2Group" [formGroup]="step2Group" label="Step 2: Basic Info">
+      <div class="step-layout">
+        <div class="step-title">
+          <h2>Basic Info</h2>
+          <p>Capture required identity fields before moving forward.</p>
+        </div>
+        <div class="form-grid">
+          <div class="field span-2">
+            <label>Name *</label>
+            <input type="text" formControlName="name" />
+            <small *ngIf="isInvalid(step2Group.get('name'))">Name is required.</small>
+          </div>
+          <div class="field">
+            <label>Phase *</label>
+            <select formControlName="phase">
+              <option [ngValue]="null">Select phase</option>
+              <option *ngFor="let option of phaseOptions" [ngValue]="option">{{ enumLabel(option, ProjectPhase) }}
+              </option>
+            </select>
+            <small *ngIf="phaseStatusError()">{{ phaseStatusError() }}</small>
+          </div>
+          <div class="field">
+            <label>Status *</label>
+            <select formControlName="status">
+              <option [ngValue]="null">Select status</option>
+              <option *ngFor="let option of statusOptions" [ngValue]="option"
+                [disabled]="!isStatusAllowedForPhase(option)">{{ enumLabel(option, ProjectStatus) }}
+              </option>
+            </select>
+          </div>
+          <div class="field span-2">
+            <label>Description</label>
+            <textarea rows="3" formControlName="description"></textarea>
+          </div>
+        </div>
+        <div class="action-row">
+          <button mat-stroked-button matStepperPrevious>Back</button>
+          <button mat-flat-button color="primary" matStepperNext [disabled]="step2Group.invalid">Next</button>
+        </div>
+      </div>
+    </mat-step>
+
+    <mat-step [stepControl]="step3Group" [formGroup]="step3Group" label="Step 3: Business Unit">
+      <div class="step-layout">
+        <div class="step-title">
+          <h2>Business Unit</h2>
+          <p>Link ownership, organization scope, and expected savings.</p>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Project Manager</label>
+            <select formControlName="projectManagerId">
+              <option [ngValue]="null">Select project manager</option>
+              <option *ngFor="let manager of projectManagers" [value]="manager.id">{{ manager.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Sponsor</label>
+            <input type="text" formControlName="sponsor" />
+          </div>
+          <div class="field">
+            <label>Business Units</label>
+            <div class="inline-editor">
+              <select [formControl]="businessUnitDraft">
+                <option value="">Select business unit</option>
+                <option *ngFor="let unit of references.businessUnits" [value]="unit.id">{{ unit.label }}</option>
+              </select>
+              <button type="button" mat-stroked-button (click)="addBusinessUnit()">Add</button>
+            </div>
+            <div class="list-grid" *ngIf="selectedBusinessUnits.length > 0">
+              <div class="list-item" *ngFor="let unit of selectedBusinessUnits">
+                <span>{{ unit.label }}</span>
+                <button type="button" mat-button color="warn" (click)="removeBusinessUnit(unit.id)">Remove</button>
+              </div>
+            </div>
+            <small *ngIf="isInvalid(step3Group.get('businessUnitIds'))">At least one business unit is required.</small>
+          </div>
+          <div class="field">
+            <label>Plant Name</label>
+            <select formControlName="plantName">
+              <option value="">Select plant</option>
+              <option *ngFor="let option of references.plants" [value]="option.label">{{ option.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Department *</label>
+            <select formControlName="departmentId">
+              <option value="">Select department</option>
+              <option *ngFor="let option of references.departments" [value]="option.id">{{ option.label }}</option>
+            </select>
+            <small *ngIf="isInvalid(step3Group.get('departmentId'))">Department is required.</small>
+          </div>
+          <div class="field">
+            <label>Cost Center </label>
+            <input type="text" formControlName="costCenter" />
+          </div>
+          <div class="field">
+            <label>Cost Saving</label>
+            <input type="number" min="0" formControlName="costSaving" />
+          </div>
+        </div>
+        <div class="action-row">
+          <button mat-stroked-button matStepperPrevious>Back</button>
+          <button mat-flat-button color="primary" matStepperNext [disabled]="step3Group.invalid">Next</button>
+        </div>
+      </div>
+    </mat-step>
+
+    <mat-step [stepControl]="step7Group" [formGroup]="step7Group" label="Step 7: Team Members">
+      <div class="step-layout">
+        <div class="step-title">
+          <h2>Team Members</h2>
+          <p>Add users and assign their role inside the project.</p>
+        </div>
+        <div class="card draft-card" [formGroup]="memberDraft">
+          <div class="form-grid">
+            <div class="field">
+              <label>User</label>
+              <select formControlName="userId">
+                <option value="">Select user</option>
+                <option *ngFor="let user of references.users" [value]="user.id">{{ user.label }}</option>
+              </select>
+            </div>
+            <div class="field" *ngIf="memberDraft.controls['userId'].value">
+              <label>Role</label>
+              <input type="text" formControlName="role" readonly />
+            </div>
+          </div>
+          <button type="button" mat-stroked-button (click)="addTeamMember()">Add Member</button>
+        </div>
+        <div formArrayName="teamMembers" class="list-grid">
+          <div class="list-item" *ngFor="let member of teamMembers.controls; index as i" [formGroupName]="i">
+            <span>{{ userLabel(member.get('userId')?.value) }} - {{ member.get('role')?.value }}</span>
+            <button type="button" mat-button color="warn" (click)="removeTeamMember(i)">Remove</button>
+          </div>
+        </div>
+        <div class="action-row">
+          <button mat-stroked-button matStepperPrevious>Back</button>
+          <button mat-flat-button color="primary" matStepperNext [disabled]="step7Group.invalid">Next</button>
+        </div>
+      </div>
+    </mat-step>
+
+    <mat-step [stepControl]="step10Group" [formGroup]="step10Group" label="Step 10: Project Files">
+      <div class="step-layout">
+        <div class="step-title">
+          <h2>Project Files</h2>
+          <p>Attach required documentation and project artifacts.</p>
+        </div>
+
+        <div class="card file-upload-card">
+          <div class="file-draft-grid">
+            <div class="field">
+              <label>Document Type *</label>
+              <select [formControl]="fileTypeDraft">
+                <option [ngValue]="null">Select document type</option>
+                <option *ngFor="let option of projectFileTypeOptions" [ngValue]="option.value"
+                  [disabled]="isProjectFileTypeSelected(option.value)">{{ option.label }}
+                </option>
+              </select>
+              <small *ngIf="projectFileTypeError()">{{ projectFileTypeError() }}</small>
+            </div>
+            <div class="field">
+              <label>File *</label>
+              <div class="file-picker">
+                <input type="file" (change)="onFileSelected($event)" style="display: none" #fileInput />
+                <button type="button" mat-stroked-button (click)="fileInput.click()">Attach File</button>
+                <span>{{ pendingProjectFile?.name || 'No file attached' }}</span>
+              </div>
+            </div>
+            <div class="field span-2">
+              <label>Description</label>
+              <input type="text" [formControl]="fileDescriptionDraft" />
+            </div>
+            <button type="button" mat-stroked-button class="add-file-button" (click)="addProjectFile(fileInput)">
+              Add File
+            </button>
+          </div>
+        </div>
+
+        <div class="list-grid file-list" *ngIf="projectFiles.length > 0">
+          <div class="file-item-row card" *ngFor="let fileData of projectFiles; index as i">
+            <div class="file-info">
+              <mat-icon>insert_drive_file</mat-icon>
+              <div class="file-meta">
+                <span class="file-name">{{ fileData.fileName }}</span>
+                <span class="file-size">{{ (fileData.file.size / 1024).toFixed(2) }} KB</span>
+              </div>
+            </div>
+            <div class="file-settings form-grid">
+              <div class="field">
+                <label>Document Type</label>
+                <span class="file-type-pill">{{ enumLabel(fileData.fileType, ProjectFileType) }}</span>
+              </div>
+              <div class="field">
+                <label>Description</label>
+                <span class="file-description">{{ fileData.description || '-' }}</span>
+              </div>
+            </div>
+            <button type="button" mat-icon-button color="warn" (click)="removeFile(i)" aria-label="Remove file">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button mat-stroked-button matStepperPrevious>Back</button>
+          <button type="button" mat-flat-button color="primary" (click)="submitProject()"
+            [disabled]="isSubmitting || wizardForm.invalid">
+            {{ isSubmitting ? 'Creating...' : 'Create Project' }}
+          </button>
+        </div>
+      </div>
+    </mat-step>
+  </mat-stepper>
+</form>

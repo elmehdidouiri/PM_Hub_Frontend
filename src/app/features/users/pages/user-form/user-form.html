@@ -34,11 +34,7 @@
         <p>Set identity, access role and initial credentials for the new collaborator.</p>
       </div>
 
-      <div *ngIf="isLoadingRoles" class="user-loading">
-        <div class="user-loading__pulse"></div>
-        <div class="user-loading__pulse user-loading__pulse--short"></div>
-        <div class="user-loading__pulse"></div>
-      </div>
+      <app-loading-spinner *ngIf="isLoadingRoles"></app-loading-spinner>
 
       <form *ngIf="!isLoadingRoles" class="user-form-grid" [formGroup]="form" (ngSubmit)="submit()">
         <label class="pm-field">

@@ -1,0 +1,267 @@
+<section class="analytics-page">
+    <header class="analytics-header">
+      <div class="analytics-header__content">
+        <div class="analytics-eyebrow">
+          <mat-icon>analytics</mat-icon>
+          <span>Portfolio Analytics</span>
+        </div>
+        <h1>Performance Intelligence</h1>
+        <p>Monthly KPI quality, fiscal year hours, and team utilization for the selected portfolio scope.</p>
+        
+        <div class="analytics-header__actions">
+          <button (click)="loadDashboard()" class="btn btn--primary" [disabled]="isRefreshing">
+            <mat-icon [class.rotate-180]="isRefreshing">refresh</mat-icon>
+            Sync Data
+          </button>
+          <button class="btn btn--ghost">
+            <mat-icon>file_download</mat-icon>
+            Export Report
+          </button>
+        </div>
+      </div>
+
+      <div class="period-card" *ngIf="dashboard">
+        <mat-icon>calendar_month</mat-icon>
+        <div>
+          <strong>{{ selectedPeriodLabel }}</strong>
+          <span>{{ fiscalYearLabel }}</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="filter-panel" [class.filter-panel--busy]="isLoading || isRefreshing">
+      <div class="filter-panel__main">
+        <div class="period-mode" aria-label="Date filter">
+          <button type="button" [class.active]="periodFilterMode === 'ytd'" (click)="onPeriodModeChanged('ytd')">
+            YTD
+          </button>
+          <button type="button" [class.active]="periodFilterMode === 'month'" (click)="onPeriodModeChanged('month')">
+            Month
+          </button>
+        </div>
+
+        <div class="filter-group">
+          <label>
+            <span>Year</span>
+            <select [ngModel]="selectedYear" (ngModelChange)="onYtdYearChanged($event)">
+              <option [ngValue]="null">All years</option>
+              <option *ngFor="let year of ytdYearOptions" [ngValue]="year">{{ fiscalYearOptionLabel(year) }}</option>
+            </select>
+          </label>
+
+          <label *ngIf="periodFilterMode === 'month'">
+            <span>Month</span>
+            <select [ngModel]="selectedMonth" (ngModelChange)="onMonthChanged($event)">
+              <option *ngFor="let month of fiscalMonthOptions" [ngValue]="month.value">{{ month.label }}</option>
+            </select>
+          </label>
+
+          <label>
+            <span>User</span>
+            <select [ngModel]="selectedUserId" (ngModelChange)="onScopeFilterChanged('user', $event)">
+              <option [ngValue]="null">All users</option>
+              <option *ngFor="let user of filters.users" [ngValue]="user.id">{{ user.label }}</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Project</span>
+            <select [ngModel]="selectedProjectId" (ngModelChange)="onScopeFilterChanged('project', $event)">
+              <option [ngValue]="null">All projects</option>
+              <option *ngFor="let project of filters.projects" [ngValue]="project.id">{{ project.label }}</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Department</span>
+            <select [ngModel]="selectedDepartmentId" (ngModelChange)="onScopeFilterChanged('department', $event)">
+              <option [ngValue]="null">All departments</option>
+              <option *ngFor="let department of filters.departments" [ngValue]="department.id">{{ department.label }}</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Business Unit</span>
+            <select [ngModel]="selectedBusinessUnitId" (ngModelChange)="onScopeFilterChanged('businessUnit', $event)">
+              <option [ngValue]="null">All units</option>
+              <option *ngFor="let businessUnit of filters.businessUnits" [ngValue]="businessUnit.id">
+                {{ businessUnit.label }}
+              </option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <button type="button" class="filter-reset-icon" (click)="resetFilters()" title="Reset all filters">
+        <mat-icon>restart_alt</mat-icon>
+      </button>
+    </section>
+
+    <div class="analytics-alert" *ngIf="errorMessage">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ errorMessage }}</span>
+    </div>
+
+
+    <div class="analytics-content-container" style="position: relative; display: grid; gap: 1rem; min-height: 250px;">
+      <app-loading-spinner *ngIf="isLoading || isRefreshing" [fullPage]="false"></app-loading-spinner>
+
+      <section class="metric-strip" *ngIf="dashboard">
+      <article class="metric-card" *ngFor="let metric of metrics" [style.--metric-tone]="getToneColor(metric.tone)">
+        <span class="metric-card__line"></span>
+        <div class="metric-card__head">
+          <div class="metric-card__info">
+            <div class="metric-card__icon-badge">
+              <mat-icon>{{ metric.icon }}</mat-icon>
+            </div>
+            <span class="metric-card__label">{{ metric.label }}</span>
+          </div>
+          <div class="metric-card__trend" *ngIf="metric.change" [class.up]="metric.isUp" [class.down]="!metric.isUp">
+            <mat-icon>{{ metric.isUp ? 'trending_up' : 'trending_down' }}</mat-icon>
+            <span>{{ metric.change }}</span>
+          </div>
+        </div>
+
+        <div class="metric-card__body">
+          <div class="metric-card__values">
+            <strong>{{ metric.value }}</strong>
+          </div>
+
+          <div class="metric-card__chart" *ngIf="metric.sparklinePath">
+            <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+              <path class="spark-area" [attr.d]="metric.sparklineAreaPath"></path>
+              <path class="spark-line" [attr.d]="metric.sparklinePath"></path>
+            </svg>
+          </div>
+        </div>
+
+        <footer class="metric-card__footer">
+          <p>{{ metric.note }}</p>
+        </footer>
+
+        <mat-icon class="metric-card__watermark">{{ metric.icon }}</mat-icon>
+      </article>
+    </section>
+
+    <nav class="analytics-tabs" aria-label="Analytics sections">
+      <button
+        type="button"
+        class="analytics-tabs__button"
+        *ngFor="let tab of tabs"
+        [class.analytics-tabs__button--active]="activeTab === tab.id"
+        (click)="setTab(tab.id)"
+      >
+        <mat-icon>{{ tab.icon }}</mat-icon>
+        <span>{{ tab.label }}</span>
+      </button>
+    </nav>
+
+    <ng-container *ngIf="dashboard">
+      <section class="analytics-section" *ngIf="activeTab === 'overview' || activeTab === 'kpis'">
+        <header class="section-header">
+          <div>
+            <mat-icon>query_stats</mat-icon>
+            <h2>KPI Analytics</h2>
+          </div>
+          <span>{{ kpiTrend.length }} months</span>
+        </header>
+
+        <div class="performance-grid">
+          <article class="chart-card performance-card" *ngFor="let chart of kpiCharts; let i = index" [attr.data-tone]="chart.tone">
+            <header>
+              <div>
+                <mat-icon>{{ chart.icon }}</mat-icon>
+                <strong>{{ chart.title }}</strong>
+              </div>
+              <span>{{ chart.subtitle }}</span>
+            </header>
+
+            <div class="kpi-chart-wrapper">
+              <div #kpiEchart class="chart-container" [hidden]="!hasKpiData(chart.key)" style="width: 100%; height: 260px; border: 0; background: transparent;"></div>
+              <div class="chart-no-data" *ngIf="!hasKpiData(chart.key)">
+                <mat-icon>query_stats</mat-icon>
+                <span>No {{ chart.title }} data available for this selection</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="analytics-section" *ngIf="activeTab === 'overview' || activeTab === 'hours'">
+        <header class="section-header">
+          <div>
+            <mat-icon>stacked_bar_chart</mat-icon>
+            <h2>Monthly Hours Breakdown by Category</h2>
+          </div>
+          <span>{{ monthlyHours.length }} months</span>
+        </header>
+
+        <article class="wide-chart-card">
+          <header>
+            <div>
+              <span>Stacked view of logged hours across the selected portfolio.</span>
+            </div>
+          </header>
+
+          <div #hoursBreakdownEchart class="chart-container" [hidden]="!hasHoursData()" style="width: 100%; height: 450px; margin-top: 1rem;"></div>
+          <div class="chart-no-data chart-no-data--wide" *ngIf="!hasHoursData()">
+            <mat-icon>bar_chart</mat-icon>
+            <span>No hourly breakdown available for the selected scope and period</span>
+          </div>
+        </article>
+
+        <div class="distribution-grid">
+          <article class="chart-card">
+            <header>
+              <div>
+                <strong>Effort by Category</strong>
+                <span>Work category distribution</span>
+              </div>
+            </header>
+            <div #utilizationEchart class="chart-container" [hidden]="!hasHoursData()" style="width: 100%; height: 420px;"></div>
+            <div class="chart-no-data" *ngIf="!hasHoursData()">
+              <mat-icon>pie_chart</mat-icon>
+              <span>No effort distribution data</span>
+            </div>
+          </article>
+
+          <article class="chart-card">
+            <header>
+              <div>
+                <strong>Effort by Business Unit</strong>
+                <span>Organization unit distribution</span>
+              </div>
+            </header>
+            <div #buHoursEchart class="chart-container" [hidden]="!hasBuData()" style="width: 100%; height: 420px;"></div>
+            <div class="chart-no-data" *ngIf="!hasBuData()">
+              <mat-icon>pie_chart</mat-icon>
+              <span>No business unit distribution</span>
+            </div>
+          </article>
+        </div>
+
+        <article class="wide-chart-card">
+          <header>
+            <div>
+              <strong>Resource Utilization Velocity</strong>
+              <span>Performance against target capacity (85% efficiency benchmark).</span>
+            </div>
+          </header>
+
+          <div #trendEchart class="chart-container" [hidden]="!hasUtilizationData()" style="width: 100%; height: 350px; margin-top: 1rem;"></div>
+          <div class="chart-no-data chart-no-data--wide" *ngIf="!hasUtilizationData()">
+            <mat-icon>trending_up</mat-icon>
+            <span>No utilization trend data available</span>
+          </div>
+        </article>
+      </section>
+    </ng-container>
+    </div>
+
+  <ng-template #emptyKpi>
+    <div class="empty-state">No KPI data for this selection.</div>
+  </ng-template>
+
+  <ng-template #emptyHours>
+    <div class="empty-state">No hours data for this selection.</div>
+  </ng-template>

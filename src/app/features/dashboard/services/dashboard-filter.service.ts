@@ -1,15 +1,18 @@
 import { Injectable } from '@angular/core';
-import { DashboardFilterParams } from '../../projects/models';
+import { DashboardFilterParams, ProjectSummaryDto } from '../../projects/models';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface DashboardFilterState {
   selectedYear: number | null;
   selectedMonth: number | null;
+  selectedStartDate: string | null;
+  selectedEndDate: string | null;
   selectedRoleId: string;
   selectedProjectStatus: string;
   selectedProjectPhase: string;
   selectedProcessStatus: string;
+  selectedProjectManagementType: string;
   selectedDepartment: string;
   selectedBusinessUnit: string;
   selectedPlant: string;
@@ -19,6 +22,7 @@ export interface FilterTicket {
   id: string;
   label: string;
   count: number;
+  projects?: ProjectSummaryDto[];
 }
 
 export interface StatusMeta {
@@ -72,6 +76,15 @@ export class DashboardFilterService {
     { id: 'cancelled',   label: 'Cancelled' },
   ];
 
+  static readonly PROJECT_MANAGEMENT_TYPE_OPTIONS = [
+    { id: 'all', label: 'All project management' },
+    { id: '0', label: 'Digital Operation' },
+    { id: '1', label: 'Digital Solution' },
+    { id: '2', label: 'Infrastructure' },
+    { id: '3', label: 'Process Simplification' },
+    { id: '4', label: 'Other' },
+  ];
+
   private static readonly PROJECT_PHASE_MAP: Record<string, string> = {
     pipeline: 'Pipeline', preprocess: 'PreProcess', initiation: 'Initiation',
     planification: 'Planification', execution: 'Execution',
@@ -90,6 +103,8 @@ export class DashboardFilterService {
     return {
       year:           state.selectedYear ?? undefined,
       month:          state.selectedMonth ?? undefined,
+      startDate:      state.selectedStartDate ?? undefined,
+      endDate:        state.selectedEndDate ?? undefined,
       roleId:         state.selectedRoleId !== 'all' ? state.selectedRoleId : undefined,
       departmentId:   state.selectedDepartment !== 'all' ? state.selectedDepartment : undefined,
       businessUnitId: state.selectedBusinessUnit !== 'all' ? state.selectedBusinessUnit : undefined,
@@ -100,6 +115,8 @@ export class DashboardFilterService {
         ? DashboardFilterService.PROJECT_PHASE_MAP[state.selectedProjectPhase] : undefined,
       processStatus:  state.selectedProcessStatus !== 'all'
         ? DashboardFilterService.PROCESS_STATUS_MAP[state.selectedProcessStatus] : undefined,
+      projectManagementType: state.selectedProjectManagementType !== 'all'
+        ? state.selectedProjectManagementType : undefined,
       ytd: state.selectedYear !== null && state.selectedMonth === null ? true : undefined,
     };
   }
@@ -114,6 +131,7 @@ export class DashboardFilterService {
       state.selectedProjectStatus !== 'all' ||
       state.selectedProjectPhase !== 'all' ||
       state.selectedProcessStatus !== 'all' ||
+      state.selectedProjectManagementType !== 'all' ||
       state.selectedDepartment !== 'all'
     );
   }
@@ -124,6 +142,7 @@ export class DashboardFilterService {
       state.selectedDepartment !== 'all',
       state.selectedProjectPhase !== 'all',
       state.selectedProjectStatus !== 'all',
+      state.selectedProjectManagementType !== 'all',
       state.selectedYear !== null,
       state.selectedMonth !== null,
     ].filter(Boolean).length;
@@ -138,8 +157,8 @@ export class DashboardFilterService {
     const stats = new Map<string, { label: string; count: number }>();
     departmentIdByName.forEach((id, name) => stats.set(id, { label: name, count: 0 }));
     for (const p of projects) {
-      const label = (p.departmentName || p.department || 'Unknown').trim();
-      const id = p.departmentId || departmentIdByName.get(label) || label;
+      const label = `${p.departmentName ?? p.DepartmentName ?? p.department ?? p.Department ?? 'Unknown'}`.trim();
+      const id = p.departmentId ?? p.DepartmentId ?? departmentIdByName.get(label) ?? label;
       const current = stats.get(id) || { label, count: 0 };
       current.count++;
       stats.set(id, current);
@@ -156,8 +175,10 @@ export class DashboardFilterService {
     const stats = new Map<string, { label: string; count: number }>();
     businessUnitIdByName.forEach((id, name) => stats.set(id, { label: name, count: 0 }));
     for (const project of projects) {
-      const units: string[] = Array.isArray(project.businessUnits) ? project.businessUnits : [];
-      const ids: string[] = Array.isArray(project.businessUnitIds) ? project.businessUnitIds : [];
+      const rawUnits = project.businessUnits ?? project.BusinessUnits ?? project.businessUnitNames ?? project.BusinessUnitNames;
+      const rawIds = project.businessUnitIds ?? project.BusinessUnitIds;
+      const units = this.toBusinessUnitLabels(rawUnits);
+      const ids = this.toStringArray(rawIds);
       if (units.length > 0) {
         units.forEach((unit, index) => {
           const label = `${unit}`.trim();
@@ -168,8 +189,8 @@ export class DashboardFilterService {
           stats.set(id, current);
         });
       } else {
-        const label = (project.businessUnitName || project.businessUnit || '').trim();
-        const id = project.businessUnitId || (label ? businessUnitIdByName.get(label) : null);
+        const label = `${project.businessUnitName ?? project.BusinessUnitName ?? project.businessUnit ?? project.BusinessUnit ?? ''}`.trim();
+        const id = project.businessUnitId ?? project.BusinessUnitId ?? (label ? businessUnitIdByName.get(label) : null);
         if (id) {
           const current = stats.get(id) || { label: label || id, count: 0 };
           current.count++;
@@ -191,9 +212,9 @@ export class DashboardFilterService {
     plantIdByName.forEach((id, name) => stats.set(id, { label: name, count: 0 }));
 
     for (const p of projects) {
-      const label = (p.plantName ?? p.PlantName ?? p.plant ?? p.Plant ?? '').trim();
+      const label = `${p.plantName ?? p.PlantName ?? p.plant ?? p.Plant ?? ''}`.trim();
       if (!label) continue;
-      const id = plantIdByName.get(label) || label;
+      const id = (p.plantId ?? p.PlantId ?? plantIdByName.get(label)) || label;
       const current = stats.get(id) || { label, count: 0 };
       current.count++;
       stats.set(id, current);
@@ -209,7 +230,7 @@ export class DashboardFilterService {
     const statusOptions = DashboardFilterService.PROJECT_STATUS_OPTIONS;
     const counts = new Map<string, number>();
     for (const p of projects) {
-      const normalized = this.normalizeProjectStatusId(p.status || p.projectStatus || '');
+      const normalized = this.normalizeProjectStatusId(p.status ?? p.Status ?? p.projectStatus ?? p.ProjectStatus ?? p.statusLabel ?? '');
       if (normalized) counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
     }
     const dynamicTickets = statusOptions
@@ -227,7 +248,7 @@ export class DashboardFilterService {
     const phaseOptions = DashboardFilterService.PROJECT_PHASE_OPTIONS;
     const counts = new Map<string, number>();
     for (const p of projects) {
-      const phase = `${p.phaseLabel || p.phase || ''}`.trim().toLowerCase();
+      const phase = this.normalizeProjectPhaseId(p.phaseLabel ?? p.PhaseLabel ?? p.phase ?? p.Phase ?? '');
       if (phase) counts.set(phase, (counts.get(phase) ?? 0) + 1);
     }
     const dynamicTickets = phaseOptions
@@ -235,7 +256,7 @@ export class DashboardFilterService {
       .map((s) => ({ 
         id: s.id, 
         label: s.label, 
-        count: counts.get(s.label.toLowerCase()) ?? counts.get(s.id) ?? 0 
+        count: counts.get(s.id) ?? counts.get(this.normalizeProjectPhaseId(s.label)) ?? 0 
       }));
 
     return [
@@ -255,6 +276,56 @@ export class DashboardFilterService {
       .sort((a, b) => b.label.localeCompare(a.label));
   }
 
+  buildProjectManagementTypeTickets(projects: any[]): FilterTicket[] {
+    const counts = new Map<string, number>();
+    for (const project of projects) {
+      const raw = project.projectManagementType ?? project.ProjectManagementType;
+      if (raw === undefined || raw === null || raw === '') {
+        continue;
+      }
+      const id = String(raw);
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+
+    return [
+      { id: 'all', label: 'All project management', count: projects.length },
+      ...DashboardFilterService.PROJECT_MANAGEMENT_TYPE_OPTIONS
+        .filter((option) => option.id !== 'all')
+        .map((option) => ({ ...option, count: counts.get(option.id) ?? 0 })),
+    ];
+  }
+
+  private toStringArray(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value.map((item) => `${item}`.trim()).filter(Boolean);
+    }
+
+    if (typeof value === 'string') {
+      return value.split(/[;,]/).map((item) => item.trim()).filter(Boolean);
+    }
+
+    return [];
+  }
+
+  private toBusinessUnitLabels(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return this.toStringArray(value);
+    }
+
+    return value
+      .map((item) => {
+        if (typeof item === 'string') {
+          return item.trim();
+        }
+        if (item && typeof item === 'object') {
+          const row = item as Record<string, unknown>;
+          return `${row['name'] ?? row['label'] ?? row['businessUnitName'] ?? row['BusinessUnitName'] ?? ''}`.trim();
+        }
+        return '';
+      })
+      .filter(Boolean);
+  }
+
   // ─── Status helpers ───────────────────────────────────────────────────────
 
   normalizeProjectStatusId(rawStatus: unknown): string {
@@ -264,6 +335,19 @@ export class DashboardFilterService {
     if (value === '1' || value.includes('on hold') || value.includes('onhold')) return 'onhold';
     if (value === '2' || value.includes('done') || value.includes('complete')) return 'done';
     if (value === '3' || value.includes('planned') || value.includes('plan')) return 'planned';
+    return value.replace(/[\s_-]+/g, '');
+  }
+
+  normalizeProjectPhaseId(rawPhase: unknown): string {
+    const value = `${rawPhase ?? ''}`.trim().toLowerCase();
+    if (!value) return '';
+    if (value === '0' || value.includes('pipeline')) return 'pipeline';
+    if (value === '1' || value.includes('pre process') || value.includes('preprocess')) return 'preprocess';
+    if (value === '2' || value.includes('initiation')) return 'initiation';
+    if (value === '3' || value.includes('planification') || value.includes('planning')) return 'planification';
+    if (value === '4' || value.includes('execution')) return 'execution';
+    if (value === '5' || value.includes('monitoring')) return 'monitoring';
+    if (value === '6' || value.includes('closing')) return 'closing';
     return value.replace(/[\s_-]+/g, '');
   }
 
@@ -283,11 +367,27 @@ export class DashboardFilterService {
   }
 
   defaultFilterState(): DashboardFilterState {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1;
+    const startDate = new Date(currentYear, currentMonth - 1, 1);
+    const endDate = new Date(currentYear, currentMonth, 0);
+
     return {
-      selectedYear: null, selectedMonth: null,
+      selectedYear: currentYear, selectedMonth: currentMonth,
+      selectedStartDate: this.toDateInputValue(startDate), selectedEndDate: this.toDateInputValue(endDate),
       selectedRoleId: 'all', selectedProjectStatus: 'all',
       selectedProjectPhase: 'all', selectedProcessStatus: 'all',
+      selectedProjectManagementType: 'all',
       selectedDepartment: 'all', selectedBusinessUnit: 'all', selectedPlant: 'all',
     };
+  }
+
+  private toDateInputValue(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
   }
 }

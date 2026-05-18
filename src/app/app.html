@@ -1,4 +1,5 @@
 <div class="app-root-shell" [class.app-root-shell--ready]="(isReady$ | async) && !(isAuthenticating$ | async)">
+  <app-global-loader></app-global-loader>
   <!-- Show app only when ready and NOT authenticating/refreshing -->
   <ng-container *ngIf="(isReady$ | async) && !(isAuthenticating$ | async); else loading">
     <div class="app-shell min-h-screen">
@@ -18,7 +19,7 @@
           <div class="loader-bar">
             <div class="loader-progress"></div>
           </div>
-          <p class="loader-text">Synchronisation de votre session...</p>
+          <p class="loader-text">Loading data...</p>
         </div>
       </div>
     </div>

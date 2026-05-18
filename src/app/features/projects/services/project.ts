@@ -28,6 +28,7 @@ import {
   ProjectSummaryDto,
   UpdateProjectPayload,
   UploadProjectFile,
+  DashboardGroupedDistributionDto,
 } from '../models';
 
 @Injectable({
@@ -144,6 +145,15 @@ export class ProjectService {
       .pipe(map((response) => response.data!));
   }
 
+  getAdminDashboardGroupedDistribution(filters: DashboardFilterParams): Observable<DashboardGroupedDistributionDto> {
+    return this.http
+      .get<ApiResponse<DashboardGroupedDistributionDto>>(`${environment.apiUrl}/dashboard/admin/grouped-distribution`, {
+        headers: this.buildHeaders(),
+        params: this.buildDashboardParams(filters),
+      })
+      .pipe(map((response) => response.data!));
+  }
+
   getAdminUserPerformance(userId: string, filters: DashboardFilterParams): Observable<DashboardPerformanceDto> {
     return this.http
       .get<ApiResponse<DashboardPerformanceDto> | DashboardPerformanceDto>(
@@ -187,7 +197,12 @@ export class ProjectService {
   private mapToBackendDto(form: any): any {
     // Si c'est déjà au format backend, on ne touche à rien
     if (Array.isArray(form.strategicCriteria)) {
-      return form;
+      const backendForm = { ...form };
+      delete backendForm.members;
+      return {
+        ...backendForm,
+        teamMembers: this.filterProjectManagerFromMembers(form.teamMembers ?? form.members, form.projectManagerId),
+      };
     }
 
     // 1. Map Strategic Criteria (Object -> Array)
@@ -238,8 +253,8 @@ export class ProjectService {
       costCenter: item.costCenter || ''
     }));
 
-    // 4. Map Members (teamMembers -> members)
-    const members = (form.teamMembers || []).map((m: any) => ({
+    // 4. Map Team Members. The project manager is a separate resource.
+    const teamMembers = this.filterProjectManagerFromMembers(form.teamMembers, form.projectManagerId).map((m: any) => ({
       userId: typeof m === 'string' ? m : (m.userId || m.id || m),
       roleId: typeof m === 'string' ? '' : (m.roleId || m.RoleId || '')
     }));
@@ -269,7 +284,7 @@ export class ProjectService {
       businessUnitIds: form.businessUnitIds || [],
       technologyIds: form.technologyIds || [],
       solutionDomainIds: form.solutionDomainIds || [],
-      members: members,
+      teamMembers: teamMembers,
       projectResources: projectResources,
       strategicCriteria: strategicCriteria,
       kpIs: kpIs,
@@ -283,6 +298,13 @@ export class ProjectService {
       serverHostName: form.serverHostName || '',
       roadblocks: Array.isArray(form.roadblocks) ? form.roadblocks.join(', ') : (form.roadblocks || '')
     };
+  }
+
+  private filterProjectManagerFromMembers(members: any[] | null | undefined, projectManagerId: string | null | undefined): any[] {
+    return (members || []).filter((member: any) => {
+      const userId = typeof member === 'string' ? member : (member?.userId || member?.UserId || member?.id || member?.Id);
+      return !projectManagerId || userId !== projectManagerId;
+    });
   }
 
   uploadProjectFile(projectId: string, fileData: UploadProjectFile): Observable<any> {
@@ -320,7 +342,7 @@ export class ProjectService {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         const apiKey = this.toProjectSearchParamName(key);
-        const apiValue = apiKey === 'pageSize' ? Math.min(Number(value) || 10, 50) : value;
+        const apiValue = apiKey === 'pageSize' ? Math.min(Number(value) || 10, 500) : value;
         httpParams = httpParams.set(apiKey, String(apiValue));
       }
     });
@@ -795,8 +817,10 @@ export class ProjectService {
       Status: 'status',
       Phase: 'phase',
       ProjectType: 'projectType',
+      ProjectManagementType: 'projectManagementType',
       DepartmentId: 'departmentId',
       BusinessUnitId: 'businessUnitId',
+      PlantId: 'plantId',
       ProjectManagerId: 'projectManagerId',
     };
 
@@ -822,8 +846,7 @@ export class ProjectService {
       averageOtd: Number.isFinite(averageOtd) ? averageOtd : 0,
       delayedProjects: Number.isFinite(delayedProjects) ? delayedProjects : 0,
       projectsByPhase,
-      // Optional runtime fields used by dashboard charts/cards.
-      totalEstimatedHours: Number(summary['totalEstimatedHours'] ?? 0),
+       totalEstimatedHours: Number(summary['totalEstimatedHours'] ?? 0),
       totalTrackedHours: Number(summary['totalTrackedHours'] ?? 0),
       ytdHours: Number(summary['ytdHours'] ?? 0),
       totalUsers: Number(summary['totalUsers'] ?? 0),

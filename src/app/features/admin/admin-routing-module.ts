@@ -4,6 +4,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { RolesAdminPage } from './pages/roles-admin-page/roles-admin-page';
 import { ReferenceAdminPage } from './pages/reference-admin-page/reference-admin-page';
 import { UserApprovalsPage } from './pages/user-approvals/user-approvals';
+import { HourBookingNotificationsPage } from './pages/hour-booking-notifications/hour-booking-notifications';
 
 const routes: Routes = [
   {
@@ -43,6 +44,10 @@ const routes: Routes = [
   {
     path: 'approvals',
     component: UserApprovalsPage,
+  },
+  {
+    path: 'hour-booking-notifications',
+    component: HourBookingNotificationsPage,
   },
 ];
 

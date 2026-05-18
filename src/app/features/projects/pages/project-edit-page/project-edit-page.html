@@ -1,732 +1,735 @@
-<section class="project-edit-page pm-page-enter">
-  <div class="bg-decoration" aria-hidden="true">
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-  </div>
-
-  <header class="page-header">
-    <div class="title-stack">
-      <span class="eyebrow">Governance Hub</span>
-      <h1>Edit: {{ project.name }}</h1>
-    </div>
-    <div class="header-actions">
-      <button type="button" class="btn btn--secondary" (click)="backToDetails()">
-        <mat-icon>visibility</mat-icon>
-        <span>View Details</span>
-      </button>
-    </div>
-  </header>
-
-  <div class="edit-grid">
-    
-    <!-- Section 1: STATUS & PHASE (PRIORITY) -->
-    <section class="edit-section edit-section--primary" [class.editing]="editingSection === 'status'">
-      <div class="section-header">
-        <h2>
-          <mat-icon>speed</mat-icon>
-          Execution State
-        </h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'status'" (click)="toggleEdit('status')">
-          <mat-icon>edit</mat-icon>
-          Quick Update
-        </button>
-      </div>
-
-      <div class="info-display" *ngIf="editingSection !== 'status'">
-        <div class="info-item">
-          <label>Status</label>
-          <span class="badge badge--status">{{ getStatusLabel(project) }}</span>
-        </div>
-        <div class="info-item">
-          <label>Phase</label>
-          <span class="badge">{{ getPhaseLabel(project) }}</span>
-        </div>
-        <div class="info-item">
-          <label>Process Status</label>
-          <span>{{ project.processStatusLabel || 'N/A' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Progress</label>
-          <span>{{ project.progressPercentage || 0 }}%</span>
-        </div>
-      </div>
-
-      <form [formGroup]="statusForm" class="edit-form" *ngIf="editingSection === 'status'">
-        <div class="form-grid">
-          <div class="field">
-            <label>Current Status *</label>
-            <select formControlName="status">
-              <option *ngFor="let opt of statusOptions" [ngValue]="opt">{{ getEnumLabel(opt, ProjectStatus) }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Project Phase *</label>
-            <select formControlName="phase">
-              <option *ngFor="let opt of phaseOptions" [ngValue]="opt">{{ getEnumLabel(opt, ProjectPhase) }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Process Status</label>
-            <select formControlName="processStatus">
-              <option *ngFor="let opt of processStatusOptions" [ngValue]="opt">{{ getEnumLabel(opt, ProcessStatus) }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Completion %</label>
-            <input type="number" formControlName="progressPercentage" min="0" max="100">
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('status')">
-            {{ isSaving ? 'Saving...' : 'Save Changes' }}
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <section class="edit-section">
-      <div class="section-header">
-        <h2><mat-icon>info</mat-icon> Backend DTO Metadata</h2>
-      </div>
-      <div class="info-display">
-        <div class="info-item"><label>Id</label><span>{{ project.id }}</span></div>
-        <div class="info-item"><label>Strategic Score</label><span>{{ project.strategicScore }}</span></div>
-        <div class="info-item"><label>Strategic Category</label><span>{{ project.strategicCategory }}</span></div>
-        <div class="info-item"><label>Created At</label><span>{{ project.createdAt | date:'medium' }}</span></div>
-        <div class="info-item"><label>Updated At</label><span>{{ project.updatedAt ? (project.updatedAt | date:'medium') : 'N/A' }}</span></div>
-      </div>
-    </section>
-
-    <!-- Section 2: IDENTITY -->
-    <section class="edit-section" [class.editing]="editingSection === 'identity'">
-      <div class="section-header">
-        <h2>
-          <mat-icon>fingerprint</mat-icon>
-          Core Identity
-        </h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'identity'" (click)="toggleEdit('identity')">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </div>
-
-      <div class="info-display" *ngIf="editingSection !== 'identity'">
-        <div class="info-item">
-          <label>Project Name</label>
-          <span>{{ project.name }}</span>
-        </div>
-        <div class="info-item">
-          <label>Description</label>
-          <span style="font-size: 0.85rem;">{{ project.description || 'No description' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Management Type</label>
-          <span>{{ project.projectManagementTypeLabel }}</span>
-        </div>
-        <div class="info-item">
-          <label>Project Type</label>
-          <span>{{ project.projectTypeLabel || 'N/A' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Project Manager</label>
-          <span>{{ project.projectManagerName || 'Unassigned' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Sponsor</label>
-          <span>{{ project.sponsor || 'N/A' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Department Name</label>
-          <span>{{ project.departmentName }}</span>
-        </div>
-        <div class="info-item">
-          <label>Plant Name</label>
-          <span>{{ project.plantName || 'N/A' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Parent Project</label>
-          <span>{{ project.parentProjectName || 'N/A' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Cost Center</label>
-          <span>{{ project.costCenter || 'N/A' }}</span>
-        </div>
-        <div class="info-item" style="grid-column: span 2;">
-          <label>Business Units</label>
-          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
-            <span class="badge" *ngFor="let bu of project.businessUnits">{{ bu }}</span>
-            <span *ngIf="!project.businessUnits.length">None</span>
-          </div>
-        </div>
-        <div class="info-item" style="grid-column: span 2;">
-          <label>Technologies</label>
-          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
-            <span class="badge" *ngFor="let t of project.technologies">{{ t }}</span>
-            <span *ngIf="!project.technologies.length">None</span>
-          </div>
-        </div>
-        <div class="info-item" style="grid-column: span 2;">
-          <label>Solution Domains</label>
-          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
-            <span class="badge" *ngFor="let s of project.solutionDomains">{{ s }}</span>
-            <span *ngIf="!project.solutionDomains.length">None</span>
-          </div>
-        </div>
-      </div>
-
-      <form [formGroup]="identityForm" class="edit-form" *ngIf="editingSection === 'identity'">
-        <div class="form-grid">
-          <div class="field">
-            <label>Name *</label>
-            <input type="text" formControlName="name">
-          </div>
-          <div class="field" style="grid-column: span 2;">
-            <label>Description</label>
-            <textarea formControlName="description"></textarea>
-          </div>
-          <div class="field">
-            <label>Management Type *</label>
-            <select formControlName="projectManagementType">
-              <option *ngFor="let opt of projectManagementTypeOptions" [ngValue]="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Project Type *</label>
-            <select formControlName="projectType">
-              <option *ngFor="let opt of projectTypeOptions" [ngValue]="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Project Manager</label>
-            <select formControlName="projectManagerId">
-              <option [ngValue]="null">Select manager</option>
-              <option *ngFor="let opt of references.users" [value]="opt.id">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Sponsor</label>
-            <input type="text" formControlName="sponsor">
-          </div>
-          <div class="field">
-            <label>Department Name *</label>
-            <select formControlName="departmentId">
-              <option value="">Select department</option>
-              <option *ngFor="let opt of references.departments" [value]="opt.id">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Plant Name</label>
-            <select formControlName="plantName">
-              <option value="">Select plant</option>
-              <option *ngFor="let opt of references.plants" [value]="opt.label">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Parent Project</label>
-            <select formControlName="parentProjectId">
-              <option [ngValue]="null">No parent project</option>
-              <option *ngFor="let opt of references.parentProjects" [value]="opt.id">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Cost Center</label>
-            <input type="text" formControlName="costCenter">
-          </div>
-          <div class="field">
-            <label>Server/Host</label>
-            <input type="text" formControlName="serverHostName">
-          </div>
-          <div class="field">
-            <label>Business Units</label>
-            <select formControlName="businessUnitIds" multiple>
-              <option *ngFor="let opt of references.businessUnits" [value]="opt.id">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Technologies</label>
-            <select formControlName="technologyIds" multiple>
-              <option *ngFor="let opt of references.technologies" [value]="opt.id">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Solution Domains</label>
-            <select formControlName="solutionDomainIds" multiple>
-              <option *ngFor="let opt of references.solutionDomains" [value]="opt.id">{{ opt.label }}</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('identity')">Save Identity</button>
-        </div>
-      </form>
-    </section>
-
-    <!-- Section 3: TIMELINE -->
-    <section class="edit-section" [class.editing]="editingSection === 'timeline'">
-      <div class="section-header">
-        <h2>
-          <mat-icon>calendar_today</mat-icon>
-          Timeline & Effort
-        </h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'timeline'" (click)="toggleEdit('timeline')">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </div>
-
-      <div class="info-display" *ngIf="editingSection !== 'timeline'">
-        <div class="info-item">
-          <label>Start Date</label>
-          <span>{{ project.startDate | date }}</span>
-        </div>
-        <div class="info-item">
-          <label>End Date</label>
-          <span>{{ project.endDate | date }}</span>
-        </div>
-        <div class="info-item">
-          <label>Est. Due Date</label>
-          <span>{{ project.estimatedDueDate | date }}</span>
-        </div>
-        <div class="info-item">
-          <label>Est. Hours</label>
-          <span>{{ project.estimatedHours || 0 }}h</span>
-        </div>
-        <div class="info-item">
-          <label>Actual Hours</label>
-          <span>{{ project.actualHours || 0 }}h</span>
-        </div>
-      </div>
-
-      <form [formGroup]="timelineForm" class="edit-form" *ngIf="editingSection === 'timeline'">
-        <div class="form-grid">
-          <div class="field"><label>Start Date *</label><input type="date" formControlName="startDate"></div>
-          <div class="field"><label>End Date</label><input type="date" formControlName="endDate"></div>
-          <div class="field"><label>Est. Due Date</label><input type="date" formControlName="estimatedDueDate"></div>
-          <div class="field"><label>Est. Hours</label><input type="number" formControlName="estimatedHours"></div>
-          <div class="field"><label>Actual Hours</label><input type="number" formControlName="actualHours"></div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('timeline')">Save</button>
-        </div>
-      </form>
-    </section>
-
-    <!-- Section: FINANCIAL -->
-    <section class="edit-section" [class.editing]="editingSection === 'financial'">
-      <div class="section-header">
-        <h2><mat-icon>account_balance</mat-icon> Financial</h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'financial'" (click)="toggleEdit('financial')"><mat-icon>edit</mat-icon></button>
-      </div>
-      <div class="info-display" *ngIf="editingSection !== 'financial'">
-        <div class="info-item"><label>Budget</label><span>{{ project.budget | number }}</span></div>
-        <div class="info-item"><label>Cost Saving</label><span>{{ project.costSaving | number }}</span></div>
-        <div class="info-item"><label>Digital Contribution</label><span>{{ project.digitalContribution | number }}</span></div>
-      </div>
-      <form [formGroup]="financialForm" class="edit-form" *ngIf="editingSection === 'financial'">
-        <div class="form-grid">
-          <div class="field"><label>Budget</label><input type="number" formControlName="budget"></div>
-          <div class="field"><label>Cost Saving</label><input type="number" formControlName="costSaving"></div>
-          <div class="field"><label>Digital Contribution</label><input type="number" formControlName="digitalContribution"></div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('financial')">Save</button>
-        </div>
-      </form>
-    </section>
-
-    <!-- Section 4: CONTEXT & ROADBLOCKS -->
-    <section class="edit-section" [class.editing]="editingSection === 'context'" style="grid-column: span 12;">
-      <div class="section-header">
-        <h2>
-          <mat-icon>notes</mat-icon>
-          Execution Context
-        </h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'context'" (click)="toggleEdit('context')">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </div>
-
-      <div class="info-display" *ngIf="editingSection !== 'context'" style="grid-template-columns: 1fr 1fr;">
-        <div class="info-item">
-          <label>Current State</label>
-          <span>{{ project.currentState || 'No content' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Next Steps</label>
-          <span>{{ project.nextSteps || 'No content' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Enhancements</label>
-          <span>{{ project.enhancements || 'No content' }}</span>
-        </div>
-        <div class="info-item">
-          <label>Code Source</label>
-          <a [href]="project.codeSourceLink" target="_blank" *ngIf="project.codeSourceLink">Link</a>
-          <span *ngIf="!project.codeSourceLink">N/A</span>
-        </div>
-        <div class="info-item">
-          <label>Solution Link</label>
-          <a [href]="project.solutionLink" target="_blank" *ngIf="project.solutionLink">Link</a>
-          <span *ngIf="!project.solutionLink">N/A</span>
-        </div>
-        <div class="info-item" style="grid-column: span 2;">
-          <label>Roadblocks</label>
-          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
-            <span class="badge" *ngFor="let rb of splitRoadblocks(project.roadblocks)">{{ rb }}</span>
-            <span *ngIf="!project.roadblocks">No roadblocks</span>
-          </div>
-        </div>
-      </div>
-
-      <form [formGroup]="contextForm" class="edit-form" *ngIf="editingSection === 'context'">
-        <div class="form-grid">
-          <div class="field">
-            <label>Current State</label>
-            <textarea formControlName="currentState"></textarea>
-          </div>
-          <div class="field">
-            <label>Next Steps</label>
-            <textarea formControlName="nextSteps"></textarea>
-          </div>
-          <div class="field">
-            <label>Enhancements</label>
-            <textarea formControlName="enhancements"></textarea>
-          </div>
-          <div class="field">
-            <label>Code Source Link</label>
-            <input type="url" formControlName="codeSourceLink">
-          </div>
-          <div class="field">
-            <label>Solution Link</label>
-            <input type="url" formControlName="solutionLink">
-          </div>
-        </div>
-        
-        <div class="field">
-          <label>Roadblocks</label>
-          <div class="draft-card" style="display: flex; gap: 1rem; align-items: center;">
-            <input type="text" [formControl]="roadblockDraft" placeholder="Type new roadblock..." style="flex: 1;">
-            <button type="button" class="btn btn--primary" (click)="addRoadblock()">Add</button>
-          </div>
-          <div class="list-grid">
-            <div class="list-item" *ngFor="let rb of roadblocks.controls; index as i">
-              <span>{{ rb.value }}</span>
-              <button type="button" class="btn btn--text" (click)="removeRoadblock(i)" style="color: #ef4444;">
-                <mat-icon>delete</mat-icon>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('context')">Save Context</button>
-        </div>
-      </form>
-    </section>
-
-    <!-- Section 5: TEAM & BUDGET -->
-    <section class="edit-section" [class.editing]="editingSection === 'team'">
-       <div class="section-header">
-        <h2>
-          <mat-icon>group</mat-icon>
-          Team Members
-        </h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'team'" (click)="toggleEdit('team')">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </div>
-      
-      <div class="info-display" *ngIf="editingSection !== 'team'">
-        <div class="info-item" *ngFor="let m of project.members">
-          <label>{{ m.roleName }}</label>
-          <span>{{ m.fullName }}</span>
-        </div>
-        <span *ngIf="!project.members.length">No members assigned.</span>
-      </div>
-
-      <form [formGroup]="teamForm" class="edit-form" *ngIf="editingSection === 'team'">
-        <div class="draft-card" [formGroup]="memberDraft">
-          <div class="form-grid">
-            <div class="field">
-              <label>User</label>
-              <select formControlName="userId">
-                <option value="">Select user</option>
-                <option *ngFor="let u of references.users" [value]="u.id">{{ u.label }}</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Role</label>
-              <input type="text" formControlName="role">
-            </div>
-          </div>
-          <button type="button" class="btn btn--primary" (click)="addTeamMember()">Add Member</button>
-        </div>
-
-        <div class="list-grid">
-          <div class="list-item" *ngFor="let m of teamMembers.controls; index as i" [formGroupName]="i">
-            <span>{{ getUserLabel(m.get('userId')?.value) }} - {{ m.get('role')?.value }}</span>
-            <button type="button" class="btn btn--text" (click)="removeTeamMember(i)" style="color: #ef4444;">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('team')">Update Team</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="edit-section" [class.editing]="editingSection === 'budget'">
-       <div class="section-header">
-        <h2>
-          <mat-icon>monetization_on</mat-icon>
-          Budget Lines
-        </h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'budget'" (click)="toggleEdit('budget')">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </div>
-
-      <div class="info-display" *ngIf="editingSection !== 'budget'">
-        <div class="info-item">
-          <label>Total Budget</label>
-          <span>{{ project.budget | number }}</span>
-        </div>
-        <div class="info-item">
-          <label>Resources</label>
-          <span>{{ project.projectResources.length }} items</span>
-        </div>
-      </div>
-
-      <form [formGroup]="budgetForm" class="edit-form" *ngIf="editingSection === 'budget'">
-        <div class="draft-card" [formGroup]="budgetDraft">
-          <div class="form-grid">
-            <div class="field">
-              <label>Item Name</label>
-              <input type="text" formControlName="itemName">
-            </div>
-            <div class="field">
-              <label>Price</label>
-              <input type="number" formControlName="pricePerUnit">
-            </div>
-            <div class="field">
-              <label>Qty</label>
-              <input type="number" formControlName="quantity">
-            </div>
-          </div>
-          <button type="button" class="btn btn--primary" (click)="addBudgetItem()">Add Item</button>
-        </div>
-
-        <div class="list-grid">
-          <div class="list-item" *ngFor="let b of budgetItems.controls; index as i" [formGroupName]="i">
-            <span>{{ b.get('itemName')?.value }} ({{ b.get('pricePerUnit')?.value }} x {{ b.get('quantity')?.value }})</span>
-            <button type="button" class="btn btn--text" (click)="removeBudgetItem(i)" style="color: #ef4444;">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('budget')">Update Budget</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="edit-section" [class.editing]="editingSection === 'strategic'">
-       <div class="section-header">
-        <h2>
-          <mat-icon>trending_up</mat-icon>
-          Strategic Alignment
-        </h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'strategic'" (click)="toggleEdit('strategic')">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </div>
-
-      <div class="info-display" *ngIf="editingSection !== 'strategic'">
-        <div class="info-item"><label>Financial Impact</label><span>{{ getStrategicScore(project.strategicCriteria, 1) }}</span></div>
-        <div class="info-item"><label>Customer Impact</label><span>{{ getStrategicScore(project.strategicCriteria, 2) }}</span></div>
-        <div class="info-item"><label>Operational Efficiency</label><span>{{ getStrategicScore(project.strategicCriteria, 3) }}</span></div>
-        <div class="info-item"><label>Strategic Alignment</label><span>{{ getStrategicScore(project.strategicCriteria, 4) }}</span></div>
-        <div class="info-item"><label>Cross Functional</label><span>{{ getStrategicScore(project.strategicCriteria, 5) }}</span></div>
-        <div class="info-item"><label>Innovation</label><span>{{ getStrategicScore(project.strategicCriteria, 6) }}</span></div>
-        <div class="info-item"><label>Risk Mitigation</label><span>{{ getStrategicScore(project.strategicCriteria, 7) }}</span></div>
-        <div class="info-item"><label>Sustainability ESG</label><span>{{ getStrategicScore(project.strategicCriteria, 8) }}</span></div>
-      </div>
-
-      <form [formGroup]="strategicForm" class="edit-form" *ngIf="editingSection === 'strategic'">
-        <div class="form-grid">
-          <div class="field"><label>Financial Impact (0-10)</label><input type="number" formControlName="financialImpact" min="0" max="10"></div>
-          <div class="field"><label>Customer Impact (0-10)</label><input type="number" formControlName="customerImpact" min="0" max="10"></div>
-          <div class="field"><label>Operational Efficiency (0-10)</label><input type="number" formControlName="operationalEfficiency" min="0" max="10"></div>
-          <div class="field"><label>Strategic Alignment (0-10)</label><input type="number" formControlName="strategicAlignment" min="0" max="10"></div>
-          <div class="field"><label>Cross Functional Impact (0-10)</label><input type="number" formControlName="crossFunctionalImpact" min="0" max="10"></div>
-          <div class="field"><label>Innovation Digitalisation (0-10)</label><input type="number" formControlName="innovationDigitalisation" min="0" max="10"></div>
-          <div class="field"><label>Risk Mitigation Urgency (0-10)</label><input type="number" formControlName="riskMitigationUrgency" min="0" max="10"></div>
-          <div class="field"><label>Sustainability ESG (0-10)</label><input type="number" formControlName="sustainabilityESG" min="0" max="10"></div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('strategic')">Save Strategy</button>
-        </div>
-      </form>
-    </section>
-
-    <!-- Section: DELIVERABLES (read-only list from API) -->
-    <section class="edit-section" style="grid-column: span 12;">
-      <div class="section-header">
-        <h2><mat-icon>checklist</mat-icon> Deliverables</h2>
-      </div>
-      <div class="info-display" style="grid-template-columns: 1fr;">
-        <div class="list-grid">
-          <div class="list-item" *ngFor="let d of deliverables">
-            <div style="flex: 1;">
-              <div style="font-weight: 600;">{{ d.name || d.title || 'Deliverable' }}</div>
-              <div style="font-size: 0.8rem; color: #64748b;">{{ d.description || '' }}</div>
-            </div>
-            <span class="badge">{{ d.status || d.priority || '' }}</span>
-          </div>
-          <span *ngIf="!deliverables.length">No deliverables defined yet.</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="edit-section" [class.editing]="editingSection === 'kpis'">
-       <div class="section-header">
-        <h2>
-          <mat-icon>assessment</mat-icon>
-          Key Performance Indicators
-        </h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'kpis'" (click)="toggleEdit('kpis')">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </div>
-
-      <div class="info-display" *ngIf="editingSection !== 'kpis'">
-        <div class="list-grid">
-          <div class="list-item" *ngFor="let k of (project.KPIs || project.kpIs || [])">
-            <div style="flex: 1;">
-              <div style="font-weight: 600;">{{ k.name }}</div>
-              <div style="font-size: 0.8rem; color: #64748b;">Target: {{ k.targetValue }} | Current: {{ k.currentValue }}</div>
-            </div>
-          </div>
-          <span *ngIf="!(project.KPIs || project.kpIs || []).length">No KPIs defined.</span>
-        </div>
-      </div>
-
-      <form [formGroup]="kpiForm" class="edit-form" *ngIf="editingSection === 'kpis'">
-        <div class="draft-card" [formGroup]="kpiDraft">
-          <div class="form-grid">
-            <div class="field"><label>KPI Name *</label><input type="text" formControlName="name"></div>
-            <div class="field"><label>Target Value</label><input type="number" formControlName="targetValue"></div>
-            <div class="field"><label>Est. Due Date</label><input type="date" formControlName="estimatedDueDate"></div>
-            <div class="field"><label>Est. Hours</label><input type="number" formControlName="estimatedHours"></div>
-            <div class="field" style="grid-column: span 2;"><label>Description</label><input type="text" formControlName="description"></div>
-          </div>
-          <button type="button" class="btn btn--primary" (click)="addKpi()">Add KPI</button>
-        </div>
-
-        <div class="list-grid">
-          <div class="list-item" *ngFor="let k of kpis.controls; index as i" [formGroupName]="i">
-            <div style="flex: 1;">
-              <div style="font-weight: 600;">{{ k.get('name')?.value }}</div>
-              <div style="font-size: 0.8rem; color: #64748b;">Target: {{ k.get('targetValue')?.value }} | Hours: {{ k.get('estimatedHours')?.value || 0 }}h</div>
-            </div>
-            <button type="button" class="btn btn--text" (click)="removeKpi(i)" style="color: #ef4444;"><mat-icon>delete</mat-icon></button>
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('kpis')">Save KPIs</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="edit-section" [class.editing]="editingSection === 'collections'" style="grid-column: span 12;">
-      <div class="section-header">
-        <h2><mat-icon>dataset</mat-icon> Collections (Backend Exact Names)</h2>
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'collections'" (click)="toggleEdit('collections')">
-          <mat-icon>edit</mat-icon>
-        </button>
-      </div>
-
-      <div class="info-display" *ngIf="editingSection !== 'collections'" style="grid-template-columns: 1fr 1fr;">
-        <div class="info-item"><label>InternMembers</label><span>{{ project.internMembers.length }} items</span></div>
-        <div class="info-item"><label>SubProjects</label><span>{{ project.subProjects.length }} items</span></div>
-        <div class="info-item"><label>Deliverables</label><span>{{ project.deliverables.length }} items</span></div>
-        <div class="info-item"><label>TimelineEntries</label><span>{{ project.timelineEntries.length }} items</span></div>
-        <div class="info-item"><label>RoadblockEntries</label><span>{{ project.roadblockEntries.length }} items</span></div>
-      </div>
-
-      <form [formGroup]="collectionsForm" class="edit-form" *ngIf="editingSection === 'collections'">
-        <div class="field">
-          <label>InternMembers</label>
-          <button type="button" class="btn btn--primary" (click)="addCollectionItem('internMembers')">Add</button>
-          <div class="list-grid" formArrayName="internMembers">
-            <div class="list-item" *ngFor="let c of collectionInternMembers.controls; index as i">
-              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
-              <button type="button" class="btn btn--text" (click)="removeCollectionItem('internMembers', i)">Remove</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>SubProjects</label>
-          <button type="button" class="btn btn--primary" (click)="addCollectionItem('subProjects')">Add</button>
-          <div class="list-grid" formArrayName="subProjects">
-            <div class="list-item" *ngFor="let c of collectionSubProjects.controls; index as i">
-              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
-              <button type="button" class="btn btn--text" (click)="removeCollectionItem('subProjects', i)">Remove</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Deliverables</label>
-          <button type="button" class="btn btn--primary" (click)="addCollectionItem('deliverables')">Add</button>
-          <div class="list-grid" formArrayName="deliverables">
-            <div class="list-item" *ngFor="let c of collectionDeliverables.controls; index as i">
-              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
-              <button type="button" class="btn btn--text" (click)="removeCollectionItem('deliverables', i)">Remove</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>TimelineEntries</label>
-          <button type="button" class="btn btn--primary" (click)="addCollectionItem('timelineEntries')">Add</button>
-          <div class="list-grid" formArrayName="timelineEntries">
-            <div class="list-item" *ngFor="let c of collectionTimelineEntries.controls; index as i">
-              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
-              <button type="button" class="btn btn--text" (click)="removeCollectionItem('timelineEntries', i)">Remove</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>RoadblockEntries</label>
-          <button type="button" class="btn btn--primary" (click)="addCollectionItem('roadblockEntries')">Add</button>
-          <div class="list-grid" formArrayName="roadblockEntries">
-            <div class="list-item" *ngFor="let c of collectionRoadblockEntries.controls; index as i">
-              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
-              <button type="button" class="btn btn--text" (click)="removeCollectionItem('roadblockEntries', i)">Remove</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('collections')">Save Collections</button>
-        </div>
-      </form>
-    </section>
-
-  </div>
-</section>
+<section class="project-edit-page pm-page-enter">
+  <div class="bg-decoration" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <header class="page-header">
+    <div class="title-stack">
+      <span class="eyebrow">Governance Hub</span>
+      <h1>Edit: {{ project.name }}</h1>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="btn btn--secondary" (click)="backToDetails()">
+        <mat-icon>visibility</mat-icon>
+        <span>View Details</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="edit-grid">
+    
+    <!-- Section 1: STATUS & PHASE (PRIORITY) -->
+    <section class="edit-section edit-section--primary" [class.editing]="editingSection === 'status'">
+      <div class="section-header">
+        <h2>
+          <mat-icon>speed</mat-icon>
+          Execution State
+        </h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'status'" (click)="toggleEdit('status')">
+          <mat-icon>edit</mat-icon>
+          Quick Update
+        </button>
+      </div>
+
+      <div class="info-display" *ngIf="editingSection !== 'status'">
+        <div class="info-item">
+          <label>Status</label>
+          <span class="badge badge--status">{{ getStatusLabel(project) }}</span>
+        </div>
+        <div class="info-item">
+          <label>Phase</label>
+          <span class="badge">{{ getPhaseLabel(project) }}</span>
+        </div>
+        <div class="info-item">
+          <label>Process Status</label>
+          <span>{{ project.processStatusLabel || 'N/A' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Progress</label>
+          <span>{{ project.progressPercentage || 0 }}%</span>
+        </div>
+      </div>
+
+      <form [formGroup]="statusForm" class="edit-form" *ngIf="editingSection === 'status'">
+        <div class="form-grid">
+          <div class="field">
+            <label>Current Status *</label>
+            <select formControlName="status">
+              <option *ngFor="let opt of statusOptions" [ngValue]="opt" [disabled]="!isStatusAllowedForPhase(opt)">
+                {{ getEnumLabel(opt, ProjectStatus) }}
+              </option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Project Phase *</label>
+            <select formControlName="phase">
+              <option *ngFor="let opt of phaseOptions" [ngValue]="opt">{{ getEnumLabel(opt, ProjectPhase) }}</option>
+            </select>
+            <small *ngIf="phaseStatusError()">{{ phaseStatusError() }}</small>
+          </div>
+          <div class="field">
+            <label>Process Status</label>
+            <select formControlName="processStatus">
+              <option *ngFor="let opt of processStatusOptions" [ngValue]="opt">{{ getEnumLabel(opt, ProcessStatus) }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Completion %</label>
+            <input type="number" formControlName="progressPercentage" min="0" max="100">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving || statusForm.invalid" (click)="saveSection('status')">
+            {{ isSaving ? 'Saving...' : 'Save Changes' }}
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="edit-section">
+      <div class="section-header">
+        <h2><mat-icon>info</mat-icon> Backend DTO Metadata</h2>
+      </div>
+      <div class="info-display">
+        <div class="info-item"><label>Id</label><span>{{ project.id }}</span></div>
+        <div class="info-item"><label>Strategic Score</label><span>{{ project.strategicScore }}</span></div>
+        <div class="info-item"><label>Strategic Category</label><span>{{ project.strategicCategory }}</span></div>
+        <div class="info-item"><label>Created At</label><span>{{ project.createdAt | date:'medium' }}</span></div>
+        <div class="info-item"><label>Updated At</label><span>{{ project.updatedAt ? (project.updatedAt | date:'medium') : 'N/A' }}</span></div>
+      </div>
+    </section>
+
+    <!-- Section 2: IDENTITY -->
+    <section class="edit-section" [class.editing]="editingSection === 'identity'">
+      <div class="section-header">
+        <h2>
+          <mat-icon>fingerprint</mat-icon>
+          Core Identity
+        </h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'identity'" (click)="toggleEdit('identity')">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+
+      <div class="info-display" *ngIf="editingSection !== 'identity'">
+        <div class="info-item">
+          <label>Project Name</label>
+          <span>{{ project.name }}</span>
+        </div>
+        <div class="info-item">
+          <label>Description</label>
+          <span style="font-size: 0.85rem;">{{ project.description || 'No description' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Management Type</label>
+          <span>{{ project.projectManagementTypeLabel }}</span>
+        </div>
+        <div class="info-item">
+          <label>Project Type</label>
+          <span>{{ project.projectTypeLabel || 'N/A' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Project Manager</label>
+          <span>{{ project.projectManagerName || 'Unassigned' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Sponsor</label>
+          <span>{{ project.sponsor || 'N/A' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Department Name</label>
+          <span>{{ project.departmentName }}</span>
+        </div>
+        <div class="info-item">
+          <label>Plant Name</label>
+          <span>{{ project.plantName || 'N/A' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Parent Project</label>
+          <span>{{ project.parentProjectName || 'N/A' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Cost Center</label>
+          <span>{{ project.costCenter || 'N/A' }}</span>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+          <label>Business Units</label>
+          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
+            <span class="badge" *ngFor="let bu of project.businessUnits">{{ bu }}</span>
+            <span *ngIf="!project.businessUnits.length">None</span>
+          </div>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+          <label>Technologies</label>
+          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
+            <span class="badge" *ngFor="let t of project.technologies">{{ t }}</span>
+            <span *ngIf="!project.technologies.length">None</span>
+          </div>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+          <label>Solution Domains</label>
+          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
+            <span class="badge" *ngFor="let s of project.solutionDomains">{{ s }}</span>
+            <span *ngIf="!project.solutionDomains.length">None</span>
+          </div>
+        </div>
+      </div>
+
+      <form [formGroup]="identityForm" class="edit-form" *ngIf="editingSection === 'identity'">
+        <div class="form-grid">
+          <div class="field">
+            <label>Name *</label>
+            <input type="text" formControlName="name">
+          </div>
+          <div class="field" style="grid-column: span 2;">
+            <label>Description</label>
+            <textarea formControlName="description"></textarea>
+          </div>
+          <div class="field">
+            <label>Management Type *</label>
+            <select formControlName="projectManagementType">
+              <option *ngFor="let opt of projectManagementTypeOptions" [ngValue]="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Project Type *</label>
+            <select formControlName="projectType">
+              <option *ngFor="let opt of projectTypeOptions" [ngValue]="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Project Manager</label>
+            <select formControlName="projectManagerId">
+              <option [ngValue]="null">Select manager</option>
+              <option *ngFor="let opt of references.users" [value]="opt.id">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Sponsor</label>
+            <input type="text" formControlName="sponsor">
+          </div>
+          <div class="field">
+            <label>Department Name *</label>
+            <select formControlName="departmentId">
+              <option value="">Select department</option>
+              <option *ngFor="let opt of references.departments" [value]="opt.id">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Plant Name</label>
+            <select formControlName="plantName">
+              <option value="">Select plant</option>
+              <option *ngFor="let opt of references.plants" [value]="opt.label">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Parent Project</label>
+            <select formControlName="parentProjectId">
+              <option [ngValue]="null">No parent project</option>
+              <option *ngFor="let opt of references.parentProjects" [value]="opt.id">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Cost Center</label>
+            <input type="text" formControlName="costCenter">
+          </div>
+          <div class="field">
+            <label>Server/Host</label>
+            <input type="text" formControlName="serverHostName">
+          </div>
+          <div class="field">
+            <label>Business Units</label>
+            <select formControlName="businessUnitIds" multiple>
+              <option *ngFor="let opt of references.businessUnits" [value]="opt.id">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Technologies</label>
+            <select formControlName="technologyIds" multiple>
+              <option *ngFor="let opt of references.technologies" [value]="opt.id">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Solution Domains</label>
+            <select formControlName="solutionDomainIds" multiple>
+              <option *ngFor="let opt of references.solutionDomains" [value]="opt.id">{{ opt.label }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('identity')">Save Identity</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section 3: TIMELINE -->
+    <section class="edit-section" [class.editing]="editingSection === 'timeline'">
+      <div class="section-header">
+        <h2>
+          <mat-icon>calendar_today</mat-icon>
+          Timeline & Effort
+        </h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'timeline'" (click)="toggleEdit('timeline')">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+
+      <div class="info-display" *ngIf="editingSection !== 'timeline'">
+        <div class="info-item">
+          <label>Start Date</label>
+          <span>{{ project.startDate | date }}</span>
+        </div>
+        <div class="info-item">
+          <label>End Date</label>
+          <span>{{ project.endDate | date }}</span>
+        </div>
+        <div class="info-item">
+          <label>Est. Due Date</label>
+          <span>{{ project.estimatedDueDate | date }}</span>
+        </div>
+        <div class="info-item">
+          <label>Est. Hours</label>
+          <span>{{ project.estimatedHours || 0 }}h</span>
+        </div>
+        <div class="info-item">
+          <label>Actual Hours</label>
+          <span>{{ project.actualHours || 0 }}h</span>
+        </div>
+      </div>
+
+      <form [formGroup]="timelineForm" class="edit-form" *ngIf="editingSection === 'timeline'">
+        <div class="form-grid">
+          <div class="field"><label>Start Date *</label><input type="date" formControlName="startDate"></div>
+          <div class="field"><label>End Date</label><input type="date" formControlName="endDate"></div>
+          <div class="field"><label>Est. Due Date</label><input type="date" formControlName="estimatedDueDate"></div>
+          <div class="field"><label>Est. Hours</label><input type="number" formControlName="estimatedHours"></div>
+          <div class="field"><label>Actual Hours</label><input type="number" formControlName="actualHours"></div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('timeline')">Save</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section: FINANCIAL -->
+    <section class="edit-section" [class.editing]="editingSection === 'financial'">
+      <div class="section-header">
+        <h2><mat-icon>account_balance</mat-icon> Financial</h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'financial'" (click)="toggleEdit('financial')"><mat-icon>edit</mat-icon></button>
+      </div>
+      <div class="info-display" *ngIf="editingSection !== 'financial'">
+        <div class="info-item"><label>Budget</label><span>{{ project.budget | number }}</span></div>
+        <div class="info-item"><label>Cost Saving</label><span>{{ project.costSaving | number }}</span></div>
+        <div class="info-item"><label>Digital Contribution</label><span>{{ project.digitalContribution | number }}</span></div>
+      </div>
+      <form [formGroup]="financialForm" class="edit-form" *ngIf="editingSection === 'financial'">
+        <div class="form-grid">
+          <div class="field"><label>Budget</label><input type="number" formControlName="budget"></div>
+          <div class="field"><label>Cost Saving</label><input type="number" formControlName="costSaving"></div>
+          <div class="field"><label>Digital Contribution</label><input type="number" formControlName="digitalContribution"></div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('financial')">Save</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section 4: CONTEXT & ROADBLOCKS -->
+    <section class="edit-section" [class.editing]="editingSection === 'context'" style="grid-column: span 12;">
+      <div class="section-header">
+        <h2>
+          <mat-icon>notes</mat-icon>
+          Execution Context
+        </h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'context'" (click)="toggleEdit('context')">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+
+      <div class="info-display" *ngIf="editingSection !== 'context'" style="grid-template-columns: 1fr 1fr;">
+        <div class="info-item">
+          <label>Current State</label>
+          <span>{{ project.currentState || 'No content' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Next Steps</label>
+          <span>{{ project.nextSteps || 'No content' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Enhancements</label>
+          <span>{{ project.enhancements || 'No content' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Code Source</label>
+          <a [href]="project.codeSourceLink" target="_blank" *ngIf="project.codeSourceLink">Link</a>
+          <span *ngIf="!project.codeSourceLink">N/A</span>
+        </div>
+        <div class="info-item">
+          <label>Solution Link</label>
+          <a [href]="project.solutionLink" target="_blank" *ngIf="project.solutionLink">Link</a>
+          <span *ngIf="!project.solutionLink">N/A</span>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+          <label>Roadblocks</label>
+          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
+            <span class="badge" *ngFor="let rb of splitRoadblocks(project.roadblocks)">{{ rb }}</span>
+            <span *ngIf="!project.roadblocks">No roadblocks</span>
+          </div>
+        </div>
+      </div>
+
+      <form [formGroup]="contextForm" class="edit-form" *ngIf="editingSection === 'context'">
+        <div class="form-grid">
+          <div class="field">
+            <label>Current State</label>
+            <textarea formControlName="currentState"></textarea>
+          </div>
+          <div class="field">
+            <label>Next Steps</label>
+            <textarea formControlName="nextSteps"></textarea>
+          </div>
+          <div class="field">
+            <label>Enhancements</label>
+            <textarea formControlName="enhancements"></textarea>
+          </div>
+          <div class="field">
+            <label>Code Source Link</label>
+            <input type="url" formControlName="codeSourceLink">
+          </div>
+          <div class="field">
+            <label>Solution Link</label>
+            <input type="url" formControlName="solutionLink">
+          </div>
+        </div>
+        
+        <div class="field">
+          <label>Roadblocks</label>
+          <div class="draft-card" style="display: flex; gap: 1rem; align-items: center;">
+            <input type="text" [formControl]="roadblockDraft" placeholder="Type new roadblock..." style="flex: 1;">
+            <button type="button" class="btn btn--primary" (click)="addRoadblock()">Add</button>
+          </div>
+          <div class="list-grid">
+            <div class="list-item" *ngFor="let rb of roadblocks.controls; index as i">
+              <span>{{ rb.value }}</span>
+              <button type="button" class="btn btn--text" (click)="removeRoadblock(i)" style="color: #ef4444;">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('context')">Save Context</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section 5: TEAM & BUDGET -->
+    <section class="edit-section" [class.editing]="editingSection === 'team'">
+       <div class="section-header">
+        <h2>
+          <mat-icon>group</mat-icon>
+          Team Members
+        </h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'team'" (click)="toggleEdit('team')">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+      
+      <div class="info-display" *ngIf="editingSection !== 'team'">
+        <div class="info-item" *ngFor="let m of project.members">
+          <label>{{ m.roleName }}</label>
+          <span>{{ m.fullName }}</span>
+        </div>
+        <span *ngIf="!project.members.length">No members assigned.</span>
+      </div>
+
+      <form [formGroup]="teamForm" class="edit-form" *ngIf="editingSection === 'team'">
+        <div class="draft-card" [formGroup]="memberDraft">
+          <div class="form-grid">
+            <div class="field">
+              <label>User</label>
+              <select formControlName="userId">
+                <option value="">Select user</option>
+                <option *ngFor="let u of references.users" [value]="u.id">{{ u.label }}</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Role</label>
+              <input type="text" formControlName="role">
+            </div>
+          </div>
+          <button type="button" class="btn btn--primary" (click)="addTeamMember()">Add Member</button>
+        </div>
+
+        <div class="list-grid">
+          <div class="list-item" *ngFor="let m of teamMembers.controls; index as i" [formGroupName]="i">
+            <span>{{ getUserLabel(m.get('userId')?.value) }} - {{ m.get('role')?.value }}</span>
+            <button type="button" class="btn btn--text" (click)="removeTeamMember(i)" style="color: #ef4444;">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('team')">Update Team</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="edit-section" [class.editing]="editingSection === 'budget'">
+       <div class="section-header">
+        <h2>
+          <mat-icon>monetization_on</mat-icon>
+          Budget Lines
+        </h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'budget'" (click)="toggleEdit('budget')">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+
+      <div class="info-display" *ngIf="editingSection !== 'budget'">
+        <div class="info-item">
+          <label>Total Budget</label>
+          <span>{{ project.budget | number }}</span>
+        </div>
+        <div class="info-item">
+          <label>Resources</label>
+          <span>{{ project.projectResources.length }} items</span>
+        </div>
+      </div>
+
+      <form [formGroup]="budgetForm" class="edit-form" *ngIf="editingSection === 'budget'">
+        <div class="draft-card" [formGroup]="budgetDraft">
+          <div class="form-grid">
+            <div class="field">
+              <label>Item Name</label>
+              <input type="text" formControlName="itemName">
+            </div>
+            <div class="field">
+              <label>Price</label>
+              <input type="number" formControlName="pricePerUnit">
+            </div>
+            <div class="field">
+              <label>Qty</label>
+              <input type="number" formControlName="quantity">
+            </div>
+          </div>
+          <button type="button" class="btn btn--primary" (click)="addBudgetItem()">Add Item</button>
+        </div>
+
+        <div class="list-grid">
+          <div class="list-item" *ngFor="let b of budgetItems.controls; index as i" [formGroupName]="i">
+            <span>{{ b.get('itemName')?.value }} ({{ b.get('pricePerUnit')?.value }} x {{ b.get('quantity')?.value }})</span>
+            <button type="button" class="btn btn--text" (click)="removeBudgetItem(i)" style="color: #ef4444;">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('budget')">Update Budget</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="edit-section" [class.editing]="editingSection === 'strategic'">
+       <div class="section-header">
+        <h2>
+          <mat-icon>trending_up</mat-icon>
+          Strategic Alignment
+        </h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'strategic'" (click)="toggleEdit('strategic')">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+
+      <div class="info-display" *ngIf="editingSection !== 'strategic'">
+        <div class="info-item"><label>Financial Impact</label><span>{{ getStrategicScore(project.strategicCriteria, 1) }}</span></div>
+        <div class="info-item"><label>Customer Impact</label><span>{{ getStrategicScore(project.strategicCriteria, 2) }}</span></div>
+        <div class="info-item"><label>Operational Efficiency</label><span>{{ getStrategicScore(project.strategicCriteria, 3) }}</span></div>
+        <div class="info-item"><label>Strategic Alignment</label><span>{{ getStrategicScore(project.strategicCriteria, 4) }}</span></div>
+        <div class="info-item"><label>Cross Functional</label><span>{{ getStrategicScore(project.strategicCriteria, 5) }}</span></div>
+        <div class="info-item"><label>Innovation</label><span>{{ getStrategicScore(project.strategicCriteria, 6) }}</span></div>
+        <div class="info-item"><label>Risk Mitigation</label><span>{{ getStrategicScore(project.strategicCriteria, 7) }}</span></div>
+        <div class="info-item"><label>Sustainability ESG</label><span>{{ getStrategicScore(project.strategicCriteria, 8) }}</span></div>
+      </div>
+
+      <form [formGroup]="strategicForm" class="edit-form" *ngIf="editingSection === 'strategic'">
+        <div class="form-grid">
+          <div class="field"><label>Financial Impact (0-10)</label><input type="number" formControlName="financialImpact" min="0" max="10"></div>
+          <div class="field"><label>Customer Impact (0-10)</label><input type="number" formControlName="customerImpact" min="0" max="10"></div>
+          <div class="field"><label>Operational Efficiency (0-10)</label><input type="number" formControlName="operationalEfficiency" min="0" max="10"></div>
+          <div class="field"><label>Strategic Alignment (0-10)</label><input type="number" formControlName="strategicAlignment" min="0" max="10"></div>
+          <div class="field"><label>Cross Functional Impact (0-10)</label><input type="number" formControlName="crossFunctionalImpact" min="0" max="10"></div>
+          <div class="field"><label>Innovation Digitalisation (0-10)</label><input type="number" formControlName="innovationDigitalisation" min="0" max="10"></div>
+          <div class="field"><label>Risk Mitigation Urgency (0-10)</label><input type="number" formControlName="riskMitigationUrgency" min="0" max="10"></div>
+          <div class="field"><label>Sustainability ESG (0-10)</label><input type="number" formControlName="sustainabilityESG" min="0" max="10"></div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('strategic')">Save Strategy</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section: DELIVERABLES (read-only list from API) -->
+    <section class="edit-section" style="grid-column: span 12;">
+      <div class="section-header">
+        <h2><mat-icon>checklist</mat-icon> Deliverables</h2>
+      </div>
+      <div class="info-display" style="grid-template-columns: 1fr;">
+        <div class="list-grid">
+          <div class="list-item" *ngFor="let d of deliverables">
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">{{ d.name || d.title || 'Deliverable' }}</div>
+              <div style="font-size: 0.8rem; color: #64748b;">{{ d.description || '' }}</div>
+            </div>
+            <span class="badge">{{ d.status || d.priority || '' }}</span>
+          </div>
+          <span *ngIf="!deliverables.length">No deliverables defined yet.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="edit-section" [class.editing]="editingSection === 'kpis'">
+       <div class="section-header">
+        <h2>
+          <mat-icon>assessment</mat-icon>
+          Key Performance Indicators
+        </h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'kpis'" (click)="toggleEdit('kpis')">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+
+      <div class="info-display" *ngIf="editingSection !== 'kpis'">
+        <div class="list-grid">
+          <div class="list-item" *ngFor="let k of (project.KPIs || project.kpIs || [])">
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">{{ k.name }}</div>
+              <div style="font-size: 0.8rem; color: #64748b;">Target: {{ k.targetValue }} | Current: {{ k.currentValue }}</div>
+            </div>
+          </div>
+          <span *ngIf="!(project.KPIs || project.kpIs || []).length">No KPIs defined.</span>
+        </div>
+      </div>
+
+      <form [formGroup]="kpiForm" class="edit-form" *ngIf="editingSection === 'kpis'">
+        <div class="draft-card" [formGroup]="kpiDraft">
+          <div class="form-grid">
+            <div class="field"><label>KPI Name *</label><input type="text" formControlName="name"></div>
+            <div class="field"><label>Target Value</label><input type="number" formControlName="targetValue"></div>
+            <div class="field"><label>Est. Due Date</label><input type="date" formControlName="estimatedDueDate"></div>
+            <div class="field"><label>Est. Hours</label><input type="number" formControlName="estimatedHours"></div>
+            <div class="field" style="grid-column: span 2;"><label>Description</label><input type="text" formControlName="description"></div>
+          </div>
+          <button type="button" class="btn btn--primary" (click)="addKpi()">Add KPI</button>
+        </div>
+
+        <div class="list-grid">
+          <div class="list-item" *ngFor="let k of kpis.controls; index as i" [formGroupName]="i">
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">{{ k.get('name')?.value }}</div>
+              <div style="font-size: 0.8rem; color: #64748b;">Target: {{ k.get('targetValue')?.value }} | Hours: {{ k.get('estimatedHours')?.value || 0 }}h</div>
+            </div>
+            <button type="button" class="btn btn--text" (click)="removeKpi(i)" style="color: #ef4444;"><mat-icon>delete</mat-icon></button>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('kpis')">Save KPIs</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="edit-section" [class.editing]="editingSection === 'collections'" style="grid-column: span 12;">
+      <div class="section-header">
+        <h2><mat-icon>dataset</mat-icon> Collections (Backend Exact Names)</h2>
+        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'collections'" (click)="toggleEdit('collections')">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+
+      <div class="info-display" *ngIf="editingSection !== 'collections'" style="grid-template-columns: 1fr 1fr;">
+        <div class="info-item"><label>InternMembers</label><span>{{ project.internMembers.length }} items</span></div>
+        <div class="info-item"><label>SubProjects</label><span>{{ project.subProjects.length }} items</span></div>
+        <div class="info-item"><label>Deliverables</label><span>{{ project.deliverables.length }} items</span></div>
+        <div class="info-item"><label>TimelineEntries</label><span>{{ project.timelineEntries.length }} items</span></div>
+        <div class="info-item"><label>RoadblockEntries</label><span>{{ project.roadblockEntries.length }} items</span></div>
+      </div>
+
+      <form [formGroup]="collectionsForm" class="edit-form" *ngIf="editingSection === 'collections'">
+        <div class="field">
+          <label>InternMembers</label>
+          <button type="button" class="btn btn--primary" (click)="addCollectionItem('internMembers')">Add</button>
+          <div class="list-grid" formArrayName="internMembers">
+            <div class="list-item" *ngFor="let c of collectionInternMembers.controls; index as i">
+              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
+              <button type="button" class="btn btn--text" (click)="removeCollectionItem('internMembers', i)">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>SubProjects</label>
+          <button type="button" class="btn btn--primary" (click)="addCollectionItem('subProjects')">Add</button>
+          <div class="list-grid" formArrayName="subProjects">
+            <div class="list-item" *ngFor="let c of collectionSubProjects.controls; index as i">
+              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
+              <button type="button" class="btn btn--text" (click)="removeCollectionItem('subProjects', i)">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Deliverables</label>
+          <button type="button" class="btn btn--primary" (click)="addCollectionItem('deliverables')">Add</button>
+          <div class="list-grid" formArrayName="deliverables">
+            <div class="list-item" *ngFor="let c of collectionDeliverables.controls; index as i">
+              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
+              <button type="button" class="btn btn--text" (click)="removeCollectionItem('deliverables', i)">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>TimelineEntries</label>
+          <button type="button" class="btn btn--primary" (click)="addCollectionItem('timelineEntries')">Add</button>
+          <div class="list-grid" formArrayName="timelineEntries">
+            <div class="list-item" *ngFor="let c of collectionTimelineEntries.controls; index as i">
+              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
+              <button type="button" class="btn btn--text" (click)="removeCollectionItem('timelineEntries', i)">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>RoadblockEntries</label>
+          <button type="button" class="btn btn--primary" (click)="addCollectionItem('roadblockEntries')">Add</button>
+          <div class="list-grid" formArrayName="roadblockEntries">
+            <div class="list-item" *ngFor="let c of collectionRoadblockEntries.controls; index as i">
+              <textarea [formControlName]="i" rows="4" style="width: 100%;"></textarea>
+              <button type="button" class="btn btn--text" (click)="removeCollectionItem('roadblockEntries', i)">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('collections')">Save Collections</button>
+        </div>
+      </form>
+    </section>
+
+  </div>
+</section>

@@ -1,0 +1,72 @@
+@use '../../../../styles/_variables' as *;
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid rgba($orange-crisp, 0.12);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 250, 246, 0.98), rgba(255, 255, 255, 0.94));
+  box-shadow: 0 18px 42px rgba(190, 102, 15, 0.08);
+}
+
+.page-header__icon {
+  width: 3rem;
+  height: 3rem;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(135deg, $orange-crisp, $orange-warm);
+  box-shadow: 0 14px 30px rgba($orange-crisp, 0.22);
+}
+
+.page-header__copy {
+  min-width: 0;
+  flex: 1;
+
+  h1 {
+    margin: 0.15rem 0 0;
+    color: $navy-500;
+    font-size: clamp(1.55rem, 2.4vw, 2.25rem);
+    font-weight: 700;
+    line-height: 1.08;
+  }
+
+  p {
+    margin: 0.4rem 0 0;
+    color: $text-soft;
+    line-height: 1.55;
+  }
+}
+
+.page-header__eyebrow {
+  color: $orange-deep;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-header__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    border-radius: 20px;
+  }
+
+  .page-header__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

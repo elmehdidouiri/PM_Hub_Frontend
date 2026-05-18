@@ -1,7 +1,4 @@
-<div class="page-loader" *ngIf="isLoading()">
-  <div class="loader-spinner"></div>
-  <span>Fetching talent profile...</span>
-</div>
+<app-loading-spinner *ngIf="isLoading()"></app-loading-spinner>
 
 <div class="user-detail-container pm-page-enter" *ngIf="!isLoading()">
   <!-- Header / Profile Card -->
@@ -128,7 +125,7 @@
                 <div class="mini-row" *ngFor="let tp of performance()?.topProjects">
                    <div class="tp-info">
                       <strong>{{ tp.projectName }}</strong>
-                      <span>{{ tp.phase }} • {{ tp.status }}</span>
+                      <span>{{ tp.phase }} � {{ tp.status }}</span>
                    </div>
                    <div class="tp-val">
                       <strong>{{ tp.totalHours }}h</strong>
@@ -207,7 +204,7 @@
             <div class="intern-header">
               <div class="intern-info">
                 <h4>{{ intern.name || (intern.firstName + ' ' + intern.lastName) }}</h4>
-                <p>{{ intern.email }} • {{ intern.roleName || intern.departmentName || 'Intern' }}</p>
+                <p>{{ intern.email }} � {{ intern.roleName || intern.departmentName || 'Intern' }}</p>
               </div>
               <button class="btn-icon" matTooltip="View Intern Details" (click)="openInternDetails(intern)">
                 <mat-icon>visibility</mat-icon>
@@ -300,3 +297,4 @@
   <p>{{ error() }}</p>
   <button class="btn-primary" (click)="ngOnInit()">Retry</button>
 </div>
+

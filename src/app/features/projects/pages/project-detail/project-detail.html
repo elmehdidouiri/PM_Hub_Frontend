@@ -233,7 +233,7 @@
           </div>
           <strong>{{ getDocumentCompletionCount() }} / {{ requiredProjectFileTypes.length }}</strong>
         </div>
-        <p class="empty-copy" *ngIf="isLoadingFiles">Loading project files...</p>
+        <app-loading-spinner *ngIf="isLoadingFiles"></app-loading-spinner>
         <p class="empty-copy" *ngIf="fileLoadError">{{ fileLoadError }}</p>
         <div class="document-status" *ngIf="!isLoadingFiles && !fileLoadError">
           <div class="document-status__bar">

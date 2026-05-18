@@ -1,0 +1,49 @@
+@use '../../../../../styles/_variables' as *;
+
+.stats-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 7rem;
+  padding: 1rem;
+  border: 1px solid rgba($orange-crisp, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.05);
+}
+
+.stats-card__icon {
+  width: 3rem;
+  height: 3rem;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(135deg, $orange-crisp, $orange-warm);
+}
+
+.stats-card__content {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+
+  span {
+    color: $text-muted;
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  strong {
+    color: $navy-500;
+    font-size: 1.65rem;
+    line-height: 1;
+  }
+
+  p {
+    margin: 0;
+    color: $text-soft;
+    font-size: 0.86rem;
+  }
+}
