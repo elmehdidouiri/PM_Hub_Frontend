@@ -1,3 +1,4 @@
+import { DashboardMetric } from '../../models/dashboard-metric.model';
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -14,13 +15,7 @@ import { HoursAllocationDashboardService } from '../../services/hours-allocation
 type QuickSelect = 'month' | 'year' | 'ytd';
 type AnalysisMode = 'resourcesCapacity' | 'workedDays' | 'allocationDetails';
 
-interface SummaryCard {
-  label: string;
-  value: string;
-  note: string;
-  icon: string;
-  tone: 'orange' | 'amber' | 'green' | 'blue' | 'neutral';
-}
+interface SummaryCard extends DashboardMetric {}
 
 import { LoadingSpinner } from '../../../../shared/components/loading-spinner/loading-spinner';
 import { LoadingService } from '../../../../shared/services/loading.service';
@@ -136,6 +131,25 @@ export class HoursAllocationDashboard implements OnInit {
 
   get months() {
     return this.filters.months.length ? this.filters.months : this.defaultMonths();
+  }
+
+  get headerPeriodLabel(): string {
+    if (this.selectedQuickSelect === 'month') {
+      const month = this.months.find((item) => item.value === this.selectedMonth);
+      return `${month?.label ?? 'Month'} ${this.selectedYear}`;
+    }
+
+    if (this.selectedQuickSelect === 'year') {
+      return `Year ${this.selectedYear}`;
+    }
+
+    return `YTD ${this.selectedYear}`;
+  }
+
+  get headerPeriodRange(): string {
+    const from = this.formatHeaderDate(this.fromDate);
+    const to = this.formatHeaderDate(this.toDate);
+    return `${from} – ${to}`;
   }
 
   reload(): void {
@@ -334,5 +348,20 @@ export class HoursAllocationDashboard implements OnInit {
       String(date.getMonth() + 1).padStart(2, '0'),
       String(date.getDate()).padStart(2, '0'),
     ].join('-');
+  }
+
+  private formatHeaderDate(value: string): string {
+    if (!value) {
+      return '—';
+    }
+
+    const date = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      return value.toUpperCase();
+    }
+
+    return date
+      .toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+      .toUpperCase();
   }
 }

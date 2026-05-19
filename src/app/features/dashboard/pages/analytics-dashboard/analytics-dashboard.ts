@@ -18,15 +18,10 @@ import { AnalyticsDashboardService } from '../../services/analytics-dashboard.se
 import { SharedModule } from '../../../../shared/shared.module';
 
 type AnalyticsTab = 'overview' | 'kpis' | 'hours';
-type MetricTone = 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'teal';
+import { MetricTone, DashboardMetric } from '../../models/dashboard-metric.model';
 type PeriodFilterMode = 'ytd' | 'month';
 
-interface AnalyticsMetric {
-  label: string;
-  value: string;
-  note: string;
-  icon: string;
-  tone: MetricTone;
+interface AnalyticsMetric extends DashboardMetric {
   change?: string;
   isUp?: boolean;
   sparklinePath?: string;
@@ -553,7 +548,7 @@ export class AnalyticsDashboard implements OnInit {
   }
 
   getToneColor(tone: MetricTone): string {
-    const map: Record<MetricTone, string> = {
+    const map: Partial<Record<MetricTone, string>> = {
       blue: '#2563eb',
       green: '#12b76a',
       orange: '#f97316',

@@ -1,3 +1,4 @@
+import { MetricTone } from '../models/dashboard-metric.model';
 import { Injectable } from '@angular/core';
 import { MonthlyHoursDashboardDto, YtdDashboardDto } from '../../../core/models/hour-entry.model';
 import {
@@ -45,7 +46,7 @@ export interface MetricCard {
   value: string;
   note: string;
   icon: string;
-  tone?: 'blue' | 'teal' | 'green' | 'orange' | 'red' | 'purple' | '';
+  tone?: MetricTone;
   delta?: number;
   progress?: number;
 }

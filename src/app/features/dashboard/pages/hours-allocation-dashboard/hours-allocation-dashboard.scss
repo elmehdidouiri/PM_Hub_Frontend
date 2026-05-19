@@ -1,11 +1,10 @@
 @use '../../../../../styles/_variables' as *;
+@use '../../styles/dashboard-page-header';
 
 :host {
   display: block;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 8% 0%, rgba(223, 104, 0, 0.1), transparent 24rem),
-    linear-gradient(180deg, #fffaf5 0%, #f8fafc 18rem, #f9fafb 100%);
+  background: #f8fafc;
   color: $text-default;
   font-family: $font-family-base;
 }
@@ -23,91 +22,15 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-// --- STANDARD HEADER (Matching App) ---
-.allocation-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  min-width: 0;
-  padding: 1.45rem 1.6rem;
-  border: 1px solid rgba(223, 104, 0, 0.16);
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at right top, rgba(223, 104, 0, 0.14), transparent 18rem),
-    linear-gradient(135deg, #ffffff 0%, #fff7ed 100%);
-  box-shadow: none;
-
-  h1, p { margin: 0; }
-
-  h1 {
-    margin-top: 0.2rem;
-    color: #101828;
-    font-size: clamp(1.65rem, 2.6vw, 2.35rem);
-    font-weight: 800;
-    letter-spacing: -0.02em;
-  }
-
-  p {
-    max-width: 40rem;
-    margin-top: 0.35rem;
-    color: #667085;
-    font-size: 0.93rem;
-    line-height: 1.5;
-  }
-}
-
-.header-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: $orange-crisp;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-
-  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
-}
-
-.reminder-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1.25rem;
-  border: none;
-  border-radius: 12px;
-  background: #df6800;
-  color: #fff;
-  font-weight: 700;
-  font-size: 0.88rem;
-  cursor: pointer;
-  transition: all $transition-fast;
-  border: 1px solid rgba(223, 104, 0, 0.2);
-  box-shadow: none;
-
-  mat-icon { font-size: 1.1rem; width: 1.1rem; height: 1.1rem; }
-
-  &:hover:not(:disabled) {
-    background: #c45a00;
-    color: #fff;
-    transform: translateY(-2px);
-    box-shadow: none;
-  }
-
-  &:disabled { opacity: 0.6; cursor: wait; }
-}
-
 // --- INTELLIGENT FILTERS ---
 .filter-container {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   padding: 0.9rem;
-  border: 1px solid rgba(223, 104, 0, 0.12);
+  border: 1px solid #e2e8f0;
   border-radius: 18px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 247, 240, 0.86));
+  background: #ffffff;
   box-shadow: none;
 
   &::before {

@@ -2,21 +2,34 @@
   <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
 
   <ng-container *ngIf="!isLoading">
-    <!-- APP STANDARD HEADER -->
-    <header class="allocation-header">
-      <div>
-        <span class="header-eyebrow">
-          <mat-icon>analytics</mat-icon>
-          Reporting
-        </span>
+    <header class="dashboard-page-header">
+      <div class="dashboard-page-header__content">
+        <div class="dashboard-page-header__eyebrow">
+          <mat-icon>schedule</mat-icon>
+          <span>Hours Reporting</span>
+        </div>
         <h1>Hours Allocation</h1>
         <p>Visualize and analyze time allocation and team productivity at a glance.</p>
+
+        <div class="dashboard-page-header__actions">
+          <button
+            type="button"
+            class="dashboard-header-btn dashboard-header-btn--primary"
+            [disabled]="isSendingReminders"
+            (click)="sendReminders()">
+            <mat-icon>notifications_active</mat-icon>
+            {{ isSendingReminders ? 'Sending...' : 'Send Reminders' }}
+          </button>
+        </div>
       </div>
 
-      <button class="reminder-button" type="button" [disabled]="isSendingReminders" (click)="sendReminders()">
-        <mat-icon>notifications_active</mat-icon>
-        {{ isSendingReminders ? 'Sending...' : 'Send Reminders' }}
-      </button>
+      <div class="dashboard-period-card">
+        <mat-icon>calendar_month</mat-icon>
+        <div>
+          <strong>{{ headerPeriodLabel }}</strong>
+          <span>{{ headerPeriodRange }}</span>
+        </div>
+      </div>
     </header>
 
     <!-- INTELLIGENT FILTER SYSTEM -->

@@ -1,39 +1,49 @@
 <section class="projects-list-page pm-page-grid pm-page-enter">
-  <header class="page-header pm-surface flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-    <div class="header-main-content flex-1 flex-wrap">
-      <div class="header-logo header-logo--accent">
-        <mat-icon>folder_open</mat-icon>
-      </div>
-      <div>
-        <span class="eyebrow">Projects</span>
-        <h1>{{ isAdmin ? 'Projects directory' : 'My projects' }}</h1>
-        <p *ngIf="isAdmin">
-          Explore the project portfolio, track execution phases and manage delivery scope.
-        </p>
-        <p *ngIf="!isAdmin">
-          Projects you are assigned to as a member or project manager. Open a project to see details.
-        </p>
-      </div>
+  
+  <!-- Premium Modern Header -->
+  <header class="page-header">
+    <div class="header-text">
+      <h1>{{ isAdmin ? 'Projects directory' : 'My projects' }}</h1>
+      <p>
+        {{ isAdmin ? 'Explore the project portfolio, track execution phases and manage delivery scope.' : 'Projects you are assigned to as a member or project manager. Open a project to see details.' }}
+      </p>
     </div>
-    <button type="button" class="refresh-action w-full justify-center xl:w-auto" (click)="refreshProjects()"
-      [disabled]="isRefreshing">
-      <mat-icon>{{ isRefreshing ? 'hourglass_top' : 'refresh' }}</mat-icon>
-      <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh list' }}</span>
-    </button>
+    
+    <div class="header-actions">
+      <button type="button" class="refresh-btn-header" (click)="refreshProjects()" [disabled]="isRefreshing">
+        <mat-icon [class.spinning]="isRefreshing">refresh</mat-icon>
+        <span>Refresh</span>
+      </button>
+      <button *ngIf="isAdmin" type="button" class="new-project-btn" (click)="navigateToCreateProject()">
+        <mat-icon>add</mat-icon>
+        <span>New Project</span>
+      </button>
+    </div>
   </header>
 
-  <section class="toolbar-card pm-surface">
-    <div class="search-filter-wrapper flex-col lg:flex-row lg:items-center">
-      <div class="search-box w-full">
-        <mat-icon>search</mat-icon>
+  <!-- Modern Search and Filters Card -->
+  <section class="toolbar-card">
+    <!-- Search Bar and Total Projects Badge -->
+    <div class="search-row" style="display: flex; align-items: center; gap: 1rem; width: 100%;">
+      <div class="search-container" style="flex: 1;">
+        <mat-icon class="search-icon">search</mat-icon>
         <input type="text" [ngModel]="searchTerm" (ngModelChange)="onSearchTermChange($event)"
-          placeholder="Search projects..." />
+          class="search-input"
+          placeholder="Search projects by name, sponsor or department..." />
         <button *ngIf="searchTerm" class="clear-btn" (click)="clearSearch()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
+      
+      <div class="search-results-badge" *ngIf="!isLoading && !errorMessage" style="display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; flex-shrink: 0; background: #fff7ed; border: 1px solid #fed7aa; padding: 0 18px; height: 52px; border-radius: 14px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);">
+        <span style="font-size: 1.35rem; font-weight: 800; color: #ea580c; line-height: 1;">{{ totalCount }}</span>
+        <span style="font-size: 0.85rem; font-weight: 600; color: #c2410c; text-transform: uppercase; letter-spacing: 0.05em;">{{ searchTerm ? 'matching' : 'projects' }}</span>
+      </div>
+    </div>
 
-      <div class="filter-controls w-full lg:w-auto">
+    <!-- Filters Row -->
+    <div class="filters-row">
+      <div class="filter-group">
         <select [(ngModel)]="selectedStatus" (change)="onFiltersChanged()" class="list-select">
           <option *ngFor="let opt of statusOptions" [value]="opt.id">{{ opt.label }}</option>
         </select>
@@ -46,135 +56,157 @@
           <option *ngFor="let opt of managementTypeOptions" [value]="opt.id">{{ opt.label }}</option>
         </select>
 
-        <button class="export-btn" (click)="onExport()" matTooltip="Export to Excel (XLSX)">
-          <mat-icon>download</mat-icon>
-          <span>Export</span>
+        <button type="button" 
+                class="incomplete-toggle-btn"
+                [class.incomplete-toggle-btn--active]="selectedIncompleteOnly"
+                (click)="selectedIncompleteOnly = !selectedIncompleteOnly; onFiltersChanged()"
+                matTooltip="Show only projects with incomplete required details">
+          <mat-icon>{{ selectedIncompleteOnly ? 'warning' : 'rule' }}</mat-icon>
+          <span>Incomplete Only</span>
         </button>
       </div>
 
-      <div class="header-actions ml-0 w-full justify-end lg:ml-auto lg:w-auto">
-        <button class="refresh-btn" (click)="refreshProjects()" [disabled]="isRefreshing">
-          <mat-icon [class.spinning]="isRefreshing">refresh</mat-icon>
-        </button>
-        <a *ngIf="isAdmin" class="add-btn" [routerLink]="['/projects/add']" matTooltip="Add Project">
-          <mat-icon>add</mat-icon>
-        </a>
-      </div>
+      <button class="export-btn" (click)="onExport()" matTooltip="Export to Excel (XLSX)">
+        <mat-icon>download</mat-icon>
+        <span>Export</span>
+      </button>
     </div>
-    <div class="toolbar-card__stats">
-      <div class="stat-pill stat-pill--primary">
-        <strong>{{ totalCount }}</strong>
-        <span>{{ isAdmin ? 'Total projects' : 'Your projects' }}</span>
-      </div>
-      <div class="stat-pill stat-pill--matching" *ngIf="searchTerm">
-        <strong>{{ totalCount }}</strong>
-        <span>Matching Results</span>
-      </div>
+
+    <!-- Active Dashboard Filters (if present) -->
+    <div class="active-dashboard-filters" *ngIf="hasActiveDashboardFilters">
+      <mat-icon class="dashboard-filter-icon">filter_alt</mat-icon>
+      <span class="active-filters-label">Active Filters from Dashboard:</span>
+      <span class="active-pill" *ngIf="selectedBusinessUnitId !== 'all'">BU</span>
+      <span class="active-pill" *ngIf="selectedDepartmentId !== 'all'">Department</span>
+      <span class="active-pill" *ngIf="selectedPlantId !== 'all'">Plant</span>
+      <span class="active-pill" *ngIf="startDate || endDate || year || month">Date Period</span>
+      <button type="button" class="clear-dashboard-filters-btn" (click)="clearDashboardFilters()">
+        <mat-icon>close</mat-icon>
+        <span>Clear Dashboard Filters</span>
+      </button>
     </div>
   </section>
 
+
+
   <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
 
-  <div class="state-card state-card--error pm-surface" *ngIf="!isLoading && errorMessage">
+  <!-- State Cards -->
+  <div class="state-card state-card--error" *ngIf="!isLoading && errorMessage">
     <mat-icon>error_outline</mat-icon>
-    <div>
+    <div class="state-text">
       <strong>Projects could not be loaded</strong>
       <p>{{ errorMessage }}</p>
     </div>
-    <button type="button" class="inline-action" (click)="refreshProjects()">Try again</button>
+    <button type="button" class="retry-btn" (click)="refreshProjects()">Try again</button>
   </div>
 
-  <div class="state-card state-card--empty pm-surface" *ngIf="!isLoading && !errorMessage && !hasProjects">
-    <mat-icon>folder_off</mat-icon>
-    <div>
+  <div class="state-card state-card--empty" *ngIf="!isLoading && !errorMessage && !hasProjects">
+    <mat-icon class="empty-icon">folder_off</mat-icon>
+    <div class="state-text">
       <strong>No projects found</strong>
       <p *ngIf="isAdmin">The projects endpoint returned no data yet.</p>
       <p *ngIf="!isAdmin">You are not assigned to any project yet. Contact an administrator.</p>
     </div>
   </div>
 
-  <div class="state-card state-card--empty pm-surface"
+  <div class="state-card state-card--empty"
     *ngIf="!isLoading && !errorMessage && hasProjects && !hasFilteredProjects">
-    <mat-icon>filter_alt_off</mat-icon>
-    <div>
+    <mat-icon class="empty-icon">filter_alt_off</mat-icon>
+    <div class="state-text">
       <strong>No matching result</strong>
-      <p>Adjust your search to find the project you are looking for.</p>
+      <p>Adjust your search or filter values to find the project you are looking for.</p>
     </div>
-    <button type="button" class="inline-action" (click)="clearSearch()">Clear search</button>
+    <button type="button" class="retry-btn" (click)="clearSearch()">Clear search</button>
   </div>
 
-  <section class="table-card pm-surface overflow-hidden" *ngIf="!isLoading && !errorMessage && hasFilteredProjects">
-    <div class="table-shell overflow-x-auto">
+  <!-- Modern Clean Table Card -->
+  <section class="table-card" *ngIf="!isLoading && !errorMessage && hasFilteredProjects">
+    <div class="table-shell">
       <table class="projects-table">
         <thead>
           <tr>
-            <th>Projet</th>
-            <th>D�partement</th>
+            <th>Project</th>
+            <th>Department</th>
             <th>Type</th>
             <th>Phase</th>
             <th>Status</th>
+            <th class="text-center">Completion</th>
             <th>Sponsor</th>
             <th class="text-right">Est. Hours</th>
             <th class="text-right">Act. Hours</th>
-            <th class="actions-col">Actions</th>
+            <th class="text-right">Actions</th>
           </tr>
         </thead>
 
         <tbody>
           <tr *ngFor="let project of paginatedProjects; trackBy: trackByProjectId">
-            <td data-label="Projet">
+            <td class="project-name-cell">
               <div class="project-cell">
-                <strong>{{ project.name }}</strong>
-               </div>
-            </td>
-            <td data-label="D�partement">{{ project.departmentName }}</td>
-            <td data-label="Type">
-              <div class="type-cell">
-                <span class="type-primary">{{ project.managementTypeLabel }}</span>
+                <span class="project-name">{{ project.name }}</span>
               </div>
             </td>
-            <td data-label="Phase">
-              <span class="table-badge">{{ project.phaseLabel }}</span>
+            <td>{{ project.departmentName }}</td>
+            <td>
+              <span class="type-badge">{{ project.managementTypeLabel }}</span>
             </td>
-            <td data-label="Status">
+            <td>
+              <span class="phase-badge">{{ project.phaseLabel }}</span>
+            </td>
+            <td>
               <div class="status-badge" [ngClass]="project.statusClass">
                 <span class="status-indicator"></span>
                 <span class="status-label">{{ project.statusLabel }}</span>
               </div>
             </td>
-            <td data-label="Sponsor">
+            <td class="text-center">
+              <div class="completion-wrapper" [matTooltip]="project.isDataComplete ? 'All details complete' : 'Missing fields: ' + project.missingFields?.join(', ')" matTooltipPosition="above">
+                <div class="completion-header">
+                  <span class="completion-label" [class.completion-label--complete]="project.isDataComplete">
+                    {{ project.isDataComplete ? 'Complete' : 'Incomplete' }}
+                  </span>
+                  <span class="completion-value">{{ project.dataCompletionPercentage }}%</span>
+                </div>
+                <div class="completion-bar-outer">
+                  <div class="completion-bar-inner" 
+                       [style.width.%]="project.dataCompletionPercentage" 
+                       [class.completion-bar-inner--complete]="project.isDataComplete">
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>
               <div class="sponsor-cell">
-                <mat-icon>handshake</mat-icon>
                 <span>{{ project.sponsorDisplay }}</span>
               </div>
             </td>
-            <td data-label="Est. Hours" class="text-right font-mono">{{ project.estimatedHours }}h</td>
-            <td data-label="Act. Hours" class="text-right font-mono">
+            <td class="text-right font-mono">{{ project.estimatedHours }}h</td>
+            <td class="text-right font-mono">
               <strong [class.hours-over]="project.actualHours > project.estimatedHours">
                 {{ project.actualHours }}h
               </strong>
             </td>
-            <td data-label="Actions" class="actions-col">
-              <div class="row-actions" *ngIf="isAdmin">
-                <button type="button" class="action-btn action-btn--view" (click)="openDetails(project.id)"
-                  aria-label="View project details">
-                  <mat-icon>visibility</mat-icon>
+            <td class="text-right">
+              <div class="action-cell-wrapper">
+                <button type="button" class="action-trigger-btn" [matMenuTriggerFor]="actionMenu" aria-label="Project actions">
+                  <mat-icon>more_vert</mat-icon>
                 </button>
-                <button type="button" class="action-btn action-btn--edit" (click)="openEdit(project.id)"
-                  aria-label="Edit project">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button type="button" class="action-btn action-btn--delete" (click)="deleteProject(project.raw)"
-                  [disabled]="deletingProjectId === project.id" aria-label="Delete project">
-                  <mat-icon>{{ deletingProjectId === project.id ? 'hourglass_top' : 'delete' }}</mat-icon>
-                </button>
-              </div>
-              <div class="row-actions row-actions--member" *ngIf="!isAdmin">
-                <button type="button" class="action-btn action-btn--view" (click)="openDetails(project.id)"
-                  aria-label="Open project">
-                  <mat-icon>arrow_forward</mat-icon>
-                  <span class="action-btn__label">Open</span>
-                </button>
+
+                <mat-menu #actionMenu="matMenu" class="modern-action-menu pm-glass" xPosition="before">
+                  <button mat-menu-item class="menu-item-action" (click)="openDetails(project.id)">
+                    <mat-icon class="menu-icon-view">visibility</mat-icon>
+                    <span>Open details</span>
+                  </button>
+                  <button mat-menu-item class="menu-item-action" *ngIf="isAdmin" (click)="openEdit(project.id)">
+                    <mat-icon class="menu-icon-edit">edit</mat-icon>
+                    <span>Edit project</span>
+                  </button>
+                  <button mat-menu-item class="menu-item-action menu-item-action--delete" *ngIf="isAdmin" 
+                          (click)="deleteProject(project.raw)" [disabled]="deletingProjectId === project.id">
+                    <mat-icon class="menu-icon-delete">{{ deletingProjectId === project.id ? 'hourglass_top' : 'delete' }}</mat-icon>
+                    <span class="delete-label">Delete project</span>
+                  </button>
+                </mat-menu>
               </div>
             </td>
           </tr>
@@ -182,6 +214,7 @@
       </table>
     </div>
 
+    <!-- Modern Clean Pagination Row -->
     <div class="table-pagination">
       <div class="table-pagination__info">
         <div class="page-size-selector">

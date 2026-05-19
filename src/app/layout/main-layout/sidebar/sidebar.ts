@@ -23,6 +23,24 @@ export class Sidebar {
   @Output() logoutClicked = new EventEmitter<void>();
   @Output() toggleSidebar = new EventEmitter<void>();
 
+  get workspaceItems(): NavItem[] {
+    return this.navItems.filter(item => 
+      item.id === 'dashboard' || 
+      item.id === 'projects' || 
+      item.id === 'hours' || 
+      item.id === 'users' || 
+      item.id === 'interns' || 
+      item.id === 'reports'
+    );
+  }
+
+  get managementItems(): NavItem[] {
+    return this.navItems.filter(item => 
+      item.id === 'admin' || 
+      item.id === 'files'
+    );
+  }
+
   expandedIds = new Set<string>();
 
   constructor(public router: Router) {}

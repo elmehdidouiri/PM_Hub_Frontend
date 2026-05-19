@@ -48,10 +48,10 @@ export class DashboardFilterService {
 
   static readonly PROJECT_STATUS_OPTIONS: StatusMeta[] = [
     { id: 'all',     label: 'All Statuses' },
-    { id: 'ongoing', label: 'Ongoing',  apiValue: '0' },
-    { id: 'onhold',  label: 'On Hold',  apiValue: '1' },
-    { id: 'done',    label: 'Done',     apiValue: '2' },
-    { id: 'planned', label: 'Planned',  apiValue: '3' },
+    { id: 'ongoing', label: 'Ongoing',  apiValue: 'Ongoing' },
+    { id: 'onhold',  label: 'On Hold',  apiValue: 'OnHold' },
+    { id: 'done',    label: 'Done',     apiValue: 'Done' },
+    { id: 'planned', label: 'Planned',  apiValue: 'Planned' },
   ];
 
   static readonly PROJECT_PHASE_OPTIONS = [
@@ -78,11 +78,10 @@ export class DashboardFilterService {
 
   static readonly PROJECT_MANAGEMENT_TYPE_OPTIONS = [
     { id: 'all', label: 'All project management' },
-    { id: '0', label: 'Digital Operation' },
-    { id: '1', label: 'Digital Solution' },
-    { id: '2', label: 'Infrastructure' },
-    { id: '3', label: 'Process Simplification' },
-    { id: '4', label: 'Other' },
+    { id: 'DigitalOperation', label: 'Digital Operation' },
+    { id: 'DigitalSolution', label: 'Digital Solution' },
+    { id: 'Infrastructure', label: 'Infrastructure' },
+    { id: 'ProcessSimplification', label: 'Process Simplification' },
   ];
 
   private static readonly PROJECT_PHASE_MAP: Record<string, string> = {
@@ -165,6 +164,7 @@ export class DashboardFilterService {
     }
     return [...stats.entries()]
       .map(([id, info]) => ({ id, label: info.label, count: info.count }))
+      .filter((t) => t.label && t.label.trim() !== '-')
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
   }
 
@@ -278,12 +278,21 @@ export class DashboardFilterService {
 
   buildProjectManagementTypeTickets(projects: any[]): FilterTicket[] {
     const counts = new Map<string, number>();
+    
+    const typeMap: Record<string, string> = {
+      '0': 'DigitalOperation',
+      '1': 'DigitalSolution',
+      '2': 'Infrastructure',
+      '3': 'ProcessSimplification'
+    };
+
     for (const project of projects) {
       const raw = project.projectManagementType ?? project.ProjectManagementType;
       if (raw === undefined || raw === null || raw === '') {
         continue;
       }
-      const id = String(raw);
+      const rawId = String(raw).trim();
+      const id = typeMap[rawId] ?? rawId;
       counts.set(id, (counts.get(id) ?? 0) + 1);
     }
 

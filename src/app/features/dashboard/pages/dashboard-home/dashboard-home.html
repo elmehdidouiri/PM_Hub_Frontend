@@ -1,40 +1,36 @@
-<div class="dashboard-page pm-page-enter">
+<div class="dashboard-page pm-page-enter">
   <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
-
-  <ng-container *ngIf="hasLoadedDashboard">
-    <div class="dashboard-content" [class.dashboard-content--refreshing]="isRefreshing">
-      <header class="page-header dashboard-hero">
-        <div class="dashboard-hero__copy">
 
-          <span class="dashboard-hero__eyebrow">PMHUB Analytics</span>
-          <h1>Performance Intelligence</h1>
+  <ng-container *ngIf="hasLoadedDashboard">
+    <div class="dashboard-content" [class.dashboard-content--refreshing]="isRefreshing">
+      <header class="dashboard-page-header">
+        <div class="dashboard-page-header__content">
+          <div class="dashboard-page-header__eyebrow">
+            <mat-icon>insights</mat-icon>
+            <span>PMHUB Analytics</span>
+          </div>
+          <h1>Performance Intelligence</h1>
           <p>Portfolio-wide OTD, effectiveness and resource utilization analytics.</p>
 
-          <div class="dashboard-hero__meta">
-
-            <span>
-
-              <mat-icon>calendar_month</mat-icon>
-
-              {{ periodLabel }}
-
-            </span>
-
-            <span>
-
-              <mat-icon>filter_alt</mat-icon>
-
-              {{ hasActiveFilters ? 'Filtered portfolio view' : 'All portfolio segments' }}
-
-            </span>
-
+          <div class="dashboard-page-header__actions">
+            <button
+              type="button"
+              class="dashboard-header-btn dashboard-header-btn--ghost"
+              [disabled]="isRefreshing || !canRestoreFilters"
+              (click)="clearAllFilters()">
+              <mat-icon>restart_alt</mat-icon>
+              Reset Environment
+            </button>
           </div>
-        </div>
-
-        <button class="pm-btn-secondary" type="button" [disabled]="isRefreshing || !canRestoreFilters" (click)="clearAllFilters()">
-          <mat-icon>restart_alt</mat-icon>
-          Reset Environment
-        </button>
+        </div>
+
+        <div class="dashboard-period-card">
+          <mat-icon>calendar_month</mat-icon>
+          <div>
+            <strong>{{ periodLabel }}</strong>
+            <span>{{ hasActiveFilters ? 'Filtered portfolio view' : 'All portfolio segments' }}</span>
+          </div>
+        </div>
       </header>
 
       <section class="dashboard-alert" *ngIf="errorMessage">
@@ -44,105 +40,118 @@
         <span>{{ errorMessage }}</span>
 
       </section>
-
-      <section class="period-bar pm-glass">
-        <div class="period-bar__dates">
-          <mat-icon>analytics</mat-icon>
-          <input type="date" class="pm-input" [value]="filterState.selectedStartDate || ''" (change)="updateDateFilter('start', $event)" [disabled]="isRefreshing" />
-          <span>to</span>
-          <input type="date" class="pm-input" [value]="filterState.selectedEndDate || ''" (change)="updateDateFilter('end', $event)" [disabled]="isRefreshing" />
-        </div>
-
-        <div class="period-bar__modes">
-          <button
-            type="button"
-            [class.period-bar__mode--active]="filterState.selectedYear === currentYear && filterState.selectedMonth === currentMonth"
-            (click)="selectCurrentMonth()"
-            [disabled]="isRefreshing">
-            Month-to-Date
-          </button>
-          <button
-            type="button"
-            [class.period-bar__mode--active]="filterState.selectedYear === null && filterState.selectedMonth === null"
-            (click)="selectAllDates()"
-            [disabled]="isRefreshing">
-            Global History
-          </button>
-        </div>
-      </section>
-
+
+      <section class="period-bar pm-glass">
+        <div class="period-bar__dates">
+          <mat-icon>analytics</mat-icon>
+          <input type="date" class="pm-input" [value]="filterState.selectedStartDate || ''" (change)="updateDateFilter('start', $event)" [disabled]="isRefreshing" />
+          <span>to</span>
+          <input type="date" class="pm-input" [value]="filterState.selectedEndDate || ''" (change)="updateDateFilter('end', $event)" [disabled]="isRefreshing" />
+        </div>
+
+        <div class="period-bar__modes">
+          <button
+            type="button"
+            [class.period-bar__mode--active]="filterState.selectedYear === currentYear && filterState.selectedMonth === currentMonth"
+            (click)="selectCurrentMonth()"
+            [disabled]="isRefreshing">
+            Month-to-Date
+          </button>
+          <button
+            type="button"
+            [class.period-bar__mode--active]="filterState.selectedYear === null && filterState.selectedMonth === null"
+            (click)="selectAllDates()"
+            [disabled]="isRefreshing">
+            Global History
+          </button>
+        </div>
+      </section>
+
       <section class="metric-grid" aria-label="Dashboard metrics">
         <article class="dashboard-metric pm-surface" *ngFor="let metric of metrics; let i = index" [style.--metric-tone]="getToneColor(metric.tone)" [style.--metric-delay.ms]="i * 65">
-          <span class="dashboard-metric__line"></span>
-          <div class="dashboard-metric__head">
-            <span class="dashboard-metric__icon">
-              <mat-icon>{{ metric.icon }}</mat-icon>
-            </span>
-            <span class="dashboard-metric__label">
-              {{ metric.label }}
-              <small>Real-time metric</small>
-            </span>
-          </div>
-          <strong>{{ metric.value }}</strong>
-          <p>{{ metric.note }}</p>
-          <mat-icon class="dashboard-metric__watermark">{{ metric.icon }}</mat-icon>
-        </article>
-      </section>
-
+          <span class="dashboard-metric__line"></span>
+          <div class="dashboard-metric__head">
+            <span class="dashboard-metric__icon">
+              <mat-icon>{{ metric.icon }}</mat-icon>
+            </span>
+            <span class="dashboard-metric__label">
+              {{ metric.label }}
+              <small>Real-time metric</small>
+            </span>
+          </div>
+          <strong>{{ metric.value }}</strong>
+          <p>{{ metric.note }}</p>
+          <mat-icon class="dashboard-metric__watermark">{{ metric.icon }}</mat-icon>
+        </article>
+      </section>
+
       <section class="target-grid" aria-label="Target thresholds">
-        <article class="target-card target-card--success">
-          <span><mat-icon>verified</mat-icon></span>
-          <div>
-            <strong>{{ aboveTargetCount }}</strong>
-            <small>Segments</small>
-            <p>Superior Efficiency Index</p>
-          </div>
-        </article>
-        <article class="target-card target-card--danger">
-          <span><mat-icon>warning</mat-icon></span>
-          <div>
-            <strong>{{ belowTargetCount }}</strong>
-            <small>Segments</small>
-            <p>Attention Required Threshold</p>
-          </div>
-        </article>
-      </section>
-
+        <article class="target-card target-card--success">
+          <span><mat-icon>verified</mat-icon></span>
+          <div>
+            <strong>{{ aboveTargetCount }}</strong>
+            <small>Segments</small>
+            <p>Superior Efficiency Index</p>
+          </div>
+        </article>
+        <article class="target-card target-card--danger">
+          <span><mat-icon>warning</mat-icon></span>
+          <div>
+            <strong>{{ belowTargetCount }}</strong>
+            <small>Segments</small>
+            <p>Attention Required Threshold</p>
+          </div>
+        </article>
+      </section>
+
       <section class="filter-sections" aria-label="Dashboard filters">
-        <article *ngFor="let section of filterSections" class="filter-section">
-          <header class="pm-section-title">
-            <div>
-              <mat-icon>{{ section.icon }}</mat-icon>
-              <h2>{{ section.title }}</h2>
-            </div>
-            <span>{{ section.tickets.length }} options</span>
-          </header>
-
-          <div class="filter-ticket-grid">
-            <button
-              type="button"
-              class="filter-ticket"
-              *ngFor="let ticket of section.tickets.slice(0, filterCardLimit)"
-              [class.filter-ticket--active]="section.selectedId === ticket.id"
-              (click)="selectFilterCard(section.kind, ticket.id)"
-              [disabled]="isRefreshing">
-              <span class="filter-ticket__top">
-                <mat-icon>{{ getTicketIcon(section.kind, ticket) }}</mat-icon>
-                <strong>{{ ticket.count }}</strong>
-              </span>
-              <span class="filter-ticket__label">{{ ticket.label }}</span>
-              <small>Projects</small>
-
-              <button *ngIf="ticket.projects?.length" class="filter-ticket__drill-down" (click)="$event.stopPropagation(); toggleDrillDown(section, ticket)">
-                <mat-icon>list</mat-icon>
-              </button>
-            </button>
-          </div>
-        </article>
-      </section>
-
-    </div>
-
+        <article *ngFor="let section of filterSections" class="filter-section">
+          <header class="pm-section-title">
+            <div>
+              <mat-icon>{{ section.icon }}</mat-icon>
+              <h2>{{ section.title }}</h2>
+            </div>
+            <div class="pm-section-title__actions">
+              <span class="pm-section-title__count">{{ section.tickets.length }} options</span>
+              <button
+                type="button"
+                class="filter-section-reset"
+                (click)="resetSectionFilter(section.kind)"
+                [disabled]="isRefreshing || !sectionHasActiveFilter(section)"
+                [attr.aria-label]="'Reset ' + section.title + ' filter'"
+                title="Reset section filter">
+                <mat-icon>restart_alt</mat-icon>
+              </button>
+            </div>
+          </header>
+
+          <div class="filter-ticket-grid">
+            <ng-container *ngFor="let ticket of section.tickets; trackBy: trackByTicketId">
+              <button
+                type="button"
+                class="filter-ticket"
+                *ngIf="ticket.count > 0 || section.selectedId === ticket.id"
+                [class.filter-ticket--active]="section.selectedId === ticket.id"
+                (click)="selectFilterCard(section.kind, ticket.id)"
+                [disabled]="isRefreshing">
+                <span class="filter-ticket__top">
+                  <mat-icon>{{ getTicketIcon(section.kind, ticket) }}</mat-icon>
+                  <strong>{{ ticket.count }}</strong>
+                </span>
+                <span class="filter-ticket__label">{{ ticket.label }}</span>
+                <small>Projects</small>
+
+                <button *ngIf="ticket.projects?.length" class="filter-ticket__drill-down" (click)="$event.stopPropagation(); toggleDrillDown(section, ticket)">
+                  <mat-icon>list</mat-icon>
+                </button>
+              </button>
+            </ng-container>
+          </div>
+        </article>
+      </section>
+
+    </div>
+
     <app-loading-spinner *ngIf="isRefreshing" [fullPage]="false"></app-loading-spinner>
-  </ng-container>
-</div>
+  </ng-container>
+</div>

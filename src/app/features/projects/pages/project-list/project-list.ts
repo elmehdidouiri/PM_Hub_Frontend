@@ -1,7 +1,8 @@
 import { AfterViewInit, ChangeDetectorRef, Component, Inject, OnInit, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
+import { Subscription } from 'rxjs';
 import { finalize, timeout } from 'rxjs/operators';
 import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 
@@ -79,11 +80,14 @@ export class ProjectList implements OnInit, AfterViewInit {
     progress: number;
     estimatedHours: number;
     actualHours: number;
+    isDataComplete?: boolean;
+    dataCompletionPercentage?: number;
+    missingFields?: string[];
   }> = [];
   users: SelectOption[] = [];
   searchTerm = '';
   currentPage = 1;
-  pageSize = 10;
+  pageSize = 5;
   totalCount = 0;
   totalPagesCount = 0;
   customPageSize: number | null = null;
@@ -93,10 +97,20 @@ export class ProjectList implements OnInit, AfterViewInit {
   deletingProjectId: string | null = null;
   errorMessage = '';
   private hasTriggeredInitialLoad = false;
+  private loadSubscription?: Subscription;
 
   selectedStatus: string = 'all';
   selectedPhase: string = 'all';
   selectedManagementType: string = 'all';
+  selectedIncompleteOnly: boolean = false;
+
+  selectedDepartmentId: string = 'all';
+  selectedBusinessUnitId: string = 'all';
+  selectedPlantId: string = 'all';
+  startDate: string | null = null;
+  endDate: string | null = null;
+  year: number | null = null;
+  month: number | null = null;
 
   readonly statusOptions = [
     { id: 'all', label: 'All Statuses' },
@@ -143,7 +157,8 @@ export class ProjectList implements OnInit, AfterViewInit {
     private readonly authService: AuthService,
     private readonly notificationService: NotificationService,
     private readonly dialog: MatDialog,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly route: ActivatedRoute
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
   }
@@ -238,11 +253,57 @@ export class ProjectList implements OnInit, AfterViewInit {
   }
 
   refreshProjects(): void {
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = undefined;
+    }
+    this.errorMessage = '';
     this.loadProjects(true);
+  }
+
+  navigateToCreateProject(): void {
+    void this.router.navigate([this.projectsBasePath(), 'new']);
   }
 
   clearSearch(): void {
     this.searchTerm = '';
+    this.currentPage = 1;
+    this.loadProjects();
+  }
+
+  get hasActiveDashboardFilters(): boolean {
+    return this.selectedBusinessUnitId !== 'all' ||
+           this.selectedDepartmentId !== 'all' ||
+           this.selectedPlantId !== 'all' ||
+           this.startDate !== null ||
+           this.endDate !== null ||
+           this.year !== null ||
+           this.month !== null;
+  }
+
+  clearDashboardFilters(): void {
+    this.selectedBusinessUnitId = 'all';
+    this.selectedDepartmentId = 'all';
+    this.selectedPlantId = 'all';
+    this.startDate = null;
+    this.endDate = null;
+    this.year = null;
+    this.month = null;
+    
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        BusinessUnitId: null,
+        DepartmentId: null,
+        PlantId: null,
+        startDate: null,
+        endDate: null,
+        year: null,
+        month: null
+      },
+      queryParamsHandling: 'merge'
+    });
+    
     this.currentPage = 1;
     this.loadProjects();
   }
@@ -343,6 +404,7 @@ export class ProjectList implements OnInit, AfterViewInit {
       Status: this.selectedStatus !== 'all' ? Number(this.selectedStatus) : null,
       Phase: this.selectedPhase !== 'all' ? Number(this.selectedPhase) : null,
       ProjectManagementType: this.selectedManagementType !== 'all' ? Number(this.selectedManagementType) : null,
+      IncompleteOnly: this.selectedIncompleteOnly ? true : null,
     };
   }
 
@@ -355,14 +417,14 @@ export class ProjectList implements OnInit, AfterViewInit {
     this.notificationService.showInfo('Preparing Excel report... please wait.');
     this.isRefreshing = true;
 
-    // We fetch all filtered projects (up to 2000) to ensure the export is complete
+    // We fetch all filtered projects using the all=true parameter to ensure the export is complete
     const params: ProjectFilterParams = {
-      PageNumber: 1,
-      PageSize: 2000,
+      all: true,
       Search: this.searchTerm.trim() || undefined,
       Status: this.selectedStatus !== 'all' ? Number(this.selectedStatus) : undefined,
       Phase: this.selectedPhase !== 'all' ? Number(this.selectedPhase) : undefined,
       ProjectManagementType: this.selectedManagementType !== 'all' ? Number(this.selectedManagementType) : undefined,
+      IncompleteOnly: this.selectedIncompleteOnly ? true : undefined,
     };
 
     this.projectService.getProjectsPaged(params).subscribe({
@@ -370,7 +432,7 @@ export class ProjectList implements OnInit, AfterViewInit {
         this.isRefreshing = false;
         const dataToExport = response.data.map(p => ({
           'Project Name': p.name,
-          'Department': p.departmentName || 'N/A',
+          'Department': p.departmentName || '-',
           'Type': this.getManagementTypeLabel(p),
           'Phase': this.getPhaseLabel(p),
           'Status': this.getStatusLabel(p),
@@ -378,8 +440,8 @@ export class ProjectList implements OnInit, AfterViewInit {
           'Estimated Hours': this.getEstimatedHoursDisplay(p),
           'Actual Hours': p.actualHours || 0,
           'Description': p.description || 'No description provided yet.',
-          'Start Date': p.startDate ? new Date(p.startDate).toLocaleDateString() : 'N/A',
-          'Estimated Due Date': p.estimatedDueDate ? new Date(p.estimatedDueDate).toLocaleDateString() : 'N/A'
+          'Start Date': p.startDate ? new Date(p.startDate).toLocaleDateString() : '-',
+          'Estimated Due Date': p.estimatedDueDate ? new Date(p.estimatedDueDate).toLocaleDateString() : '-'
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -426,7 +488,7 @@ export class ProjectList implements OnInit, AfterViewInit {
     if (label) return label;
 
     const value = project.status ?? this.readNumber(raw, ['status', 'Status']);
-    if (value === undefined || value === null) return 'N/A';
+    if (value === undefined || value === null) return '-';
 
     return this.statusLabels[value as ProjectStatus] || String(value);
   }
@@ -437,7 +499,7 @@ export class ProjectList implements OnInit, AfterViewInit {
     if (label) return label;
 
     const value = project.phase ?? this.readNumber(raw, ['phase', 'Phase']);
-    if (value === undefined || value === null) return 'N/A';
+    if (value === undefined || value === null) return '-';
 
     return this.phaseLabels[value as ProjectPhase] || String(value);
   }
@@ -455,7 +517,7 @@ export class ProjectList implements OnInit, AfterViewInit {
     const label = project.projectTypeLabel || this.readString(raw, ['projectTypeLabel', 'ProjectTypeLabel']);
     if (label) return label;
 
-    return value !== undefined && value !== null ? String(value) : 'N/A';
+    return value !== undefined && value !== null ? String(value) : '-';
   }
 
   private getManagementTypeLabel(project: ProjectSummaryDto): string {
@@ -471,7 +533,7 @@ export class ProjectList implements OnInit, AfterViewInit {
     const label = project.projectManagementTypeLabel || this.readString(raw, ['projectManagementTypeLabel', 'ProjectManagementTypeLabel']);
     if (label && label.toLowerCase() !== 'development') return label;
 
-    return value !== undefined && value !== null ? `Category ${value}` : 'N/A';
+    return value !== undefined && value !== null ? `Category ${value}` : '-';
   }
 
   private getStatusClass(project: ProjectSummaryDto): string {
@@ -508,7 +570,7 @@ export class ProjectList implements OnInit, AfterViewInit {
     }
 
     const rawProject = this.asRecord(project);
-    return this.readString(rawProject, ['sponsorName', 'sponsorUserName', 'sponsorFullName']) || 'N/A';
+    return this.readString(rawProject, ['sponsorName', 'sponsorUserName', 'sponsorFullName']) || '-';
   }
 
   private getEstimatedHoursDisplay(project: ProjectSummaryDto): number {
@@ -565,10 +627,21 @@ export class ProjectList implements OnInit, AfterViewInit {
       Status: this.selectedStatus !== 'all' ? Number(this.selectedStatus) : undefined,
       Phase: this.selectedPhase !== 'all' ? Number(this.selectedPhase) : undefined,
       ProjectManagementType: this.selectedManagementType !== 'all' ? Number(this.selectedManagementType) : undefined,
+      IncompleteOnly: this.selectedIncompleteOnly ? true : undefined,
+      DepartmentId: this.selectedDepartmentId !== 'all' ? this.selectedDepartmentId : undefined,
+      BusinessUnitId: this.selectedBusinessUnitId !== 'all' ? this.selectedBusinessUnitId : undefined,
+      PlantId: this.selectedPlantId !== 'all' ? this.selectedPlantId : undefined,
     };
 
-    this.projectService
-      .getProjectsPaged(params)
+    if (this.startDate) (params as any).startDate = this.startDate;
+    if (this.endDate) (params as any).endDate = this.endDate;
+    if (this.year) (params as any).year = this.year;
+    if (this.month) (params as any).month = this.month;
+
+    this.loadSubscription?.unsubscribe();
+
+    this.loadSubscription = this.projectService
+      .getProjectsPaged(params, { noCache: isManualRefresh })
       .pipe(
         timeout(15000),
         finalize(() => {
@@ -600,7 +673,46 @@ export class ProjectList implements OnInit, AfterViewInit {
       return;
     }
     this.hasTriggeredInitialLoad = true;
-    this.loadProjects();
+    
+    this.route.queryParams.subscribe((params) => {
+      if (params['Search'] !== undefined || params['search'] !== undefined) {
+        this.searchTerm = params['Search'] ?? params['search'] ?? '';
+      }
+      if (params['Status'] !== undefined || params['status'] !== undefined) {
+        this.selectedStatus = String(params['Status'] ?? params['status']);
+      }
+      if (params['Phase'] !== undefined || params['phase'] !== undefined) {
+        this.selectedPhase = String(params['Phase'] ?? params['phase']);
+      }
+      if (params['ProjectManagementType'] !== undefined || params['projectManagementType'] !== undefined) {
+        this.selectedManagementType = String(params['ProjectManagementType'] ?? params['projectManagementType']);
+      }
+      if (params['incompleteOnly'] !== undefined || params['IncompleteOnly'] !== undefined) {
+        this.selectedIncompleteOnly = String(params['incompleteOnly'] ?? params['IncompleteOnly']) === 'true';
+      }
+      if (params['BusinessUnitId'] !== undefined || params['businessUnitId'] !== undefined) {
+        this.selectedBusinessUnitId = String(params['BusinessUnitId'] ?? params['businessUnitId']);
+      }
+      if (params['DepartmentId'] !== undefined || params['departmentId'] !== undefined) {
+        this.selectedDepartmentId = String(params['DepartmentId'] ?? params['departmentId']);
+      }
+      if (params['PlantId'] !== undefined || params['plantId'] !== undefined) {
+        this.selectedPlantId = String(params['PlantId'] ?? params['plantId']);
+      }
+      if (params['startDate'] !== undefined) {
+        this.startDate = String(params['startDate']);
+      }
+      if (params['endDate'] !== undefined) {
+        this.endDate = String(params['endDate']);
+      }
+      if (params['year'] !== undefined) {
+        this.year = Number(params['year']);
+      }
+      if (params['month'] !== undefined) {
+        this.month = Number(params['month']);
+      }
+      this.loadProjects();
+    });
   }
 
   private extractErrorMessage(error: unknown, fallback: string): string {
@@ -639,7 +751,7 @@ export class ProjectList implements OnInit, AfterViewInit {
       id: project.id,
       name: project.name,
       description: project.description || 'No description provided yet.',
-      departmentName: project.departmentName || 'N/A',
+      departmentName: project.departmentName || '-',
       managerDisplay: this.getProjectManagerDisplay(project),
       sponsorDisplay: this.getSponsorDisplay(project),
       managementTypeLabel: this.getManagementTypeLabel(project),
@@ -651,6 +763,9 @@ export class ProjectList implements OnInit, AfterViewInit {
       progress: this.getProgressDisplay(project),
       estimatedHours: this.getEstimatedHoursDisplay(project),
       actualHours: Number(project.actualHours ?? 0),
+      isDataComplete: project.isDataComplete !== undefined ? project.isDataComplete : true,
+      dataCompletionPercentage: project.dataCompletionPercentage !== undefined ? project.dataCompletionPercentage : 100,
+      missingFields: project.missingFields || [],
     }));
   }
 

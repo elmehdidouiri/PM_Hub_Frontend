@@ -10,6 +10,7 @@ import { AppRoutingModule } from './app-routing-module';
 import { App } from './app';
 import { CoreModule } from './core/core-module';
 import { authInterceptor } from './core/interceptors/auth-interceptor';
+import { errorInterceptor } from './core/interceptors/error-interceptor';
 import { LayoutModule } from './layout/layout-module';
 import { SharedModule } from './shared/shared.module';
 import { AuthService } from './core/services/auth';
@@ -65,7 +66,7 @@ function appInitializer(authService: AuthService, platformId: any) {
     LayoutModule,
   ],
   providers: [
-    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor, errorInterceptor])),
     {
       provide: APP_INITIALIZER,
       useFactory: appInitializer,

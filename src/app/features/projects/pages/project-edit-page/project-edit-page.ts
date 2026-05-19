@@ -3,6 +3,7 @@ import { AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, Valida
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { NotificationService } from '../../../../core/services/notification.service';
+import { AuthService } from '../../../../core/services/auth';
 import {
   ProjectDto,
   ProcessStatus,
@@ -23,6 +24,7 @@ import { ProjectService } from '../../services/project';
   styleUrls: ['./project-edit-page.scss'],
 })
 export class ProjectEditPage implements OnInit {
+  mode: 'details' | 'edit' = 'details';
   public readonly ProjectPhase = ProjectPhase;
   public readonly ProjectStatus = ProjectStatus;
   public readonly ProcessStatus = ProcessStatus;
@@ -60,6 +62,7 @@ export class ProjectEditPage implements OnInit {
   roadblockDraft: FormControl<string>;
   businessUnitDraft: FormControl<string>;
   kpiDraft!: FormGroup;
+  internMemberDraft = new FormControl('', { nonNullable: true });
 
   // Deliverables (loaded separately via API)
   deliverables: any[] = [];
@@ -92,7 +95,8 @@ export class ProjectEditPage implements OnInit {
     private readonly notificationService: NotificationService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly authService: AuthService
   ) {
     this.memberDraft = this.fb.group({
       userId: this.fb.nonNullable.control('', Validators.required),
@@ -112,6 +116,9 @@ export class ProjectEditPage implements OnInit {
   }
 
   ngOnInit(): void {
+    this.route.data.subscribe(data => {
+      this.mode = data['mode'] || 'details';
+    });
     this.project = this.route.snapshot.data['project'];
     const refs = this.route.snapshot.data['refs'];
     if (refs) {
@@ -195,7 +202,8 @@ export class ProjectEditPage implements OnInit {
         userId: [m.userId, Validators.required],
         role: [m.roleName, Validators.required],
         roleId: [m.roleId || '']
-      })))
+      }))),
+      internMembers: this.fb.array(this.toJsonControls(this.project.internMembers))
     });
 
     // ── Budget / Resources ──
@@ -222,13 +230,7 @@ export class ProjectEditPage implements OnInit {
       })))
     });
 
-    this.collectionsForm = this.fb.group({
-      internMembers: this.fb.array(this.toJsonControls(this.project.internMembers)),
-      subProjects: this.fb.array(this.toJsonControls(this.project.subProjects)),
-      deliverables: this.fb.array(this.toJsonControls(this.project.deliverables)),
-      timelineEntries: this.fb.array(this.toJsonControls(this.project.timelineEntries)),
-      roadblockEntries: this.fb.array(this.toJsonControls(this.project.roadblockEntries)),
-    });
+    this.collectionsForm = this.fb.group({});
 
     this.kpiDraft = this.fb.group({
       name: ['', Validators.required],
@@ -342,7 +344,6 @@ export class ProjectEditPage implements OnInit {
     const team = this.teamForm.getRawValue();
     const budget = this.budgetForm.getRawValue();
     const kpi = this.kpiForm.getRawValue();
-    const collections = this.collectionsForm.getRawValue();
 
     return {
       ...identity,
@@ -354,25 +355,21 @@ export class ProjectEditPage implements OnInit {
       teamMembers: (team.teamMembers || []).filter((member: { userId?: string }) => member.userId !== identity.projectManagerId),
       budgetItems: budget.budgetItems,
       kpIs: kpi.kpis,
-      internMembers: this.parseJsonList(collections.internMembers),
-      subProjects: this.parseJsonList(collections.subProjects),
-      deliverables: this.parseJsonList(collections.deliverables),
-      timelineEntries: this.parseJsonList(collections.timelineEntries),
-      roadblockEntries: this.parseJsonList(collections.roadblockEntries),
+      internMembers: this.parseJsonList(team.internMembers),
+      subProjects: this.project.subProjects || [],
+      deliverables: this.project.deliverables || [],
+      timelineEntries: this.project.timelineEntries || [],
+      roadblockEntries: this.project.roadblockEntries || [],
       roadblocks: context.roadblocks?.join(', ') || ''
     };
   }
 
   // ── FormArray getters ──
   get teamMembers(): FormArray { return this.teamForm.get('teamMembers') as FormArray; }
+  get teamInternMembers(): FormArray { return this.teamForm.get('internMembers') as FormArray; }
   get budgetItems(): FormArray { return this.budgetForm.get('budgetItems') as FormArray; }
   get roadblocks(): FormArray { return this.contextForm.get('roadblocks') as FormArray; }
   get kpis(): FormArray { return this.kpiForm.get('kpis') as FormArray; }
-  get collectionInternMembers(): FormArray { return this.collectionsForm.get('internMembers') as FormArray; }
-  get collectionSubProjects(): FormArray { return this.collectionsForm.get('subProjects') as FormArray; }
-  get collectionDeliverables(): FormArray { return this.collectionsForm.get('deliverables') as FormArray; }
-  get collectionTimelineEntries(): FormArray { return this.collectionsForm.get('timelineEntries') as FormArray; }
-  get collectionRoadblockEntries(): FormArray { return this.collectionsForm.get('roadblockEntries') as FormArray; }
 
   // ── Array CRUD ──
   addTeamMember(): void {
@@ -385,6 +382,28 @@ export class ProjectEditPage implements OnInit {
     this.memberDraft.reset({ userId: '', role: '', roleId: '' });
   }
   removeTeamMember(i: number): void { this.teamMembers.removeAt(i); }
+
+  addInternMember(): void {
+    const val = this.internMemberDraft.value.trim();
+    if (val) {
+      const obj = { fullName: val };
+      this.teamInternMembers.push(this.fb.control(JSON.stringify(obj)));
+      this.internMemberDraft.reset();
+    }
+  }
+  removeInternMember(i: number): void {
+    this.teamInternMembers.removeAt(i);
+  }
+
+  getInternName(controlValue: string): string {
+    if (!controlValue) return '';
+    try {
+      const parsed = JSON.parse(controlValue);
+      return parsed.fullName || parsed.name || parsed.raw || controlValue;
+    } catch {
+      return controlValue;
+    }
+  }
 
   onProjectManagerChange(pmUserId: string | null): void {
     this.removeProjectManagerFromTeam(pmUserId);
@@ -418,27 +437,31 @@ export class ProjectEditPage implements OnInit {
   }
   removeKpi(i: number): void { this.kpis.removeAt(i); }
 
-  addCollectionItem(key: 'internMembers' | 'subProjects' | 'deliverables' | 'timelineEntries' | 'roadblockEntries'): void {
-    this.getCollectionByKey(key).push(this.fb.control('{}'));
-  }
 
-  removeCollectionItem(key: 'internMembers' | 'subProjects' | 'deliverables' | 'timelineEntries' | 'roadblockEntries', i: number): void {
-    this.getCollectionByKey(key).removeAt(i);
-  }
-
-  getCollectionByKey(key: 'internMembers' | 'subProjects' | 'deliverables' | 'timelineEntries' | 'roadblockEntries'): FormArray {
-    const map = {
-      internMembers: this.collectionInternMembers,
-      subProjects: this.collectionSubProjects,
-      deliverables: this.collectionDeliverables,
-      timelineEntries: this.collectionTimelineEntries,
-      roadblockEntries: this.collectionRoadblockEntries,
-    };
-    return map[key];
-  }
 
   prettyJson(value: unknown): string {
     return JSON.stringify(value, null, 2);
+  }
+
+  isOptionSelected(controlName: string, id: string): boolean {
+    const currentValues = this.identityForm.get(controlName)?.value || [];
+    return currentValues.includes(id);
+  }
+
+  toggleOption(controlName: string, id: string): void {
+    const control = this.identityForm.get(controlName);
+    if (!control) return;
+    const currentValues = [...(control.value || [])];
+    const index = currentValues.indexOf(id);
+    if (index > -1) {
+      currentValues.splice(index, 1);
+    } else {
+      currentValues.push(id);
+    }
+    control.setValue(currentValues);
+    control.markAsDirty();
+    control.updateValueAndValidity();
+    this.cdr.detectChanges();
   }
 
   private toJsonControls(items: unknown[] | null | undefined): FormControl<string>[] {
@@ -521,8 +544,26 @@ export class ProjectEditPage implements OnInit {
     }
   }
 
+  get isAdmin(): boolean {
+    return this.authService.isAdmin();
+  }
+
+  switchToEdit(): void {
+    if (!this.isAdmin) return;
+    this.router.navigate(['/projects', this.project.id, 'edit']);
+  }
+
+  backToList(): void {
+    this.router.navigate([this.projectsBasePath()]);
+  }
+
   backToDetails(): void {
     this.router.navigate(['/projects', this.project.id]);
+  }
+
+  private projectsBasePath(): string {
+    const path = this.router.url.split('?')[0].split('#')[0];
+    return path.includes('/admin/projects') ? '/admin/projects' : '/projects';
   }
 
   private phaseStatusValidator(group: AbstractControl): { invalidPhaseStatus: true } | null {

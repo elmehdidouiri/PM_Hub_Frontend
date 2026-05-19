@@ -358,6 +358,9 @@ export interface ProjectSummaryDto {
   projectManagementType: ProjectManagementType;
   projectManagementTypeLabel?: string;
   progress?: number | null;
+  isDataComplete?: boolean;
+  dataCompletionPercentage?: number;
+  missingFields?: string[];
 }
 
 export interface GroupedDistributionItem {
@@ -571,6 +574,7 @@ export interface ProjectFilterParams {
   departmentId?: string;
   businessUnitId?: string;
   projectManagerId?: string;
+  incompleteOnly?: boolean;
   Status?: number;
   Phase?: number;
   ProjectType?: number;
@@ -586,6 +590,9 @@ export interface ProjectFilterParams {
   SortDescending?: boolean;
   UserId?: string;
   InternId?: string;
+  IncompleteOnly?: boolean;
+  all?: boolean;
+  All?: boolean;
 }
 export interface DashboardExtendedSummaryDto {
   totalProjects: number;

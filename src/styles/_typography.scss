@@ -1,0 +1,179 @@
+// PMHUB — Global typography system (Inter / Linear-style SaaS)
+@use 'variables' as *;
+
+// ─── Semantic text colors ───────────────────────────────────────────────────
+$type-primary:   #0f172a;
+$type-secondary: #64748b;
+$type-muted:     #94a3b8;
+
+// ─── Scale tokens (compact SaaS — lisible sans surcharge visuelle) ─────────
+$type-hero-size:      1.875rem;   // 30px
+$type-hero-weight:    700;
+$type-hero-ls:        -0.03em;
+$type-hero-lh:        1.15;
+
+$type-section-size:   1.0625rem;  // 17px
+$type-section-weight: 600;
+$type-section-ls:     -0.02em;
+$type-section-lh:     1.25;
+
+$type-body-size:      0.875rem;   // 14px
+$type-body-sm-size:   0.8125rem;  // 13px
+$type-body-weight:    500;
+$type-body-lh:        1.55;
+
+$type-kpi-size:       1.75rem;    // 28px — grands blocs dashboard
+$type-kpi-card-size:  1.375rem;   // 22px — cartes KPI compactes
+$type-ticket-count-size: 1.125rem; // 18px — chiffre sur filter tickets
+$type-kpi-weight:     700;
+$type-kpi-ls:         -0.03em;
+$type-kpi-lh:         1.1;
+
+$type-label-size:     0.6875rem;  // 11px
+$type-label-weight:   700;
+$type-label-ls:       0.08em;
+
+$type-ui-size:        0.875rem;   // 14px — buttons, inputs, table cells, sidebar
+$type-ui-weight:      500;
+$type-ui-semibold:    600;
+$type-ui-lh:          1.4;
+$type-ui-lh-relaxed:  1.5;
+
+$type-btn-height:     2.25rem;    // 36px
+$type-input-height:   2.5rem;     // 40px
+$type-btn-radius:     12px;
+
+$type-title-desc-gap: 0.75rem;    // 12px
+$type-section-gap:    1.25rem;    // 20px
+$type-card-gap:       1rem;       // 16px
+
+:root {
+  --font-sans: #{$font-family-base};
+
+  --text-primary: #{$type-primary};
+  --text-secondary: #{$type-secondary};
+  --text-muted: #{$type-muted};
+
+  --type-hero-size: #{$type-hero-size};
+  --type-hero-weight: #{$type-hero-weight};
+  --type-hero-ls: #{$type-hero-ls};
+  --type-hero-lh: #{$type-hero-lh};
+
+  --type-section-size: #{$type-section-size};
+  --type-section-weight: #{$type-section-weight};
+  --type-section-ls: #{$type-section-ls};
+  --type-section-lh: #{$type-section-lh};
+
+  --type-body-size: #{$type-body-size};
+  --type-body-sm-size: #{$type-body-sm-size};
+  --type-body-weight: #{$type-body-weight};
+  --type-body-lh: #{$type-body-lh};
+
+  --type-kpi-size: #{$type-kpi-size};
+  --type-kpi-weight: #{$type-kpi-weight};
+  --type-kpi-ls: #{$type-kpi-ls};
+  --type-kpi-lh: #{$type-kpi-lh};
+
+  --type-label-size: #{$type-label-size};
+  --type-label-weight: #{$type-label-weight};
+  --type-label-ls: #{$type-label-ls};
+
+  --type-ui-size: #{$type-ui-size};
+  --type-ui-weight: #{$type-ui-weight};
+  --type-ui-semibold: #{$type-ui-semibold};
+  --type-ui-lh: #{$type-ui-lh};
+
+  --type-btn-height: #{$type-btn-height};
+  --type-input-height: #{$type-input-height};
+  --type-btn-radius: #{$type-btn-radius};
+}
+
+@mixin type-hero {
+  font-size: var(--type-hero-size);
+  font-weight: var(--type-hero-weight);
+  letter-spacing: var(--type-hero-ls);
+  line-height: var(--type-hero-lh);
+  color: var(--text-primary);
+}
+
+@mixin type-section-title {
+  font-size: var(--type-section-size);
+  font-weight: var(--type-section-weight);
+  letter-spacing: var(--type-section-ls);
+  line-height: var(--type-section-lh);
+  color: var(--text-primary);
+}
+
+@mixin type-body {
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+@mixin type-kpi-value {
+  font-size: var(--type-kpi-size);
+  font-weight: var(--type-kpi-weight);
+  letter-spacing: var(--type-kpi-ls);
+  line-height: var(--type-kpi-lh);
+  color: var(--text-primary);
+}
+
+@mixin type-kpi-card-value {
+  font-size: #{$type-kpi-card-size};
+  font-weight: #{$type-kpi-weight};
+  letter-spacing: #{$type-kpi-ls};
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+@mixin type-ticket-count {
+  font-size: #{$type-ticket-count-size};
+  font-weight: #{$type-kpi-weight};
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+@mixin type-kpi-label {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-ls);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+@mixin type-ui-label {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-ls);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+@mixin type-button {
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-semibold);
+  line-height: var(--type-ui-lh);
+}
+
+@mixin type-input {
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-lh);
+}
+
+@mixin type-table-header {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+@mixin type-table-cell {
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-lh-relaxed);
+  color: var(--text-primary);
+}

@@ -7,44 +7,50 @@
   <div class="sidebar__overlay" (click)="close()"></div>
 
   <div class="sidebar__panel">
-    <!-- Brand Section -->
+
+    <!-- ── Brand Header ─────────────────────────────────────────────── -->
     <div class="sidebar__brand">
       <div class="sidebar__brand-badge">
         <img src="assets/images/auth/logo.svg" alt="PMHub" class="sidebar__brand-logo">
       </div>
-      <span class="sidebar__brand-name" *ngIf="!collapsed || isMobile">PMHUB</span>
-      
-     
+      <div class="sidebar__brand-copy" *ngIf="!collapsed || isMobile">
+        <span class="sidebar__brand-name">PMHUB</span>
+       </div>
     </div>
 
-
-
-    <!-- Navigation Scroll Area -->
+    <!-- ── Navigation Scroll Area ────────────────────────────────────── -->
     <div class="sidebar__scroll">
+
+      <!-- WORKSPACE GROUP -->
       <div class="sidebar__group">
-        <h3 class="sidebar__heading" *ngIf="!collapsed || isMobile">Navigation</h3>
+        <h4 class="sidebar__heading" *ngIf="!collapsed || isMobile">Workspace</h4>
         
-        <div class="sidebar-item" *ngFor="let item of navItems">
-          <!-- Parent Link -->
+        <div class="sidebar-item" *ngFor="let item of workspaceItems">
+
+          <!-- Simple nav link -->
           <a class="sidebar-link" 
              [routerLink]="item.route" 
              routerLinkActive="sidebar-link--active"
              [routerLinkActiveOptions]="{exact: !!item.exact}"
+             [attr.data-tooltip]="item.label"
              (click)="onNavItemClick()"
              *ngIf="!item.children?.length">
-            <mat-icon>{{ item.icon }}</mat-icon>
-            <span *ngIf="!collapsed || isMobile">{{ item.label }}</span>
+            <mat-icon class="sidebar-link__icon">{{ item.icon }}</mat-icon>
+            <span class="sidebar-link__text" *ngIf="!collapsed || isMobile">{{ item.label }}</span>
           </a>
 
-          <!-- Group Button (for items with children) -->
+          <!-- Group button (has children) -->
           <button class="sidebar-link sidebar-link--button" 
                   (click)="onSectionButtonClick(item.id)"
+                  [attr.data-tooltip]="item.label"
                   *ngIf="item.children?.length"
                   [class.sidebar-link--active]="hasActiveChild(item)">
-            <mat-icon>{{ item.icon }}</mat-icon>
-            <span *ngIf="!collapsed || isMobile">{{ item.label }}</span>
-            <mat-icon class="sidebar-link__chevron" *ngIf="!collapsed || isMobile">
-              {{ isExpanded(item.id) ? 'expand_more' : 'chevron_right' }}
+            <mat-icon class="sidebar-link__icon">{{ item.icon }}</mat-icon>
+            <span class="sidebar-link__text" *ngIf="!collapsed || isMobile">{{ item.label }}</span>
+            <mat-icon class="sidebar-link__chevron" 
+                      *ngIf="!collapsed || isMobile"
+                      [style.transform]="isExpanded(item.id) ? 'rotate(90deg)' : 'rotate(0deg)'">
+              chevron_right
             </mat-icon>
           </button>
 
@@ -52,7 +58,7 @@
           <div class="sidebar-submenu" 
                [class.sidebar-submenu--expanded]="isExpanded(item.id)"
                *ngIf="item.children?.length && (!collapsed || isMobile)">
-            <div>
+            <div class="sidebar-submenu__list">
               <a *ngFor="let child of item.children"
                  [routerLink]="child.route"
                  routerLinkActive="sidebar-submenu__link--active"
@@ -63,10 +69,71 @@
               </a>
             </div>
           </div>
+
         </div>
       </div>
+
+      <!-- MANAGEMENT GROUP -->
+      <div class="sidebar__group" *ngIf="managementItems.length > 0">
+        <h4 class="sidebar__heading" *ngIf="!collapsed || isMobile">Management</h4>
+        
+        <div class="sidebar-item" *ngFor="let item of managementItems">
+
+          <!-- Simple nav link -->
+          <a class="sidebar-link" 
+             [routerLink]="item.route" 
+             routerLinkActive="sidebar-link--active"
+             [routerLinkActiveOptions]="{exact: !!item.exact}"
+             [attr.data-tooltip]="item.label"
+             (click)="onNavItemClick()"
+             *ngIf="!item.children?.length">
+            <mat-icon class="sidebar-link__icon">{{ item.icon }}</mat-icon>
+            <span class="sidebar-link__text" *ngIf="!collapsed || isMobile">{{ item.label }}</span>
+          </a>
+
+          <!-- Group button (has children) -->
+          <button class="sidebar-link sidebar-link--button" 
+                  (click)="onSectionButtonClick(item.id)"
+                  [attr.data-tooltip]="item.label"
+                  *ngIf="item.children?.length"
+                  [class.sidebar-link--active]="hasActiveChild(item)">
+            <mat-icon class="sidebar-link__icon">{{ item.icon }}</mat-icon>
+            <span class="sidebar-link__text" *ngIf="!collapsed || isMobile">{{ item.label }}</span>
+            <mat-icon class="sidebar-link__chevron" 
+                      *ngIf="!collapsed || isMobile"
+                      [style.transform]="isExpanded(item.id) ? 'rotate(90deg)' : 'rotate(0deg)'">
+              chevron_right
+            </mat-icon>
+          </button>
+
+          <!-- Submenu -->
+          <div class="sidebar-submenu" 
+               [class.sidebar-submenu--expanded]="isExpanded(item.id)"
+               *ngIf="item.children?.length && (!collapsed || isMobile)">
+            <div class="sidebar-submenu__list">
+              <a *ngFor="let child of item.children"
+                 [routerLink]="child.route"
+                 routerLinkActive="sidebar-submenu__link--active"
+                 [routerLinkActiveOptions]="{exact: !!child.exact}"
+                 class="sidebar-submenu__link"
+                 (click)="onNavItemClick()">
+                {{ child.label }}
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- end .sidebar__scroll -->
+
+    <!-- ── Sidebar Footer (point 14) ─────────────────────────────────── -->
+    <div class="sidebar__footer" *ngIf="!collapsed || isMobile">
+      <span class="sidebar__footer-label">Active Workspace</span>
+      <span class="sidebar__footer-workspace">PMHub Enterprise</span>
+      <div class="sidebar__footer-meta">
+       </div>
     </div>
 
-
-  </div>
+  </div><!-- end .sidebar__panel -->
 </aside>

@@ -1,5 +1,6 @@
 /* Import Variables avec @use (moderne) */
 @use 'styles/variables' as *;
+@use 'styles/typography' as *;
 
 /* Angular Material Theme */
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
@@ -23,11 +24,15 @@ html, body, app-root {
 body {
   font-family: $font-family-base;
   font-size: $font-size-base;
-  color: $text-default;
+  font-weight: $font-weight-medium;
+  line-height: 1.6;
+  color: $text-slate-900;
   background:
     radial-gradient(circle at top left, rgba($orange-warm, 0.12), transparent 22%),
     linear-gradient(180deg, #fffaf6 0%, $bg-secondary 100%);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
 /* --- Tailwind-like Utility Shim --- */
@@ -277,14 +282,13 @@ $true-slate-900: #0f172a;
 }
 
 .pm-input {
-  height: 2.85rem;
+  height: $type-input-height;
   padding: 0 1rem;
-  border-radius: 12px;
+  border-radius: $type-btn-radius;
   border: 1px solid $true-slate-300;
   background: #ffffff;
-  color: $true-slate-900;
-  font-size: 0.88rem;
-  font-weight: 500;
+  color: $text-slate-900;
+  @include type-input;
   transition: all 0.2s ease;
   
   &:focus {
@@ -299,11 +303,10 @@ $true-slate-900: #0f172a;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 2.75rem;
+  min-height: $type-btn-height;
   padding: 0 1.25rem;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 600;
+  border-radius: $type-btn-radius;
+  @include type-button;
   cursor: pointer;
   transition: all 0.2s ease;
   border: 1px solid transparent;
@@ -393,19 +396,14 @@ $true-slate-900: #0f172a;
     
     th {
       background: $true-slate-50;
-      padding: 1.15rem 1.5rem;
-      color: $true-slate-500;
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      padding: 1rem 1.5rem;
+      @include type-table-header;
       border-bottom: 1px solid $true-slate-200;
     }
     
     td {
-      padding: 1.15rem 1.5rem;
-      color: $true-slate-700;
-      font-size: 0.88rem;
+      padding: 1rem 1.5rem;
+      @include type-table-cell;
       border-bottom: 1px solid $true-slate-100;
       vertical-align: middle;
     }
@@ -461,9 +459,8 @@ $true-slate-900: #0f172a;
     border-radius: 16px;
     border: 1px solid $true-slate-300;
     background: #ffffff;
-    color: $true-navy-900;
-    font-size: 0.88rem;
-    font-weight: 500;
+    color: $text-slate-900;
+    @include type-input;
     outline: none;
     transition: all 0.2s ease;
     
@@ -705,28 +702,23 @@ $true-slate-900: #0f172a;
   }
   
   &__eyebrow {
-    font-size: 0.72rem;
-    font-weight: 800;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
+    @include type-ui-label;
     display: block;
-    margin-bottom: 0.45rem;
+    margin-bottom: $type-title-desc-gap;
   }
   
   &__title {
-    font-size: 1.85rem;
-    font-weight: 800;
-    color: $true-slate-800;
-    letter-spacing: -0.025em;
-    line-height: 1.35;
+    font-size: clamp(1.375rem, 2vw, var(--type-hero-size));
+    font-weight: var(--type-hero-weight);
+    letter-spacing: var(--type-hero-ls);
+    line-height: var(--type-hero-lh);
+    color: var(--text-primary);
     margin: 0;
   }
   
   &__desc {
-    font-size: 0.88rem;
-    color: #64748b;
-    margin: 0.45rem 0 0 0;
+    @include type-body;
+    margin: $type-title-desc-gap 0 0 0;
     max-width: 32rem;
   }
   

@@ -31,9 +31,10 @@ const routes: Routes = [
   },
   {
     path: ':id',
-    component: ProjectDetailsPage,
+    component: ProjectEditPage,
     resolve: {
       project: projectDetailsResolver,
+      refs: projectReferencesResolver,
     },
     data: {
       mode: 'details',

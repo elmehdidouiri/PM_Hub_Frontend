@@ -1,26 +1,26 @@
 <section class="analytics-page">
-    <header class="analytics-header">
-      <div class="analytics-header__content">
-        <div class="analytics-eyebrow">
+    <header class="dashboard-page-header analytics-header">
+      <div class="dashboard-page-header__content analytics-header__content">
+        <div class="dashboard-page-header__eyebrow analytics-eyebrow">
           <mat-icon>analytics</mat-icon>
           <span>Portfolio Analytics</span>
         </div>
         <h1>Performance Intelligence</h1>
         <p>Monthly KPI quality, fiscal year hours, and team utilization for the selected portfolio scope.</p>
         
-        <div class="analytics-header__actions">
-          <button (click)="loadDashboard()" class="btn btn--primary" [disabled]="isRefreshing">
+        <div class="dashboard-page-header__actions analytics-header__actions">
+          <button type="button" (click)="loadDashboard()" class="dashboard-header-btn dashboard-header-btn--primary btn btn--primary" [disabled]="isRefreshing">
             <mat-icon [class.rotate-180]="isRefreshing">refresh</mat-icon>
             Sync Data
           </button>
-          <button class="btn btn--ghost">
+          <button type="button" class="dashboard-header-btn dashboard-header-btn--ghost btn btn--ghost">
             <mat-icon>file_download</mat-icon>
             Export Report
           </button>
         </div>
       </div>
 
-      <div class="period-card" *ngIf="dashboard">
+      <div class="dashboard-period-card period-card" *ngIf="dashboard">
         <mat-icon>calendar_month</mat-icon>
         <div>
           <strong>{{ selectedPeriodLabel }}</strong>

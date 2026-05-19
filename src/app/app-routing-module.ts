@@ -6,6 +6,10 @@ import { MainLayout } from './layout/main-layout/main-layout';
 
 const routes: Routes = [
   {
+    path: 'server-error',
+    loadComponent: () => import('./shared/components/server-error/server-error.component').then(m => m.ServerErrorComponent)
+  },
+  {
     path: 'auth',
     loadChildren: () => import('./features/auth/auth.module').then((m) => m.AuthModule)
   },

@@ -146,10 +146,38 @@ export class ProjectService {
   }
 
   getAdminDashboardGroupedDistribution(filters: DashboardFilterParams): Observable<DashboardGroupedDistributionDto> {
+    let httpParams = new HttpParams();
+    
+    const keyMap: Record<string, string> = {
+      projectStatus: 'ProjectStatus',
+      projectPhase: 'ProjectPhase',
+      processStatus: 'ProcessStatus',
+      departmentId: 'DepartmentId',
+      businessUnitId: 'BusinessUnitId',
+      plantId: 'PlantId',
+      projectManagerId: 'ProjectManagerId',
+      projectType: 'ProjectType',
+      projectManagementType: 'ProjectManagementType',
+      year: 'Year',
+      month: 'Month',
+      startDate: 'StartDate',
+      endDate: 'EndDate',
+      ytd: 'Ytd',
+      roleId: 'RoleId'
+    };
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') {
+        return;
+      }
+      const apiKey = keyMap[key] ?? (key.charAt(0).toUpperCase() + key.slice(1));
+      httpParams = httpParams.set(apiKey, String(value));
+    });
+
     return this.http
-      .get<ApiResponse<DashboardGroupedDistributionDto>>(`${environment.apiUrl}/dashboard/admin/grouped-distribution`, {
+      .get<ApiResponse<DashboardGroupedDistributionDto>>(`${environment.apiUrl}/dashboard/admin/grouped-distribution/counts`, {
         headers: this.buildHeaders(),
-        params: this.buildDashboardParams(filters),
+        params: httpParams,
       })
       .pipe(map((response) => response.data!));
   }
@@ -336,20 +364,30 @@ export class ProjectService {
       );
   }
 
-  getProjectsPaged(params: ProjectFilterParams = {}): Observable<PaginatedResponse<ProjectSummaryDto>> {
+  getProjectsPaged(
+    params: ProjectFilterParams = {},
+    options?: { noCache?: boolean }
+  ): Observable<PaginatedResponse<ProjectSummaryDto>> {
     let httpParams = new HttpParams();
     
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         const apiKey = this.toProjectSearchParamName(key);
-        const apiValue = apiKey === 'pageSize' ? Math.min(Number(value) || 10, 500) : value;
+        const apiValue = apiKey === 'pageSize' ? Math.min(Number(value) || 10, 100) : value;
         httpParams = httpParams.set(apiKey, String(apiValue));
       }
     });
 
+    let headers = this.buildHeaders();
+    if (options?.noCache) {
+      headers = headers
+        .set('Cache-Control', 'no-cache, no-store, must-revalidate')
+        .set('Pragma', 'no-cache');
+    }
+
     return this.http
       .get<ApiResponse<PaginatedResponse<ProjectSummaryDto>> | PaginatedResponse<ProjectSummaryDto>>(`${this.apiUrl}/paged`, {
-        headers: this.buildHeaders(),
+        headers,
         params: httpParams,
       })
       .pipe(
@@ -821,7 +859,10 @@ export class ProjectService {
       DepartmentId: 'departmentId',
       BusinessUnitId: 'businessUnitId',
       PlantId: 'plantId',
-      ProjectManagerId: 'projectManagerId',
+      IncompleteOnly: 'incompleteOnly',
+      incompleteOnly: 'incompleteOnly',
+      all: 'all',
+      All: 'all',
     };
 
     return map[key] ?? key;
