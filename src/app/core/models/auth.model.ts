@@ -24,13 +24,18 @@ export interface ResetPasswordRequest {
   confirmPassword: string;
 }
 
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
  
 export interface RegisterRequest {
   firstName: string;
   lastName: string;
   email: string;
   password: string;
-  roleId: string;
 }
 
  

@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, inject } from '@angular/core';
 import { forkJoin, of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { catchError, finalize, map } from 'rxjs/operators';
 
 import {
   AdminNotificationUserDto,
@@ -22,7 +22,7 @@ interface NotificationAudience {
   selector: 'app-hour-booking-notifications',
   standalone: false,
   templateUrl: './hour-booking-notifications.html',
-  styleUrl: './hour-booking-notifications.scss',
+  styleUrls: ['./hour-booking-notifications.scss'],
 })
 export class HourBookingNotificationsPage implements OnInit {
   private readonly api = inject(AdminNotificationsApiService);
@@ -61,6 +61,11 @@ export class HourBookingNotificationsPage implements OnInit {
   searchTerm = '';
   isLoading = true;
   sendingKey: string | null = null;
+  selectedUserIds: Record<NotificationAudienceType, Set<string>> = {
+    'hour-booking': new Set<string>(),
+    'monthly-target': new Set<string>(),
+    'inactive-users': new Set<string>(),
+  };
 
   ngOnInit(): void {
     this.refresh();
@@ -83,6 +88,25 @@ export class HourBookingNotificationsPage implements OnInit {
 
   get totalUsers(): number {
     return this.audiences.reduce((total, audience) => total + audience.users.length, 0);
+  }
+
+  get selectedUserCount(): number {
+    return this.activeSelectedUserIds.size;
+  }
+
+  get areAllFilteredUsersSelected(): boolean {
+    const visibleIds = this.getFilteredUserIds();
+    return visibleIds.length > 0 && visibleIds.every((id) => this.activeSelectedUserIds.has(id));
+  }
+
+  get isFilteredSelectionIndeterminate(): boolean {
+    const visibleIds = this.getFilteredUserIds();
+    const selectedVisibleCount = visibleIds.filter((id) => this.activeSelectedUserIds.has(id)).length;
+    return selectedVisibleCount > 0 && selectedVisibleCount < visibleIds.length;
+  }
+
+  private get activeSelectedUserIds(): Set<string> {
+    return this.selectedUserIds[this.activeType];
   }
 
   refresh(): void {
@@ -121,6 +145,36 @@ export class HourBookingNotificationsPage implements OnInit {
     this.searchTerm = '';
   }
 
+  isUserSelected(userId: string): boolean {
+    return this.activeSelectedUserIds.has(userId);
+  }
+
+  toggleUserSelection(userId: string, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+
+    if (checked) {
+      this.activeSelectedUserIds.add(userId);
+    } else {
+      this.activeSelectedUserIds.delete(userId);
+    }
+  }
+
+  toggleSelectAllFiltered(event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    const visibleIds = this.getFilteredUserIds();
+
+    if (checked) {
+      visibleIds.forEach((id) => this.activeSelectedUserIds.add(id));
+      return;
+    }
+
+    visibleIds.forEach((id) => this.activeSelectedUserIds.delete(id));
+  }
+
+  clearSelection(): void {
+    this.activeSelectedUserIds.clear();
+  }
+
   sendReminder(user: AdminNotificationUserDto): void {
     if (!user.userId || this.sendingKey) {
       return;
@@ -154,8 +208,61 @@ export class HourBookingNotificationsPage implements OnInit {
       });
   }
 
+  sendSelectedReminders(): void {
+    const type = this.activeType;
+    const selectedIds = new Set(this.activeSelectedUserIds);
+    const selectedUsers = this.activeAudience.users.filter((user) => user.userId && selectedIds.has(user.userId));
+
+    if (!selectedUsers.length) {
+      this.notifications.showError('Select at least one user to send reminders.');
+      this.clearSelection();
+      return;
+    }
+
+    this.sendingKey = this.buildBulkSendingKey(type);
+    forkJoin(
+      selectedUsers.map((user) =>
+        this.sendReminderRequest(type, user.userId).pipe(
+          map(() => ({ ok: true, user })),
+          catchError(() => of({ ok: false, user }))
+        )
+      )
+    )
+      .pipe(
+        finalize(() => {
+          this.zone.run(() => {
+            this.sendingKey = null;
+            this.cdr.markForCheck();
+          });
+        })
+      )
+      .subscribe((results) => {
+        this.zone.run(() => {
+          const sentUsers = results.filter((result) => result.ok).map((result) => result.user);
+          const failedCount = results.length - sentUsers.length;
+
+          sentUsers.forEach((user) => {
+            this.removeUser(type, user.userId);
+            this.selectedUserIds[type].delete(user.userId);
+          });
+
+          if (sentUsers.length) {
+            this.notifications.showSuccess(`${sentUsers.length} reminder${sentUsers.length > 1 ? 's' : ''} sent.`);
+          }
+          if (failedCount) {
+            this.notifications.showError(`${failedCount} reminder${failedCount > 1 ? 's' : ''} could not be sent.`);
+          }
+
+          this.cdr.markForCheck();
+        });
+      });
+  }
+
   isSending(user: AdminNotificationUserDto): boolean {
-    return this.sendingKey === this.buildSendingKey(this.activeType, user.userId);
+    return (
+      this.sendingKey === this.buildBulkSendingKey(this.activeType) ||
+      this.sendingKey === this.buildSendingKey(this.activeType, user.userId)
+    );
   }
 
   getInitials(user: AdminNotificationUserDto): string {
@@ -212,6 +319,7 @@ export class HourBookingNotificationsPage implements OnInit {
     const audience = this.audiences.find((item) => item.type === type);
     if (audience) {
       audience.users = users ?? [];
+      this.pruneSelection(type);
     }
   }
 
@@ -226,10 +334,30 @@ export class HourBookingNotificationsPage implements OnInit {
     const audience = this.audiences.find((item) => item.type === type);
     if (audience) {
       audience.users = audience.users.filter((user) => user.userId !== userId);
+      this.selectedUserIds[type].delete(userId);
     }
   }
 
   private buildSendingKey(type: NotificationAudienceType, userId: string): string {
     return `${type}:${userId}`;
+  }
+
+  private buildBulkSendingKey(type: NotificationAudienceType): string {
+    return `${type}:bulk`;
+  }
+
+  private getFilteredUserIds(): string[] {
+    return this.filteredUsers.map((user) => user.userId).filter(Boolean);
+  }
+
+  private pruneSelection(type: NotificationAudienceType): void {
+    const audience = this.audiences.find((item) => item.type === type);
+    const currentIds = new Set((audience?.users ?? []).map((user) => user.userId).filter(Boolean));
+
+    this.selectedUserIds[type].forEach((userId) => {
+      if (!currentIds.has(userId)) {
+        this.selectedUserIds[type].delete(userId);
+      }
+    });
   }
 }

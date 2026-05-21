@@ -1,8 +1,13 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 
 import { InternDto } from '../../models/intern.models';
 import { InternService } from '../../services/intern';
+import { ProjectService } from '../../../projects/services/project';
+import { NotificationService } from '../../../../core/services/notification.service';
+import { InternDetailsDialog } from '../../../users/components/intern-details-dialog/intern-details-dialog';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 
 @Component({
   selector: 'app-intern-detail',
@@ -14,6 +19,9 @@ export class InternDetail implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly internService = inject(InternService);
+  private readonly dialog = inject(MatDialog);
+  private readonly projectService = inject(ProjectService);
+  private readonly notifications = inject(NotificationService);
 
   intern: InternDto | null = null;
   isLoading = false;
@@ -47,6 +55,82 @@ export class InternDetail implements OnInit {
 
   goBack(): void {
     void this.router.navigate(['/interns']);
+  }
+
+  viewPerformance(): void {
+    if (!this.intern) return;
+    
+    this.isLoading = true;
+    this.projectService.getProjectsPaged({ InternId: this.intern.id, pageSize: 50 }).subscribe({
+      next: (res) => {
+        this.isLoading = false;
+        const projectIds = (res.data || []).map((p) => p.id);
+        
+        const mappedIntern = {
+          id: this.intern!.id,
+          name: this.intern!.name,
+          email: this.intern!.supervisorEmail || '',
+          roleName: this.intern!.roleName,
+          supervisorId: this.intern!.supervisorId,
+          supervisorName: this.intern!.supervisorName,
+          supervisorEmail: this.intern!.supervisorEmail
+        };
+
+        this.dialog.open(InternDetailsDialog, {
+          data: { intern: mappedIntern, projectIds },
+          panelClass: 'pm-dialog-panel'
+        });
+      },
+      error: (err) => {
+        this.isLoading = false;
+        this.notifications.showError('Unable to load projects for this intern.');
+      }
+    });
+  }
+
+  deleteIntern(): void {
+    if (!this.intern) {
+      return;
+    }
+
+    const data: ConfirmationDialogData = {
+      title: 'Delete Intern',
+      message: `Are you sure you want to delete "${this.intern.name}"? This action will permanently remove their records.`,
+      icon: 'person_remove',
+      saveLabel: 'Delete Permanently',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px',
+      panelClass: 'pm-dialog-panel'
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === 'save') {
+        this.executeDelete();
+      }
+    });
+  }
+
+  private executeDelete(): void {
+    if (!this.intern) return;
+    this.isLoading = true;
+
+    this.internService.deleteIntern(this.intern.id).subscribe({
+      next: () => {
+        this.isLoading = false;
+        this.notifications.showSuccess('Intern deleted successfully.');
+        this.goBack();
+      },
+      error: (error) => {
+        this.isLoading = false;
+        this.errorMessage = this.extractErrorMessage(error, 'Unable to delete intern.');
+        this.notifications.showError(this.errorMessage);
+      },
+    });
   }
 
   formatDate(value: string | null): string {

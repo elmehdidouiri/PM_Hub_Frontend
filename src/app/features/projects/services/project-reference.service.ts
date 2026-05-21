@@ -25,7 +25,7 @@ export class ProjectReferenceService {
   loadAll(): Observable<ProjectReferenceData> {
     if (!this.referencesCache$) {
       this.referencesCache$ = forkJoin({
-        departments: this.fetchOptions('/departments'),
+        departments: this.fetchDepartments(),
         plants: this.fetchOptions('/plants'),
         businessUnits: this.fetchOptions('/businessunits'),
         technologies: this.fetchOptions('/technologies'),
@@ -121,9 +121,37 @@ export class ProjectReferenceService {
       );
   }
 
+  private fetchDepartments(): Observable<SelectOption[]> {
+    return this.http
+      .get<ApiResponse<unknown[]> | unknown[]>(`${this.apiUrl}/departments`, {
+        headers: this.buildHeaders(),
+      })
+      .pipe(
+        map((response) => this.unwrapList(response)),
+        map((items) =>
+          items
+            .map((item) => {
+              const record = this.asRecord(item);
+              const businessUnitName = this.readString(record, ['businessUnitName', 'BusinessUnitName']);
+              const plantName = this.readString(record, ['plantName', 'PlantName']);
+              const description = [businessUnitName, plantName].filter(Boolean).join(' • ');
+
+              return {
+                id: this.readString(record, ['id', 'departmentId', 'DepartmentId']),
+                label: this.readString(record, ['name', 'label', 'title']),
+                description,
+                businessUnitName,
+                plantName,
+              };
+            })
+            .filter((department) => !!department.id && !!department.label)
+        )
+      );
+  }
+
   private fetchUsers(): Observable<SelectOption[]> {
     return this.http
-      .get<ApiResponse<unknown[]> | unknown[]>(`${this.apiUrl}/users`, {
+      .get<ApiResponse<unknown[]> | unknown[]>(`${this.apiUrl}/users/team-member-candidates`, {
         headers: this.buildHeaders(),
       })
       .pipe(

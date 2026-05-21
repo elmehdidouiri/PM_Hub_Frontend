@@ -572,3 +572,202 @@
   .summary-grid { grid-template-columns: 1fr; }
   .hero__title h1 { font-size: 1.4rem; }
 }
+
+// --- PAGINATION SYSTEM ---
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #f1f5f9;
+  background: rgba(248, 250, 252, 0.35);
+  flex-wrap: wrap;
+}
+
+.table-pagination__info {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.page-size-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+
+  .page-size-select {
+    padding: 0.25rem 1.5rem 0.25rem 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #ffffff;
+    font-size: 0.75rem;
+    color: #334155;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    background-size: 0.75rem;
+    min-width: 55px;
+
+    &:focus {
+      outline: none;
+      border-color: #df6800;
+    }
+  }
+}
+
+.table-pagination__summary {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.table-pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pagination-btn {
+  min-width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+
+  &:hover:not(:disabled) {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.pagination-btn--active {
+  background: #df6800 !important;
+  color: #ffffff !important;
+  border-color: #df6800 !important;
+}
+
+// --- ACTIVE ANALYSIS GLOW & BADGE ---
+.panel--active-analysis {
+  border-color: rgba(223, 104, 0, 0.45) !important;
+  box-shadow: 0 8px 30px rgba(223, 104, 0, 0.06) !important;
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+
+  .panel__header {
+    border-bottom-color: rgba(223, 104, 0, 0.3) !important;
+  }
+}
+
+.active-analysis-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(223, 104, 0, 0.08);
+  color: #df6800;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 0.5rem;
+  border: 1px solid rgba(223, 104, 0, 0.15);
+
+  .pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #df6800;
+    animation: pulse-dot-anim 1.5s infinite;
+  }
+}
+
+@keyframes pulse-dot-anim {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(223, 104, 0, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 5px rgba(223, 104, 0, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(223, 104, 0, 0); }
+}
+
+// --- ANALYSIS MODE TABS ---
+.analysis-tabs {
+  display: flex;
+  gap: 0.75rem;
+  background: #ffffff;
+  padding: 0.5rem;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
+  margin: 0.5rem 0 1rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.analysis-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+
+  mat-icon {
+    font-size: 1.2rem;
+    width: 1.2rem;
+    height: 1.2rem;
+    color: #94a3b8;
+    transition: color 0.2s ease;
+  }
+
+  &:hover {
+    background: #f8fafc;
+    color: #1e293b;
+    mat-icon { color: #64748b; }
+  }
+
+  &.active {
+    background: #fff7f0;
+    color: #df6800;
+    box-shadow: inset 0 0 0 1px #ffd8bd;
+
+    mat-icon {
+      color: #df6800;
+    }
+  }
+}

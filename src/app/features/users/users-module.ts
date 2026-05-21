@@ -23,7 +23,7 @@ import { ChartBarComponent } from '../dashboard/components/chart-bar/chart-bar.c
 import { RouterModule } from '@angular/router';
 
 @NgModule({
-  declarations: [UserList, UserDetail, UserForm, InternDetailsDialog],
+  declarations: [UserList, UserDetail, UserForm],
   imports: [
     CommonModule, 
     SharedModule, 

@@ -1,9 +1,13 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 
 import { NotificationService } from '../../../../core/services/notification.service';
 import { InternDto } from '../../models/intern.models';
 import { InternService } from '../../services/intern';
+import { ProjectService } from '../../../projects/services/project';
+import { InternDetailsDialog } from '../../../users/components/intern-details-dialog/intern-details-dialog';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 
 @Component({
   selector: 'app-intern-list',
@@ -17,6 +21,8 @@ export class InternList implements OnInit {
   private readonly notifications = inject(NotificationService);
   private readonly zone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly dialog = inject(MatDialog);
+  private readonly projectService = inject(ProjectService);
 
   interns: InternDto[] = [];
   filteredInterns: InternDto[] = [];
@@ -24,6 +30,7 @@ export class InternList implements OnInit {
   searchTerm = '';
   isLoading = false;
   isRefreshing = false;
+  deletingInternId: string | null = null;
   errorMessage = '';
 
   ngOnInit(): void {
@@ -97,6 +104,85 @@ export class InternList implements OnInit {
       .writeText(id)
       .then(() => this.notifications.showSuccess('Intern id copied.'))
       .catch(() => this.notifications.showWarning('Unable to copy this intern id.'));
+  }
+
+  viewPerformance(intern: InternDto): void {
+    if (!intern?.id) return;
+    
+    this.isLoading = true;
+    this.projectService.getProjectsPaged({ InternId: intern.id, pageSize: 50 }).subscribe({
+      next: (res) => {
+        this.isLoading = false;
+        const projectIds = (res.data || []).map((p) => p.id);
+        
+        const mappedIntern = {
+          id: intern.id,
+          name: intern.name,
+          email: intern.supervisorEmail || '',
+          roleName: intern.roleName,
+          supervisorId: intern.supervisorId,
+          supervisorName: intern.supervisorName,
+          supervisorEmail: intern.supervisorEmail
+        };
+
+        this.dialog.open(InternDetailsDialog, {
+          data: { intern: mappedIntern, projectIds },
+          panelClass: 'pm-dialog-panel'
+        });
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.isLoading = false;
+        this.notifications.showError('Unable to load projects for this intern.');
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  deleteIntern(intern: InternDto): void {
+    if (!intern?.id || this.deletingInternId) {
+      return;
+    }
+
+    const data: ConfirmationDialogData = {
+      title: 'Delete Intern',
+      message: `Are you sure you want to delete "${intern.name}"? This action will permanently remove their records.`,
+      icon: 'person_remove',
+      saveLabel: 'Delete Permanently',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px',
+      panelClass: 'pm-dialog-panel'
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === 'save') {
+        this.executeDelete(intern);
+      }
+    });
+  }
+
+  private executeDelete(intern: InternDto): void {
+    this.deletingInternId = intern.id;
+
+    this.internService.deleteIntern(intern.id).subscribe({
+      next: () => {
+        this.interns = this.interns.filter((item) => item.id !== intern.id);
+        this.applyFilter();
+        this.deletingInternId = null;
+        this.notifications.showSuccess('Intern deleted successfully.');
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.deletingInternId = null;
+        this.notifications.showError(this.extractErrorMessage(error, 'Unable to delete intern.'));
+        this.cdr.markForCheck();
+      },
+    });
   }
 
   trackByInternId(_: number, intern: InternDto): string {

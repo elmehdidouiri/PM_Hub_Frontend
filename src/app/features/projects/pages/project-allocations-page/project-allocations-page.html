@@ -1,0 +1,122 @@
+<section class="project-allocations-page pm-page-enter">
+  <header class="allocations-header">
+    <button type="button" class="icon-button" (click)="backToProject()" aria-label="Retour au projet">
+      <mat-icon>west</mat-icon>
+    </button>
+
+    <div class="allocations-header__title">
+      <span>Allocations projet</span>
+      <h1>{{ project?.name || 'Project' }}</h1>
+    </div>
+
+    <div class="allocation-search">
+      <mat-icon>search</mat-icon>
+      <input
+        type="search"
+        [(ngModel)]="search"
+        (keyup.enter)="reload()"
+        placeholder="Rechercher une personne"
+        aria-label="Rechercher une personne"
+      />
+      <button type="button" class="icon-button icon-button--small" (click)="clearSearch()" aria-label="Effacer">
+        <mat-icon>close</mat-icon>
+      </button>
+      <button type="button" class="search-submit" (click)="reload()">Rechercher</button>
+    </div>
+  </header>
+
+  <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
+  <p class="empty-state" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+  <ng-container *ngIf="!isLoading && !errorMessage">
+    <section class="kpi-grid">
+      <article>
+        <span>Total heures</span>
+        <strong>{{ totalHours | number:'1.0-2' }}h</strong>
+      </article>
+      <article>
+        <span>Contributeurs</span>
+        <strong>{{ allocations.length }}</strong>
+      </article>
+      <article>
+        <span>Moyenne / personne</span>
+        <strong>{{ averageHours | number:'1.0-2' }}h</strong>
+      </article>
+      <article>
+        <span>Jours travaillés</span>
+        <strong>{{ workedDays | number:'1.0-2' }}</strong>
+      </article>
+      <article>
+        <span>Allocations</span>
+        <strong>{{ allocationCount }}</strong>
+      </article>
+    </section>
+
+    <section class="insight-grid" *ngIf="allocations.length; else noAllocations">
+      <article class="panel panel--wide">
+        <div class="panel-title">
+          <span>Qui a alloué quoi</span>
+          <strong>{{ sortedAllocations.length }} personnes</strong>
+        </div>
+
+        <div class="person-list">
+          <div class="person-row" *ngFor="let item of sortedAllocations">
+            <div class="person-row__identity">
+              <i>{{ getInitials(item.userName) }}</i>
+              <div>
+                <strong>{{ item.userName || '-' }}</strong>
+                <span>{{ item.role || '-' }}</span>
+              </div>
+              <small *ngIf="item.isProjectManager">PM</small>
+            </div>
+
+            <div class="person-row__meter">
+              <i [style.width.%]="allocationShare(item)"></i>
+            </div>
+
+            <div class="person-row__facts">
+              <span><b>{{ item.totalHours | number:'1.0-2' }}h</b> total</span>
+              <span>{{ item.workedDays | number:'1.0-2' }} jours</span>
+              <span>{{ item.allocationCount }} allocations</span>
+              <span>{{ getDominantActivity(item) }}</span>
+            </div>
+
+            <div class="activity-tags">
+              <span *ngIf="item.executionHours">Execution {{ item.executionHours | number:'1.0-1' }}h</span>
+              <span *ngIf="item.techLeadHours">Tech lead {{ item.techLeadHours | number:'1.0-1' }}h</span>
+              <span *ngIf="item.processHours">Process {{ item.processHours | number:'1.0-1' }}h</span>
+              <span *ngIf="item.projectManagementHours">PM {{ item.projectManagementHours | number:'1.0-1' }}h</span>
+              <span *ngIf="item.researchAndDevHours">R&D {{ item.researchAndDevHours | number:'1.0-1' }}h</span>
+              <span *ngIf="item.workshopHours">Workshop {{ item.workshopHours | number:'1.0-1' }}h</span>
+              <span *ngIf="item.otherHours">Other {{ item.otherHours | number:'1.0-1' }}h</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-title">
+          <span>Comment les heures sont utilisées</span>
+          <strong>{{ activityBreakdown.length }} types</strong>
+        </div>
+
+        <div class="activity-list">
+          <div class="activity-row" *ngFor="let item of activityBreakdown">
+            <mat-icon>{{ item.icon }}</mat-icon>
+            <div>
+              <div>
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value | number:'1.0-2' }}h</strong>
+              </div>
+              <i><b [style.width.%]="activityShare(item.value)"></b></i>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+  </ng-container>
+
+  <ng-template #noAllocations>
+    <p class="empty-state">Aucune allocation trouvée pour ce projet.</p>
+  </ng-template>
+</section>

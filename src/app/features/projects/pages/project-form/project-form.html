@@ -194,9 +194,21 @@
 
         </div>
 
-        <div class="form-grid">
+        <div class="business-scope-grid">
 
-          <div class="field">
+          <div class="business-scope-card business-scope-card--wide">
+
+            <div class="business-scope-card__header">
+              <mat-icon>account_tree</mat-icon>
+              <div>
+                <h3>Ownership</h3>
+                <span>Project lead and sponsor</span>
+              </div>
+            </div>
+
+            <div class="business-scope-fields">
+
+              <div class="field">
 
             <label>Project Manager</label>
 
@@ -210,19 +222,33 @@
 
           </div>
 
-          <div class="field">
+              <div class="field">
 
             <label>Sponsor</label>
 
             <input type="text" formControlName="sponsor" />
 
+              </div>
+
+            </div>
+
           </div>
 
-          <div class="field">
+          <div class="business-scope-card business-scope-card--wide">
+
+            <div class="business-scope-card__header">
+              <mat-icon>domain</mat-icon>
+              <div>
+                <h3>Business Units</h3>
+                <span>{{ selectedBusinessUnits.length }} selected</span>
+              </div>
+            </div>
+
+            <div class="field">
 
             <label>Business Units</label>
 
-            <div class="inline-editor">
+              <div class="scope-picker">
 
               <select [formControl]="businessUnitDraft">
 
@@ -232,17 +258,21 @@
 
               </select>
 
-              <button type="button" mat-stroked-button (click)="addBusinessUnit()">Add</button>
+                <button type="button" mat-icon-button color="primary" (click)="addBusinessUnit()" aria-label="Add business unit">
+                  <mat-icon>add</mat-icon>
+                </button>
 
             </div>
 
-            <div class="list-grid" *ngIf="selectedBusinessUnits.length > 0">
+              <div class="scope-chip-list" *ngIf="selectedBusinessUnits.length > 0">
 
-              <div class="list-item" *ngFor="let unit of selectedBusinessUnits">
+                <div class="scope-chip" *ngFor="let unit of selectedBusinessUnits">
 
                 <span>{{ unit.label }}</span>
 
-                <button type="button" mat-button color="warn" (click)="removeBusinessUnit(unit.id)">Remove</button>
+                  <button type="button" mat-icon-button color="warn" (click)="removeBusinessUnit(unit.id)" aria-label="Remove business unit">
+                    <mat-icon>close</mat-icon>
+                  </button>
 
               </div>
 
@@ -250,39 +280,125 @@
 
             <small *ngIf="isInvalid(step3Group.get('businessUnitIds'))">At least one business unit is required.</small>
 
-          </div>
-
-          <div class="field">
-
-            <label>Plant Name</label>
-
-            <select formControlName="plantName">
-
-              <option value="">Select plant</option>
-
-              <option *ngFor="let option of references.plants" [value]="option.label">{{ option.label }}</option>
-
-            </select>
+            </div>
 
           </div>
 
-          <div class="field">
+          <div class="business-scope-card business-scope-card--wide">
 
-            <label>Department *</label>
+            <div class="business-scope-card__header">
+              <mat-icon>apartment</mat-icon>
+              <div>
+                <h3>Departments</h3>
+                <span>{{ selectedDepartments.length }} selected</span>
+              </div>
+            </div>
 
-            <select formControlName="departmentId">
+            <div class="field">
 
-              <option value="">Select department</option>
+              <label>Departments *</label>
 
-              <option *ngFor="let option of references.departments" [value]="option.id">{{ option.label }}</option>
+              <div class="scope-picker">
 
-            </select>
+                <select [formControl]="departmentDraft">
 
-            <small *ngIf="isInvalid(step3Group.get('departmentId'))">Department is required.</small>
+                  <option value="">Select department</option>
+
+                  <option *ngFor="let option of availableDepartments" [value]="option.id">{{ option.label }}</option>
+
+                </select>
+
+                <button type="button" mat-icon-button color="primary" (click)="addDepartment()" aria-label="Add department">
+                  <mat-icon>add</mat-icon>
+                </button>
+
+              </div>
+
+              <div class="scope-chip-list" *ngIf="selectedDepartments.length > 0">
+
+                <div class="scope-chip scope-chip--department" *ngFor="let department of selectedDepartments">
+
+                  <span>{{ department.label }}</span>
+
+                  <small *ngIf="department.description">{{ department.description }}</small>
+
+                  <button type="button" mat-icon-button color="warn" (click)="removeDepartment(department.id)" aria-label="Remove department">
+                    <mat-icon>close</mat-icon>
+                  </button>
+
+                </div>
+
+              </div>
+
+              <small *ngIf="isInvalid(step3Group.get('departmentIds'))">At least one department is required.</small>
+
+            </div>
 
           </div>
 
-          <div class="field">
+          <div class="business-scope-card">
+
+            <div class="business-scope-card__header">
+              <mat-icon>factory</mat-icon>
+              <div>
+                <h3>Plants</h3>
+                <span>{{ selectedPlants.length }} selected</span>
+              </div>
+            </div>
+
+            <div class="field">
+
+              <label>Plants</label>
+
+              <div class="scope-picker">
+
+                <select [formControl]="plantDraft">
+
+                  <option value="">Select plant</option>
+
+                  <option *ngFor="let option of references.plants" [value]="option.label">{{ option.label }}</option>
+
+                </select>
+
+                <button type="button" mat-icon-button color="primary" (click)="addPlant()" aria-label="Add plant">
+                  <mat-icon>add</mat-icon>
+                </button>
+
+              </div>
+
+              <div class="scope-chip-list" *ngIf="selectedPlants.length > 0">
+
+                <div class="scope-chip" *ngFor="let plant of selectedPlants">
+
+                  <span>{{ plant.label }}</span>
+
+                  <button type="button" mat-icon-button color="warn" (click)="removePlant(plant.label)" aria-label="Remove plant">
+                    <mat-icon>close</mat-icon>
+                  </button>
+
+                </div>
+
+              </div>
+
+              <div class="scope-empty" *ngIf="selectedPlants.length === 0">Select one or more plants.</div>
+
+            </div>
+
+          </div>
+
+          <div class="business-scope-card">
+
+            <div class="business-scope-card__header">
+              <mat-icon>payments</mat-icon>
+              <div>
+                <h3>Financial Scope</h3>
+                <span>Cost center and saving</span>
+              </div>
+            </div>
+
+            <div class="business-scope-fields business-scope-fields--stacked">
+
+              <div class="field">
 
             <label>Cost Center </label>
 
@@ -290,11 +406,15 @@
 
           </div>
 
-          <div class="field">
+              <div class="field">
 
             <label>Cost Saving</label>
 
             <input type="number" min="0" formControlName="costSaving" />
+
+              </div>
+
+            </div>
 
           </div>
 
@@ -326,11 +446,11 @@
 
         </div>
 
-        <div class="card draft-card" [formGroup]="memberDraft">
+        <div class="team-member-panel" [formGroup]="memberDraft">
 
-          <div class="form-grid">
+          <div class="team-member-panel__content">
 
-            <div class="field">
+            <div class="field team-member-picker">
 
               <label>User</label>
 
@@ -344,31 +464,65 @@
 
             </div>
 
-            <div class="field" *ngIf="memberDraft.controls['userId'].value">
+            <div class="team-role-preview" *ngIf="memberDraft.controls['userId'].value; else selectMemberHint">
 
-              <label>Role</label>
+              <span class="team-role-preview__label">Role</span>
 
-              <input type="text" formControlName="role" readonly />
+              <strong>{{ memberDraft.controls['role'].value || 'Role not available' }}</strong>
+
+              <span *ngIf="userEmail(memberDraft.controls['userId'].value)">
+                {{ userEmail(memberDraft.controls['userId'].value) }}
+              </span>
 
             </div>
 
-          </div>
-
-          <button type="button" mat-stroked-button (click)="addTeamMember()">Add Member</button>
-
-        </div>
-
-        <div formArrayName="teamMembers" class="list-grid">
-
-          <div class="list-item" *ngFor="let member of teamMembers.controls; index as i" [formGroupName]="i">
-
-            <span>{{ userLabel(member.get('userId')?.value) }} - {{ member.get('role')?.value }}</span>
-
-            <button type="button" mat-button color="warn" (click)="removeTeamMember(i)">Remove</button>
+            <ng-template #selectMemberHint>
+              <div class="team-role-preview team-role-preview--empty">
+                <mat-icon>person_add</mat-icon>
+                <span>Select a candidate to preview their role.</span>
+              </div>
+            </ng-template>
 
           </div>
 
+          <button type="button" mat-flat-button color="primary" class="team-add-button" (click)="addTeamMember()">
+            <mat-icon>add</mat-icon>
+            Add Member
+          </button>
+
         </div>
+
+        <div class="team-members-summary">
+          <span>{{ teamMembers.length }} member{{ teamMembers.length === 1 ? '' : 's' }} selected</span>
+        </div>
+
+        <div formArrayName="teamMembers" class="team-members-list" *ngIf="teamMembers.length; else noTeamMembers">
+
+          <div class="team-member-row" *ngFor="let member of teamMembers.controls; index as i" [formGroupName]="i">
+
+            <div class="team-member-avatar">{{ userInitials(member.get('userId')?.value) }}</div>
+
+            <div class="team-member-info">
+              <strong>{{ userLabel(member.get('userId')?.value) }}</strong>
+              <span>{{ userEmail(member.get('userId')?.value) || 'No email available' }}</span>
+            </div>
+
+            <span class="team-member-role">{{ member.get('role')?.value || 'Role not set' }}</span>
+
+            <button type="button" mat-icon-button color="warn" (click)="removeTeamMember(i)" aria-label="Remove team member">
+              <mat-icon>delete</mat-icon>
+            </button>
+
+          </div>
+
+        </div>
+
+        <ng-template #noTeamMembers>
+          <div class="team-members-empty">
+            <mat-icon>groups</mat-icon>
+            <span>No team members added yet.</span>
+          </div>
+        </ng-template>
 
         <div class="action-row">
 
@@ -428,13 +582,21 @@
 
               <div class="file-picker">
 
-                <input type="file" (change)="onFileSelected($event)" style="display: none" #fileInput />
+                <input
+                  type="file"
+                  accept=".pdf,.xlsx,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  (change)="onFileSelected($event)"
+                  style="display: none"
+                  #fileInput
+                />
 
                 <button type="button" mat-stroked-button (click)="fileInput.click()">Attach File</button>
 
                 <span>{{ pendingProjectFile?.name || 'No file attached' }}</span>
 
               </div>
+
+              <small *ngIf="pendingProjectFileError">{{ pendingProjectFileError }}</small>
 
             </div>
 

@@ -9,6 +9,7 @@ import { catchError } from 'rxjs/operators';
 import { AppRoutingModule } from './app-routing-module';
 import { App } from './app';
 import { CoreModule } from './core/core-module';
+import { angularZoneInterceptor } from './core/interceptors/angular-zone-interceptor';
 import { authInterceptor } from './core/interceptors/auth-interceptor';
 import { errorInterceptor } from './core/interceptors/error-interceptor';
 import { LayoutModule } from './layout/layout-module';
@@ -66,7 +67,7 @@ function appInitializer(authService: AuthService, platformId: any) {
     LayoutModule,
   ],
   providers: [
-    provideHttpClient(withFetch(), withInterceptors([authInterceptor, errorInterceptor])),
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor, errorInterceptor, angularZoneInterceptor])),
     {
       provide: APP_INITIALIZER,
       useFactory: appInitializer,

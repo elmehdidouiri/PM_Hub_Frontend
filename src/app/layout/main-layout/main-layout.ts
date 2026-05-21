@@ -5,6 +5,11 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth';
 import { BreadcrumbService } from '../../core/services/breadcrumb.service';
 import { User } from '../../core/models';
+import {
+  HeaderNotification,
+  HeaderNotificationSummary,
+  NotificationService,
+} from '../../core/services/notification.service';
 
 export interface NavChildItem {
   label: string;
@@ -36,6 +41,7 @@ export class MainLayout implements OnInit {
   private authService = inject(AuthService);
   private router = inject(Router);
   private breadcrumbService = inject(BreadcrumbService);
+  private notificationService = inject(NotificationService);
   private viewportInitialized = false;
 
   user: User | null = null;
@@ -44,6 +50,9 @@ export class MainLayout implements OnInit {
   sidebarOpen = true;
   isMobile = false;
   profileMenuOpen = false;
+  notificationMenuOpen = false;
+  notifications?: HeaderNotificationSummary;
+  expandedNotificationGroups = new Set<string>();
 
   readonly navItems: NavItem[] = [
     {
@@ -121,9 +130,7 @@ export class MainLayout implements OnInit {
         { label: 'Technologies', route: '/admin/technologies' },
         { label: 'Solution Domains', route: '/admin/solution-domains' },
       ]
-    },
-
-    { id: 'files', label: 'Vault', icon: 'inventory_2', route: '/files', adminOnly: true },
+    }
   ];
 
   ngOnInit(): void {
@@ -147,6 +154,7 @@ export class MainLayout implements OnInit {
     }
 
     this.updateViewportState();
+    this.loadNotifications();
 
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
@@ -156,6 +164,7 @@ export class MainLayout implements OnInit {
         }
         this.user = this.authService.getCurrentUser();
         this.refreshFilteredNavItems();
+        this.notificationMenuOpen = false;
       });
   }
 
@@ -168,6 +177,9 @@ export class MainLayout implements OnInit {
   onDocumentClick(): void {
     if (this.profileMenuOpen) {
       this.profileMenuOpen = false;
+    }
+    if (this.notificationMenuOpen) {
+      this.notificationMenuOpen = false;
     }
   }
 
@@ -365,6 +377,51 @@ export class MainLayout implements OnInit {
 
   closeProfileMenu(): void {
     this.profileMenuOpen = false;
+  }
+
+  toggleNotificationMenu(event: MouseEvent): void {
+    event.stopPropagation();
+    this.profileMenuOpen = false;
+    this.notificationMenuOpen = !this.notificationMenuOpen;
+    this.loadNotifications();
+  }
+
+  closeNotificationMenu(): void {
+    this.notificationMenuOpen = false;
+  }
+
+  loadNotifications(): void {
+    this.notificationService.getHeaderNotifications().subscribe({
+      next: (response) => {
+        this.notifications = response.data ?? undefined;
+        this.expandedNotificationGroups.clear();
+      },
+      error: (err) => {
+        console.error('Failed to load header notifications', err);
+      },
+    });
+  }
+
+  toggleNotificationGroup(groupKey: string): void {
+    if (this.expandedNotificationGroups.has(groupKey)) {
+      this.expandedNotificationGroups.delete(groupKey);
+      return;
+    }
+
+    this.expandedNotificationGroups.add(groupKey);
+  }
+
+  isNotificationGroupExpanded(groupKey: string): boolean {
+    return this.expandedNotificationGroups.has(groupKey);
+  }
+
+  itemsForGroup(groupKey: string): HeaderNotification[] {
+    return this.notifications?.items.filter((item) => item.groupKey === groupKey) ?? [];
+  }
+
+  onNotificationClick(item: HeaderNotification): void {
+    this.notificationMenuOpen = false;
+    this.router.navigateByUrl(item.actionUrl);
   }
 
   logoutFromMenu(): void {

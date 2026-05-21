@@ -9,10 +9,18 @@
             <mat-icon>insights</mat-icon>
             <span>PMHUB Analytics</span>
           </div>
-          <h1>Performance Intelligence</h1>
+          <h1>Dashboard Projects</h1>
           <p>Portfolio-wide OTD, effectiveness and resource utilization analytics.</p>
 
           <div class="dashboard-page-header__actions">
+            <button
+              type="button"
+              class="dashboard-header-btn dashboard-header-btn--primary"
+              [disabled]="isRefreshing"
+              (click)="navigateToProjectsWithFilters()">
+              <mat-icon>folder_open</mat-icon>
+              View Projects
+            </button>
             <button
               type="button"
               class="dashboard-header-btn dashboard-header-btn--ghost"

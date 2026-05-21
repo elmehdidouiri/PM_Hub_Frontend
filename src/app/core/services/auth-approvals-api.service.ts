@@ -11,8 +11,8 @@ export interface PendingUserDto {
   lastName: string;
   fullName: string;
   email: string;
-  roleId: string;
-  roleName: string;
+  roleId: string | null;
+  roleName: string | null;
   isAdmin: boolean;
   isApproved: boolean;
   isActive: boolean;
@@ -23,6 +23,7 @@ export interface PendingUserDto {
 export interface ApproveUserDto {
   userId: string;
   isApproved: boolean;
+  roleId?: string;
 }
 
 @Injectable({ providedIn: 'root' })

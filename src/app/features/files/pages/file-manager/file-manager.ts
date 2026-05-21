@@ -14,6 +14,7 @@ import {
   UploadProjectFileVersionFormValue,
 } from '../../models/file.models';
 import { FileService } from '../../services/file';
+import { extractApiErrorMessages } from '../../../../shared/utils/api-error.util';
 
 @Component({
   selector: 'app-file-manager',
@@ -22,6 +23,14 @@ import { FileService } from '../../services/file';
   styleUrl: './file-manager.scss',
 })
 export class FileManager implements OnInit {
+  private readonly allowedProjectFileExtensions = new Set(['.pdf', '.xlsx', '.docx', '.pptx']);
+  private readonly allowedProjectFileContentTypes = new Set([
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ]);
+  private readonly maxProjectFileSizeBytes = 10 * 1024 * 1024;
   private readonly formBuilder = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly fileService = inject(FileService);
@@ -50,6 +59,8 @@ export class FileManager implements OnInit {
   selectedFile: ProjectFileDto | null = null;
   uploadFile: File | null = null;
   versionFile: File | null = null;
+  uploadFileError = '';
+  versionFileError = '';
 
   isLoading = false;
   isUploading = false;
@@ -148,20 +159,23 @@ export class FileManager implements OnInit {
   }
 
   submitUpload(): void {
-    if (this.uploadForm.invalid || !this.uploadFile || !this.hasProjectId) {
+    const fileError = this.validateProjectFile(this.uploadFile);
+    if (this.uploadForm.invalid || fileError || !this.hasProjectId) {
       this.uploadForm.markAllAsTouched();
-      if (!this.uploadFile) {
-        this.notifications.showWarning('Choose a file before uploading.');
+      if (fileError) {
+        this.uploadFileError = fileError;
+        this.notifications.showWarning(fileError);
       }
       return;
     }
 
     this.isUploading = true;
+    const uploadFile = this.uploadFile as File;
     const formValue = this.uploadForm.getRawValue();
 
     this.fileService
       .upload(this.currentProjectId, {
-        file: this.uploadFile,
+        file: uploadFile,
         fileType: Number(formValue.fileType),
         description: formValue.description?.trim() || null,
       } satisfies UploadProjectFileFormValue)
@@ -170,6 +184,7 @@ export class FileManager implements OnInit {
           this.isUploading = false;
           this.uploadForm.reset({ fileType: null, description: '' });
           this.uploadFile = null;
+          this.uploadFileError = '';
           this.notifications.showSuccess('File uploaded successfully.');
 
           if (file) {
@@ -214,24 +229,28 @@ export class FileManager implements OnInit {
   }
 
   uploadNewVersion(): void {
-    if (!this.selectedFile || !this.versionFile || !this.hasProjectId || !this.isComplianceFile(this.selectedFile)) {
-      if (!this.versionFile) {
-        this.notifications.showWarning('Choose the new version file first.');
+    const fileError = this.validateProjectFile(this.versionFile);
+    if (!this.selectedFile || fileError || !this.hasProjectId || !this.isComplianceFile(this.selectedFile)) {
+      if (fileError) {
+        this.versionFileError = fileError;
+        this.notifications.showWarning(fileError);
       }
       return;
     }
 
     this.isUploadingVersion = true;
+    const versionFile = this.versionFile as File;
 
     this.fileService
       .uploadVersion(this.currentProjectId, this.selectedFile.id, {
-        file: this.versionFile,
+        file: versionFile,
         description: this.versionForm.controls.description.value?.trim() || null,
       } satisfies UploadProjectFileVersionFormValue)
       .subscribe({
         next: (version) => {
           this.isUploadingVersion = false;
           this.versionFile = null;
+          this.versionFileError = '';
           this.versionForm.reset({ description: '' });
           this.notifications.showSuccess('New file version uploaded.');
 
@@ -332,12 +351,36 @@ export class FileManager implements OnInit {
 
   onUploadFileChange(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.uploadFile = input.files?.[0] ?? null;
+    const selectedFile = input.files?.[0] ?? null;
+    const validationError = this.validateProjectFile(selectedFile);
+
+    if (validationError) {
+      this.uploadFile = null;
+      this.uploadFileError = validationError;
+      input.value = '';
+      this.notifications.showWarning(validationError);
+      return;
+    }
+
+    this.uploadFile = selectedFile;
+    this.uploadFileError = '';
   }
 
   onVersionFileChange(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.versionFile = input.files?.[0] ?? null;
+    const selectedFile = input.files?.[0] ?? null;
+    const validationError = this.validateProjectFile(selectedFile);
+
+    if (validationError) {
+      this.versionFile = null;
+      this.versionFileError = validationError;
+      input.value = '';
+      this.notifications.showWarning(validationError);
+      return;
+    }
+
+    this.versionFile = selectedFile;
+    this.versionFileError = '';
   }
 
   isComplianceFile(file: ProjectFileDto | null): boolean {
@@ -406,12 +449,9 @@ export class FileManager implements OnInit {
       message?: string;
     };
 
-    if (Array.isArray(apiError?.error?.errors) && apiError.error.errors.length > 0) {
-      return apiError.error.errors[0];
-    }
-
-    if (apiError?.error?.message) {
-      return apiError.error.message;
+    const apiMessages = extractApiErrorMessages(apiError?.error);
+    if (apiMessages.length > 0) {
+      return apiMessages.join(' ');
     }
 
     if (apiError?.message) {
@@ -419,5 +459,35 @@ export class FileManager implements OnInit {
     }
 
     return fallback;
+  }
+
+  private validateProjectFile(file: File | null): string {
+    if (!file) {
+      return 'Choose a file before uploading.';
+    }
+
+    if (file.size <= 0) {
+      return 'File cannot be empty.';
+    }
+
+    if (file.size > this.maxProjectFileSizeBytes) {
+      return 'File size cannot exceed 10 MB.';
+    }
+
+    const extension = this.fileExtension(file.name);
+    if (!this.allowedProjectFileExtensions.has(extension)) {
+      return 'Allowed file extensions are .pdf, .xlsx, .docx and .pptx.';
+    }
+
+    if (!this.allowedProjectFileContentTypes.has(file.type)) {
+      return 'Allowed file types are PDF, Excel, Word and PowerPoint.';
+    }
+
+    return '';
+  }
+
+  private fileExtension(fileName: string): string {
+    const dotIndex = fileName.lastIndexOf('.');
+    return dotIndex >= 0 ? fileName.slice(dotIndex).toLowerCase() : '';
   }
 }

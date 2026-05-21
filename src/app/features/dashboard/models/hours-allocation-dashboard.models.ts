@@ -27,7 +27,11 @@ export interface HoursAllocationDashboardParams {
   fromDate?: string | null;
   toDate?: string | null;
   quickSelect?: 'month' | 'year' | 'ytd' | null;
-  analysis?: 'resourcesCapacity' | 'workedDays' | 'allocationDetails' | null;
+  analysis?: 'resourcesCapacity' | 'team' | 'details' | 'projects' | 'roles' | 'projectUsers' | null;
+  search?: string | null;
+  pageNumber?: number | null;
+  pageSize?: number | null;
+  all?: boolean | null;
 }
 
 export interface HoursAllocationSummaryDto {
@@ -113,6 +117,25 @@ export interface HoursAllocationByTeamDto {
   allocationCount: number;
 }
 
+export interface HoursAllocationByProjectUserDto {
+  projectId: string;
+  projectName: string;
+  userId: string;
+  userName: string;
+  role: string;
+  totalHours: number;
+  executionHours: number;
+  techLeadHours: number;
+  processHours: number;
+  projectManagementHours: number;
+  researchAndDevHours: number;
+  workshopHours: number;
+  otherHours: number;
+  workedDays: number;
+  allocationCount: number;
+  isProjectManager: boolean;
+}
+
 export interface HoursAllocationDashboardDto {
   summary: HoursAllocationSummaryDto;
   details: HoursAllocationDetailDto[];
@@ -121,4 +144,13 @@ export interface HoursAllocationDashboardDto {
   hoursByProject: HoursAllocationByProjectDto[];
   hoursByRole: HoursAllocationByRoleDto[];
   hoursByTeam: HoursAllocationByTeamDto[];
+  hoursByProjectUser: HoursAllocationByProjectUserDto[];
+  pagination?: {
+    pageNumber: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+  };
 }

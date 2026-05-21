@@ -30,6 +30,7 @@ import {
   UploadProjectFile,
   DashboardGroupedDistributionDto,
 } from '../models';
+import { extractApiErrorMessages } from '../../../shared/utils/api-error.util';
 
 @Injectable({
   providedIn: 'root',
@@ -211,7 +212,7 @@ export class ProjectService {
   updateProject(id: string, payload: any): Observable<ProjectDto> {
     const mappedPayload = this.mapToBackendDto(payload);
     return this.http
-      .put<ApiResponse<ProjectDto>>(`${this.apiUrl}/${id}`, mappedPayload, {
+      .patch<ApiResponse<ProjectDto>>(`${this.apiUrl}/${id}`, mappedPayload, {
         headers: this.buildHeaders(),
       })
       .pipe(
@@ -292,10 +293,11 @@ export class ProjectService {
       name: form.name,
       description: form.description || '',
       departmentId: form.departmentId,
+      departmentIds: form.departmentIds || (form.departmentId ? [form.departmentId] : []),
       projectManagerId: form.projectManagerId,
-      startDate: form.startDate || null,
-      endDate: form.endDate,
-      estimatedDueDate: form.estimatedDueDate || form.endDate,
+      startDate: this.toNullableDate(form.startDate),
+      endDate: this.toNullableDate(form.endDate),
+      estimatedDueDate: this.toNullableDate(form.estimatedDueDate || form.endDate),
       phase: Number(form.phase) || 0,
       status: Number(form.status) || 0,
       processStatus: Number(form.processStatus) || 0,
@@ -333,6 +335,15 @@ export class ProjectService {
       const userId = typeof member === 'string' ? member : (member?.userId || member?.UserId || member?.id || member?.Id);
       return !projectManagerId || userId !== projectManagerId;
     });
+  }
+
+  private toNullableDate(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return value ? String(value) : null;
+    }
+
+    const trimmedValue = value.trim();
+    return trimmedValue ? trimmedValue : null;
   }
 
   uploadProjectFile(projectId: string, fileData: UploadProjectFile): Observable<any> {
@@ -754,21 +765,9 @@ export class ProjectService {
       }
 
       if (backendError && typeof backendError === 'object') {
-        const raw = backendError as Record<string, unknown>;
-        const directMessage = this.firstString(raw, ['message', 'Message', 'error', 'Error', 'detail', 'title']);
-        if (directMessage) {
-          return directMessage;
-        }
-
-        const validationErrors = raw['errors'];
-        if (validationErrors && typeof validationErrors === 'object') {
-          const messages = Object.values(validationErrors as Record<string, unknown>)
-            .flatMap((value) => (Array.isArray(value) ? value : [value]))
-            .filter((value): value is string => typeof value === 'string' && !!value.trim());
-
-          if (messages.length) {
-            return messages.join(' ');
-          }
+        const messages = extractApiErrorMessages(backendError);
+        if (messages.length) {
+          return messages.join(' ');
         }
       }
 
@@ -776,17 +775,6 @@ export class ProjectService {
     }
 
     return fallbackMessage;
-  }
-
-  private firstString(record: Record<string, unknown>, keys: string[]): string {
-    for (const key of keys) {
-      const value = record[key];
-      if (typeof value === 'string' && value.trim()) {
-        return value.trim();
-      }
-    }
-
-    return '';
   }
 
   private isApiResponse(value: unknown): value is ApiResponse<any> {

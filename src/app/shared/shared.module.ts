@@ -16,6 +16,7 @@ import { ConfirmationDialog } from './components/confirmation-dialog/confirmatio
 import { LoadingSpinner } from './components/loading-spinner/loading-spinner';
 import { GlobalLoaderComponent } from './components/global-loader/global-loader';
 import { PageHeader } from './components/page-header/page-header';
+import { InternDetailsDialog } from '../features/users/components/intern-details-dialog/intern-details-dialog';
 
 const MATERIAL_MODULES = [
   MatButtonModule,
@@ -30,7 +31,8 @@ const MATERIAL_MODULES = [
 @NgModule({
   declarations: [
     ConfirmationDialog,
-    PageHeader
+    PageHeader,
+    InternDetailsDialog
   ],
   imports: [
     CommonModule,
@@ -46,7 +48,8 @@ const MATERIAL_MODULES = [
     ConfirmationDialog,
     PageHeader,
     LoadingSpinner,
-    GlobalLoaderComponent
+    GlobalLoaderComponent,
+    InternDetailsDialog
   ]
 })
 export class SharedModule { }

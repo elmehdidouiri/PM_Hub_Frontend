@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { catchError, of } from 'rxjs';
+import { catchError, finalize, of } from 'rxjs';
 
 import {
   ProcessStatus,
@@ -15,6 +15,11 @@ import {
   StrategicCriterionType,
 } from '../../models';
 import { ProjectFilesApiService } from '../../../../core/services/project-files-api.service';
+import {
+  HoursAllocationByProjectUserDto,
+  HoursAllocationDashboardParams,
+} from '../../../dashboard/models/hours-allocation-dashboard.models';
+import { HoursAllocationDashboardService } from '../../../dashboard/services/hours-allocation-dashboard.service';
 
 @Component({
   selector: 'app-project-detail',
@@ -95,11 +100,17 @@ export class ProjectDetail implements OnInit {
   projectFiles: ProjectFileDto[] = [];
   isLoadingFiles = false;
   fileLoadError = '';
+  showAllocations = false;
+  isLoadingAllocations = false;
+  allocationLoadError = '';
+  allocationSearch = '';
+  projectAllocations: HoursAllocationByProjectUserDto[] = [];
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly projectFilesApi: ProjectFilesApiService,
+    private readonly hoursAllocationDashboard: HoursAllocationDashboardService,
     private readonly cdr: ChangeDetectorRef
   ) {}
 
@@ -120,6 +131,27 @@ export class ProjectDetail implements OnInit {
     }
 
     this.router.navigate(['/admin/projects', this.project.id, 'edit']);
+  }
+
+  toggleAllocations(): void {
+    this.showAllocations = !this.showAllocations;
+
+    if (this.showAllocations && !this.projectAllocations.length && !this.isLoadingAllocations) {
+      this.loadProjectAllocations();
+    }
+  }
+
+  searchAllocations(): void {
+    this.loadProjectAllocations();
+  }
+
+  clearAllocationSearch(): void {
+    if (!this.allocationSearch.trim()) {
+      return;
+    }
+
+    this.allocationSearch = '';
+    this.loadProjectAllocations();
   }
 
   getProgress(project: ProjectDto): number {
@@ -187,6 +219,99 @@ export class ProjectDetail implements OnInit {
 
       return total + (Number(resource.pricePerUnit) || 0) * (Number(resource.quantity) || 0);
     }, 0);
+  }
+
+  getAllocationTotalHours(): number {
+    return this.projectAllocations.reduce((total, item) => total + item.totalHours, 0);
+  }
+
+  getAllocationWorkedDays(): number {
+    return this.projectAllocations.reduce((total, item) => total + item.workedDays, 0);
+  }
+
+  getAllocationCount(): number {
+    return this.projectAllocations.reduce((total, item) => total + item.allocationCount, 0);
+  }
+
+  getProjectManagerAllocationCount(): number {
+    return this.projectAllocations.filter((item) => item.isProjectManager).length;
+  }
+
+  getAverageHoursPerContributor(): number {
+    if (!this.projectAllocations.length) {
+      return 0;
+    }
+
+    return this.getAllocationTotalHours() / this.projectAllocations.length;
+  }
+
+  getMaxAllocationHours(): number {
+    return Math.max(1, ...this.projectAllocations.map((item) => item.totalHours));
+  }
+
+  getAllocationShare(item: HoursAllocationByProjectUserDto): number {
+    return Math.max(0, Math.min(100, (item.totalHours / this.getMaxAllocationHours()) * 100));
+  }
+
+  getDominantAllocationType(item: HoursAllocationByProjectUserDto): string {
+    const categories = [
+      { label: 'Execution', value: item.executionHours },
+      { label: 'Tech Lead', value: item.techLeadHours },
+      { label: 'Process', value: item.processHours },
+      { label: 'PM', value: item.projectManagementHours },
+      { label: 'R&D', value: item.researchAndDevHours },
+      { label: 'Workshop', value: item.workshopHours },
+      { label: 'Other', value: item.otherHours },
+    ];
+    const best = categories.sort((a, b) => b.value - a.value)[0];
+    return best?.value > 0 ? best.label : 'No split';
+  }
+
+  getSortedAllocations(): HoursAllocationByProjectUserDto[] {
+    return [...this.projectAllocations].sort((a, b) => b.totalHours - a.totalHours);
+  }
+
+  getAllocationActivityBreakdown(): Array<{ label: string; value: number; icon: string }> {
+    const totals = this.projectAllocations.reduce(
+      (acc, item) => {
+        acc.execution += item.executionHours;
+        acc.techLead += item.techLeadHours;
+        acc.process += item.processHours;
+        acc.projectManagement += item.projectManagementHours;
+        acc.researchAndDev += item.researchAndDevHours;
+        acc.workshop += item.workshopHours;
+        acc.other += item.otherHours;
+        return acc;
+      },
+      {
+        execution: 0,
+        techLead: 0,
+        process: 0,
+        projectManagement: 0,
+        researchAndDev: 0,
+        workshop: 0,
+        other: 0,
+      }
+    );
+
+    return [
+      { label: 'Execution', value: totals.execution, icon: 'rocket_launch' },
+      { label: 'Tech lead', value: totals.techLead, icon: 'engineering' },
+      { label: 'Process', value: totals.process, icon: 'account_tree' },
+      { label: 'Project management', value: totals.projectManagement, icon: 'assignment_turned_in' },
+      { label: 'R&D', value: totals.researchAndDev, icon: 'science' },
+      { label: 'Workshop', value: totals.workshop, icon: 'groups' },
+      { label: 'Other', value: totals.other, icon: 'more_horiz' },
+    ].filter((item) => item.value > 0);
+  }
+
+  getAllocationActivityShare(value: number): number {
+    const total = this.getAllocationActivityBreakdown().reduce((sum, item) => sum + item.value, 0);
+    if (!total) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(100, (value / total) * 100));
   }
 
   getDueDateHint(project: ProjectDto): string {
@@ -386,6 +511,39 @@ export class ProjectDetail implements OnInit {
         this.projectFiles = [...(files as ProjectFileDto[])];
         this.isLoadingFiles = false;
         this.cdr.detectChanges();
+      });
+  }
+
+  private loadProjectAllocations(): void {
+    const projectId = this.project?.id;
+    if (!projectId) {
+      return;
+    }
+
+    const params: HoursAllocationDashboardParams = {
+      analysis: 'projectUsers',
+      projectId,
+      search: this.allocationSearch.trim() || null,
+      all: true,
+    };
+
+    this.isLoadingAllocations = true;
+    this.allocationLoadError = '';
+
+    this.hoursAllocationDashboard
+      .getDashboard(params)
+      .pipe(
+        catchError(() => {
+          this.allocationLoadError = 'Unable to load project allocations.';
+          return of(null);
+        }),
+        finalize(() => {
+          this.isLoadingAllocations = false;
+          this.cdr.detectChanges();
+        })
+      )
+      .subscribe((dashboard) => {
+        this.projectAllocations = dashboard?.hoursByProjectUser ?? [];
       });
   }
 

@@ -43,6 +43,7 @@
 
   <!-- ───── LOADING ───── -->
   <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
+  
   <!-- ───── ERROR ───── -->
   <div class="state-card state-card--error" *ngIf="!isLoading && errorMessage">
     <mat-icon>error_outline</mat-icon>
@@ -86,9 +87,9 @@
             {{ user.email }}
           </a>
         </div>
-        <div class="role-badge">
+        <div class="role-badge" *ngIf="user.roleName">
           <mat-icon>badge</mat-icon>
-          {{ user.roleName || 'No role' }}
+          {{ user.roleName }}
         </div>
       </div>
 
@@ -104,12 +105,30 @@
         </div>
       </div>
 
+      <!-- Role Selection -->
+      <div class="request-card__role-select">
+        <label [for]="'role-select-' + user.id">Assign Role <span class="required">*</span></label>
+        <div class="select-wrapper">
+          <select
+            [id]="'role-select-' + user.id"
+            [(ngModel)]="selectedRoleIds[user.id]"
+            class="role-select-input"
+          >
+            <option [value]="undefined" disabled selected>Select a role...</option>
+            <option *ngFor="let role of roles" [value]="role.id">
+              {{ role.name }}
+            </option>
+          </select>
+          <mat-icon class="select-chevron">expand_more</mat-icon>
+        </div>
+      </div>
+
       <!-- Actions -->
       <div class="request-card__actions">
         <button
           class="action-btn action-btn--approve"
           (click)="approve(user)"
-          [disabled]="processingId !== null"
+          [disabled]="processingId !== null || !selectedRoleIds[user.id]"
           id="approve-{{ user.id }}"
         >
           <mat-icon>check_circle</mat-icon>

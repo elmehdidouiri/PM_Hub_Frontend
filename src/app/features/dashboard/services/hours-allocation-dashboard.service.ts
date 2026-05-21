@@ -6,6 +6,7 @@ import { environment } from '../../../../environments/environment';
 import { ApiResponse } from '../../../core/models';
 import {
   HoursAllocationByProjectDto,
+  HoursAllocationByProjectUserDto,
   HoursAllocationByRoleDto,
   HoursAllocationByTeamDto,
   HoursAllocationByUserDto,
@@ -114,6 +115,23 @@ export class HoursAllocationDashboardService {
       hoursByTeam: this.array(this.pick(row, ['hoursByTeam', 'HoursByTeam', 'team', 'Team'])).map((item) =>
         this.toTeam(item),
       ),
+      hoursByProjectUser: this.array(
+        this.pick(row, ['hoursByProjectUser', 'HoursByProjectUser', 'projectUsers', 'ProjectUsers']),
+      ).map((item) => this.toProjectUser(item)),
+      pagination: this.toPagination(this.pick(row, ['pagination', 'Pagination'])),
+    };
+  }
+
+  private toPagination(item: unknown) {
+    if (!item) return undefined;
+    const r = this.asRecord(item);
+    return {
+      pageNumber: this.num(r, ['pageNumber', 'PageNumber']),
+      pageSize: this.num(r, ['pageSize', 'PageSize']),
+      totalCount: this.num(r, ['totalCount', 'TotalCount']),
+      totalPages: this.num(r, ['totalPages', 'TotalPages']),
+      hasPreviousPage: Boolean(this.pick(r, ['hasPreviousPage', 'HasPreviousPage'])),
+      hasNextPage: Boolean(this.pick(r, ['hasNextPage', 'HasNextPage'])),
     };
   }
 
@@ -204,6 +222,28 @@ export class HoursAllocationDashboardService {
       totalHours: this.num(r, ['totalHours', 'TotalHours']),
       workedDays: this.num(r, ['workedDays', 'WorkedDays']),
       allocationCount: this.num(r, ['allocationCount', 'AllocationCount', 'allocations', 'Allocations']),
+    };
+  }
+
+  private toProjectUser(item: unknown): HoursAllocationByProjectUserDto {
+    const r = this.asRecord(item);
+    return {
+      projectId: this.str(r, ['projectId', 'ProjectId']),
+      projectName: this.str(r, ['projectName', 'ProjectName']),
+      userId: this.str(r, ['userId', 'UserId']),
+      userName: this.str(r, ['userName', 'UserName', 'fullName', 'FullName']),
+      role: this.str(r, ['role', 'Role', 'roleName', 'RoleName']),
+      totalHours: this.num(r, ['totalHours', 'TotalHours']),
+      executionHours: this.num(r, ['executionHours', 'ExecutionHours']),
+      techLeadHours: this.num(r, ['techLeadHours', 'TechLeadHours', 'technicalSupervisionHours', 'TechnicalSupervisionHours']),
+      processHours: this.num(r, ['processHours', 'ProcessHours']),
+      projectManagementHours: this.num(r, ['projectManagementHours', 'ProjectManagementHours', 'managementHours', 'ManagementHours']),
+      researchAndDevHours: this.num(r, ['researchAndDevHours', 'ResearchAndDevHours', 'rAndDHours', 'RAndDHours']),
+      workshopHours: this.num(r, ['workshopHours', 'WorkshopHours']),
+      otherHours: this.num(r, ['otherHours', 'OtherHours']),
+      workedDays: this.num(r, ['workedDays', 'WorkedDays']),
+      allocationCount: this.num(r, ['allocationCount', 'AllocationCount', 'allocations', 'Allocations']),
+      isProjectManager: Boolean(this.pick(r, ['isProjectManager', 'IsProjectManager'])),
     };
   }
 

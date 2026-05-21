@@ -25,10 +25,16 @@
       </div>
     </div>
 
-    <button type="button" class="edit-button" (click)="editProject()">
-      <mat-icon>edit</mat-icon>
-      <span>Edit project</span>
-    </button>
+    <div class="detail-actions">
+      <button type="button" class="allocation-button" (click)="toggleAllocations()">
+        <mat-icon>{{ showAllocations ? 'visibility_off' : 'query_stats' }}</mat-icon>
+        <span>{{ showAllocations ? 'Masquer allocations' : 'Voir allocations' }}</span>
+      </button>
+      <button type="button" class="edit-button" (click)="editProject()">
+        <mat-icon>edit</mat-icon>
+        <span>Edit project</span>
+      </button>
+    </div>
   </header>
 
   <section class="overview-strip">
@@ -178,6 +184,107 @@
           </div>
         </div>
         <ng-template #noMembers><p class="empty-copy">(vide)</p></ng-template>
+      </article>
+
+      <article class="work-panel allocation-panel" *ngIf="showAllocations">
+        <div class="section-heading allocation-heading">
+          <div>
+            <span>Decision view</span>
+            <h2>Project Allocations</h2>
+          </div>
+          <div class="allocation-search">
+            <mat-icon>search</mat-icon>
+            <input
+              type="search"
+              [(ngModel)]="allocationSearch"
+              (keyup.enter)="searchAllocations()"
+              placeholder="Search user"
+              aria-label="Search project allocations by user"
+            />
+            <button type="button" class="icon-action" (click)="clearAllocationSearch()" aria-label="Clear allocation search">
+              <mat-icon>close</mat-icon>
+            </button>
+            <button type="button" class="allocation-search__submit" (click)="searchAllocations()">Search</button>
+          </div>
+        </div>
+
+        <app-loading-spinner *ngIf="isLoadingAllocations"></app-loading-spinner>
+        <p class="empty-copy" *ngIf="allocationLoadError">{{ allocationLoadError }}</p>
+
+        <ng-container *ngIf="!isLoadingAllocations && !allocationLoadError">
+          <div class="allocation-kpis">
+            <div>
+              <span>Total hours</span>
+              <strong>{{ getAllocationTotalHours() | number:'1.0-2' }}h</strong>
+            </div>
+            <div>
+              <span>Contributors</span>
+              <strong>{{ projectAllocations.length }}</strong>
+            </div>
+            <div>
+              <span>Average / user</span>
+              <strong>{{ getAverageHoursPerContributor() | number:'1.0-2' }}h</strong>
+            </div>
+            <div>
+              <span>Worked days</span>
+              <strong>{{ getAllocationWorkedDays() | number:'1.0-2' }}</strong>
+            </div>
+            <div>
+              <span>Project managers</span>
+              <strong>{{ getProjectManagerAllocationCount() }}</strong>
+            </div>
+          </div>
+
+          <div class="allocation-insights" *ngIf="projectAllocations.length; else noAllocations">
+            <section class="allocation-ranking">
+              <div class="allocation-subtitle">
+                <span>Team load</span>
+                <strong>{{ getSortedAllocations().length }} people</strong>
+              </div>
+
+              <div class="allocation-person" *ngFor="let item of getSortedAllocations()">
+                <div class="allocation-person__main">
+                  <i>{{ getInitials(item.userName) }}</i>
+                  <div>
+                    <strong>{{ displayValue(item.userName) }}</strong>
+                    <span>{{ displayValue(item.role) }}</span>
+                  </div>
+                  <small *ngIf="item.isProjectManager">PM</small>
+                </div>
+                <div class="allocation-person__meter">
+                  <i [style.width.%]="getAllocationShare(item)"></i>
+                </div>
+                <div class="allocation-person__meta">
+                  <strong>{{ item.totalHours | number:'1.0-2' }}h</strong>
+                  <span>{{ item.workedDays | number:'1.0-2' }} days</span>
+                  <span>{{ getDominantAllocationType(item) }}</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="allocation-breakdown">
+              <div class="allocation-subtitle">
+                <span>Activity mix</span>
+                <strong>{{ getAllocationCount() }} allocations</strong>
+              </div>
+
+              <div class="activity-row" *ngFor="let item of getAllocationActivityBreakdown()">
+                <mat-icon>{{ item.icon }}</mat-icon>
+                <div>
+                  <div>
+                    <span>{{ item.label }}</span>
+                    <strong>{{ item.value | number:'1.0-2' }}h</strong>
+                  </div>
+                  <i><b [style.width.%]="getAllocationActivityShare(item.value)"></b></i>
+                </div>
+              </div>
+            </section>
+          </div>
+        </ng-container>
+
+        <ng-template #noAllocations>
+          <p class="empty-copy">No allocations found for this project.</p>
+        </ng-template>
       </article>
 
       <div class="two-column">

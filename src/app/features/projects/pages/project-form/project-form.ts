@@ -32,6 +32,14 @@ import { ProjectService } from '../../services/project';
 })
 export class ProjectForm implements OnInit {
   private readonly draftStorageKey = 'pmhub.project.create.draft';
+  private readonly allowedProjectFileExtensions = new Set(['.pdf', '.xlsx', '.docx', '.pptx']);
+  private readonly allowedProjectFileContentTypes = new Set([
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ]);
+  private readonly maxProjectFileSizeBytes = 10 * 1024 * 1024;
   protected readonly ProcessStatus = ProcessStatus;
   protected readonly ProjectPhase = ProjectPhase;
   protected readonly ProjectStatus = ProjectStatus;
@@ -73,12 +81,15 @@ export class ProjectForm implements OnInit {
   readonly budgetDraft: FormGroup;
   readonly roadblockDraft: FormControl<string>;
   readonly businessUnitDraft: FormControl<string>;
+  readonly plantDraft: FormControl<string>;
+  readonly departmentDraft: FormControl<string>;
   readonly technologyDraft: FormControl<string>;
   readonly solutionDomainDraft: FormControl<string>;
   readonly fileTypeDraft: FormControl<ProjectFileType | null>;
   readonly fileDescriptionDraft: FormControl<string>;
   readonly wizardForm: FormGroup;
   pendingProjectFile: File | null = null;
+  pendingProjectFileError = '';
   private submittedSuccessfully = false;
 
   constructor(
@@ -105,6 +116,8 @@ export class ProjectForm implements OnInit {
 
     this.roadblockDraft = this.fb.nonNullable.control('');
     this.businessUnitDraft = this.fb.nonNullable.control('');
+    this.plantDraft = this.fb.nonNullable.control('');
+    this.departmentDraft = this.fb.nonNullable.control('');
     this.technologyDraft = this.fb.nonNullable.control('');
     this.solutionDomainDraft = this.fb.nonNullable.control('');
     this.fileTypeDraft = this.fb.control<ProjectFileType | null>(null, Validators.required);
@@ -128,7 +141,8 @@ export class ProjectForm implements OnInit {
         sponsor: this.fb.nonNullable.control(''),
         businessUnitIds: this.fb.nonNullable.control<string[]>([], Validators.minLength(1)),
         plantName: this.fb.nonNullable.control(''),
-        departmentId: this.fb.nonNullable.control('', Validators.required),
+        departmentId: this.fb.nonNullable.control(''),
+        departmentIds: this.fb.nonNullable.control<string[]>([], Validators.minLength(1)),
         costCenter: this.fb.nonNullable.control(''),
         costSaving: this.fb.control<number | null>(null, Validators.min(0)),
       }),
@@ -186,12 +200,12 @@ export class ProjectForm implements OnInit {
     const errors: any = {};
     let hasError = false;
 
-    if (start && end && new Date(end) < new Date(start)) {
+    if (start && end && new Date(end) <= new Date(start)) {
       errors['endDateInvalid'] = true;
       hasError = true;
     }
 
-    if (start && estimated && new Date(estimated) < new Date(start)) {
+    if (start && estimated && new Date(estimated) <= new Date(start)) {
       errors['estimatedDateInvalid'] = true;
       hasError = true;
     }
@@ -216,12 +230,34 @@ export class ProjectForm implements OnInit {
 
   onFileSelected(event: any): void {
     const files: FileList = event.target.files;
-    this.pendingProjectFile = files && files.length > 0 ? files[0] : null;
+    const selectedFile = files && files.length > 0 ? files[0] : null;
+    const validationError = this.validateProjectFile(selectedFile);
+
+    if (validationError) {
+      this.pendingProjectFile = null;
+      this.pendingProjectFileError = validationError;
+      this.notificationService.showWarning(validationError);
+      event.target.value = '';
+      return;
+    }
+
+    this.pendingProjectFile = selectedFile;
+    this.pendingProjectFileError = '';
   }
 
   addProjectFile(fileInput?: HTMLInputElement): void {
     if (this.fileTypeDraft.invalid || !this.pendingProjectFile) {
       this.fileTypeDraft.markAsTouched();
+      if (!this.pendingProjectFile) {
+        this.pendingProjectFileError = 'File is required before attaching a document.';
+      }
+      return;
+    }
+
+    const validationError = this.validateProjectFile(this.pendingProjectFile);
+    if (validationError) {
+      this.pendingProjectFileError = validationError;
+      this.notificationService.showWarning(validationError);
       return;
     }
 
@@ -240,6 +276,7 @@ export class ProjectForm implements OnInit {
     });
 
     this.pendingProjectFile = null;
+    this.pendingProjectFileError = '';
     this.fileTypeDraft.reset(null);
     this.fileDescriptionDraft.reset('');
     if (fileInput) {
@@ -348,6 +385,30 @@ export class ProjectForm implements OnInit {
     return this.references.businessUnits.filter((unit) => selected.has(unit.id));
   }
 
+  get selectedDepartments(): SelectOption[] {
+    const ids = this.step3Group.controls['departmentIds'].value ?? [];
+    const selected = new Set(ids);
+    return this.references.departments.filter((department) => selected.has(department.id));
+  }
+
+  get selectedPlants(): SelectOption[] {
+    const names = new Set(this.selectedPlantNames);
+    return this.references.plants.filter((plant) => names.has(plant.label));
+  }
+
+  get selectedPlantNames(): string[] {
+    return this.splitPlantNames(this.step3Group.controls['plantName'].value);
+  }
+
+  get availableDepartments(): SelectOption[] {
+    const plantNames = new Set(this.selectedPlantNames);
+    if (!plantNames.size) {
+      return this.references.departments;
+    }
+
+    return this.references.departments.filter((department) => !department.plantName || plantNames.has(department.plantName));
+  }
+
   addTeamMember(): void {
     if (this.memberDraft.invalid) {
       this.memberDraft.markAllAsTouched();
@@ -363,6 +424,22 @@ export class ProjectForm implements OnInit {
 
   userLabel(userId: string): string {
     return this.references.users.find((user) => user.id === userId)?.label || userId;
+  }
+
+  userEmail(userId: string): string {
+    return this.references.users.find((user) => user.id === userId)?.email || '';
+  }
+
+  userInitials(userId: string): string {
+    const label = this.userLabel(userId);
+    const initials = label
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('');
+
+    return initials || 'TM';
   }
 
   removeTeamMember(index: number): void {
@@ -416,6 +493,56 @@ export class ProjectForm implements OnInit {
     this.step3Group.controls['businessUnitIds'].setValue(next);
     this.step3Group.controls['businessUnitIds'].markAsDirty();
     this.step3Group.controls['businessUnitIds'].updateValueAndValidity();
+  }
+
+  addPlant(): void {
+    const selectedName = this.plantDraft.value;
+    if (!selectedName) {
+      return;
+    }
+
+    const current = this.selectedPlantNames;
+    if (!current.includes(selectedName)) {
+      this.step3Group.controls['plantName'].setValue([...current, selectedName].join(', '));
+      this.step3Group.controls['plantName'].markAsDirty();
+      this.step3Group.controls['plantName'].updateValueAndValidity();
+    }
+
+    this.plantDraft.setValue('');
+  }
+
+  removePlant(name: string): void {
+    const next = this.selectedPlantNames.filter((item) => item !== name);
+    this.step3Group.controls['plantName'].setValue(next.join(', '));
+    this.step3Group.controls['plantName'].markAsDirty();
+    this.step3Group.controls['plantName'].updateValueAndValidity();
+  }
+
+  addDepartment(): void {
+    const selectedId = this.departmentDraft.value;
+    if (!selectedId) {
+      return;
+    }
+
+    const current = this.step3Group.controls['departmentIds'].value ?? [];
+    if (!current.includes(selectedId)) {
+      const next = [...current, selectedId];
+      this.step3Group.controls['departmentIds'].setValue(next);
+      this.step3Group.controls['departmentId'].setValue(next[0] ?? '');
+      this.step3Group.controls['departmentIds'].markAsDirty();
+      this.step3Group.controls['departmentIds'].updateValueAndValidity();
+    }
+
+    this.departmentDraft.setValue('');
+  }
+
+  removeDepartment(id: string): void {
+    const current = this.step3Group.controls['departmentIds'].value ?? [];
+    const next = current.filter((item: string) => item !== id);
+    this.step3Group.controls['departmentIds'].setValue(next);
+    this.step3Group.controls['departmentId'].setValue(next[0] ?? '');
+    this.step3Group.controls['departmentIds'].markAsDirty();
+    this.step3Group.controls['departmentIds'].updateValueAndValidity();
   }
 
   get selectedTechnologies(): SelectOption[] {
@@ -491,9 +618,9 @@ export class ProjectForm implements OnInit {
     if (this.wizardForm.invalid) {
       this.wizardForm.markAllAsTouched();
       if (this.wizardForm.errors?.['endDateInvalid']) {
-        this.notificationService.showWarning('Project end date must be after the start date.');
+        this.notificationService.showWarning('Project end date must be strictly after the start date.');
       } else if (this.wizardForm.errors?.['estimatedDateInvalid']) {
-        this.notificationService.showWarning('Estimated due date must be after the start date.');
+        this.notificationService.showWarning('Estimated due date must be strictly after the start date.');
       } else if (this.step2Group.errors?.['invalidPhaseStatus']) {
         this.notificationService.showWarning(this.phaseStatusError());
       } else {
@@ -637,6 +764,11 @@ export class ProjectForm implements OnInit {
     const step1 = this.step1Group.getRawValue();
     const step2 = this.step2Group.getRawValue();
     const step3 = this.step3Group.getRawValue();
+    const step4 = this.step4Group.getRawValue();
+    const step5 = this.step5Group.getRawValue();
+    const step6 = this.step6Group.getRawValue();
+    const step8 = this.step8Group.getRawValue();
+    const step9 = this.step9Group.getRawValue();
 
     return {
       projectManagementType: step1.projectManagementType as ProjectManagementType,
@@ -649,14 +781,39 @@ export class ProjectForm implements OnInit {
       sponsor: this.emptyToNull(step3.sponsor),
       businessUnitIds: step3.businessUnitIds ?? [],
       plantName: this.emptyToNull(step3.plantName),
-      departmentId: step3.departmentId,
+      departmentId: step3.departmentIds?.[0] ?? step3.departmentId,
+      departmentIds: step3.departmentIds ?? [],
       costCenter: this.emptyToNull(step3.costCenter),
       costSaving: this.numberOrNull(step3.costSaving),
+      technologyIds: step4.technologyIds ?? [],
+      solutionDomainIds: step4.solutionDomainIds ?? [],
+      startDate: this.toApiDate(step5.startDate),
+      endDate: this.toApiDate(step5.endDate),
+      estimatedDueDate: this.toApiDate(step5.estimatedDueDate),
+      estimatedHours: this.numberOrNull(step5.estimatedHours),
+      actualHours: this.numberOrNull(step5.actualHours),
+      strategicCriteria: step6,
+      kpi: {
+        customerSatisfaction: null,
+        digitalContribution: null,
+      },
       teamMembers: this.teamMembers.getRawValue().filter((item) => !this.isProjectManager(String(item['userId']))).map((item) => ({
         userId: String(item['userId']),
         role: String(item['role']).trim(),
         roleId: String(item['roleId'] || this.roleIdForUser(String(item['userId']))).trim(),
       })),
+      budgetItems: (step8.budgetItems || []).map((item: Record<string, unknown>) => ({
+        itemName: String(item['itemName'] || '').trim(),
+        pricePerUnit: this.numberOrNull(item['pricePerUnit']) ?? 0,
+        quantity: this.numberOrNull(item['quantity']) ?? 0,
+        costCenter: String(item['costCenter'] || '').trim(),
+      })),
+      currentState: this.emptyToNull(step9.currentState),
+      nextSteps: this.emptyToNull(step9.nextSteps),
+      enhancements: this.emptyToNull(step9.enhancements),
+      codeSourceLink: this.emptyToNull(step9.codeSourceLink),
+      solutionLink: this.emptyToNull(step9.solutionLink),
+      roadblocks: this.roadblocks.getRawValue(),
       parentProjectId: this.showParentProject ? step1.parentProjectId || null : null,
       processStatus: this.showProcessStatus ? (step1.processStatus as ProcessStatus | null) : null,
     };
@@ -742,6 +899,11 @@ export class ProjectForm implements OnInit {
 
       if (draft.form) {
         this.wizardForm.patchValue(draft.form, { emitEvent: false });
+        const rawDepartmentIds = draft.form['step3']?.['departmentIds'];
+        const rawDepartmentId = draft.form['step3']?.['departmentId'];
+        if ((!Array.isArray(rawDepartmentIds) || rawDepartmentIds.length === 0) && typeof rawDepartmentId === 'string' && rawDepartmentId) {
+          this.step3Group.controls['departmentIds'].setValue([rawDepartmentId]);
+        }
       }
 
       this.teamMembers.clear();
@@ -849,6 +1011,36 @@ export class ProjectForm implements OnInit {
     return value ? `${value}T00:00:00Z` : null;
   }
 
+  private validateProjectFile(file: File | null): string {
+    if (!file) {
+      return 'File is required before attaching a document.';
+    }
+
+    if (file.size <= 0) {
+      return 'File cannot be empty.';
+    }
+
+    if (file.size > this.maxProjectFileSizeBytes) {
+      return 'File size cannot exceed 10 MB.';
+    }
+
+    const extension = this.fileExtension(file.name);
+    if (!this.allowedProjectFileExtensions.has(extension)) {
+      return 'Allowed file extensions are .pdf, .xlsx, .docx and .pptx.';
+    }
+
+    if (!this.allowedProjectFileContentTypes.has(file.type)) {
+      return 'Allowed file types are PDF, Excel, Word and PowerPoint.';
+    }
+
+    return '';
+  }
+
+  private fileExtension(fileName: string): string {
+    const dotIndex = fileName.lastIndexOf('.');
+    return dotIndex >= 0 ? fileName.slice(dotIndex).toLowerCase() : '';
+  }
+
   private numberOrNull(value: unknown): number | null {
     if (value === null || value === undefined || value === '') return null;
     return Number(value);
@@ -857,6 +1049,13 @@ export class ProjectForm implements OnInit {
   private emptyToNull(value: string | null | undefined): string | null {
     const trimmed = (value ?? '').trim();
     return trimmed ? trimmed : null;
+  }
+
+  private splitPlantNames(value: string | null | undefined): string[] {
+    return (value ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 
   private updateStepperOrientation(): void {

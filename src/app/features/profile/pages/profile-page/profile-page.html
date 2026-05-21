@@ -1,31 +1,153 @@
-<section class="profile">
-  <div class="profile__header">
-    <div class="profile__badge">
-      <mat-icon>person</mat-icon>
+<section class="profile-page">
+  <header class="profile-hero">
+    <div class="profile-hero__identity">
+      <div class="profile-avatar">{{ initials }}</div>
+      <div>
+        <span class="profile-eyebrow">My workspace</span>
+        <h1>{{ displayName }}</h1>
+        <p>{{ user?.email || 'Email address not provided' }}</p>
+      </div>
     </div>
-    <div>
-      <h2 class="profile__title">Profile</h2>
-      <p class="profile__subtitle">Your account details</p>
+
+    <div class="profile-hero__visual" aria-hidden="true">
+      <span class="profile-hero__ring profile-hero__ring--one"></span>
+      <span class="profile-hero__ring profile-hero__ring--two"></span>
+      <mat-icon>admin_panel_settings</mat-icon>
     </div>
+  </header>
+
+  <div class="profile-layout">
+    <section class="profile-panel profile-panel--details">
+      <div class="panel-heading">
+        <span class="panel-heading__icon">
+          <mat-icon>badge</mat-icon>
+        </span>
+        <div>
+          <h2>Account information</h2>
+          <p>The information displayed on your PMHub profile.</p>
+        </div>
+      </div>
+
+      <div class="profile-details">
+        <article class="profile-detail">
+          <span>Full name</span>
+          <strong>{{ displayName }}</strong>
+        </article>
+
+        <article class="profile-detail">
+          <span>Email</span>
+          <strong>{{ user?.email || '-' }}</strong>
+        </article>
+
+        <article class="profile-detail">
+          <span>Role</span>
+          <strong>{{ roleLabel }}</strong>
+        </article>
+      </div>
+    </section>
+
+    <aside class="profile-panel profile-panel--security">
+      <div class="security-mark">
+        <mat-icon>lock</mat-icon>
+      </div>
+      <h2>Security</h2>
+      <p>Keep a unique password and update it regularly to protect your project data.</p>
+      <div class="security-status">
+        <span></span>
+        Protected session
+      </div>
+    </aside>
   </div>
 
-  <div class="profile__card">
-    <div class="profile__row">
-      <span class="profile__label">Full name</span>
-      <strong class="profile__value">
-        {{ user?.firstName }} {{ user?.lastName }}
-      </strong>
+  <section class="profile-panel password-panel">
+    <div class="panel-heading">
+      <span class="panel-heading__icon panel-heading__icon--navy">
+        <mat-icon>lock_reset</mat-icon>
+      </span>
+      <div>
+        <h2>Change password</h2>
+        <p>Enter your current password, then confirm the new one.</p>
+      </div>
     </div>
 
-    <div class="profile__row">
-      <span class="profile__label">Email</span>
-      <strong class="profile__value">{{ user?.email || '-' }}</strong>
-    </div>
+    <form class="password-form" [formGroup]="passwordForm" (ngSubmit)="submitPasswordChange()" novalidate>
+      <label class="profile-field">
+        <span>Current password</span>
+        <div class="password-input">
+          <input
+            [type]="hideCurrentPassword ? 'password' : 'text'"
+            formControlName="currentPassword"
+            autocomplete="current-password"
+            placeholder="Your current password"
+          />
+          <button
+            type="button"
+            class="password-toggle"
+            (click)="hideCurrentPassword = !hideCurrentPassword"
+            [attr.aria-label]="hideCurrentPassword ? 'Show current password' : 'Hide current password'"
+          >
+            <mat-icon>{{ hideCurrentPassword ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+        </div>
+        <small *ngIf="passwordForm.controls['currentPassword'].touched && passwordForm.controls['currentPassword'].invalid">
+          {{ getPasswordErrorMessage('currentPassword') }}
+        </small>
+      </label>
 
-    <div class="profile__row">
-      <span class="profile__label">Role</span>
-      <strong class="profile__value">{{ user?.roleName || (user?.isAdmin ? 'Administrator' : '-') }}</strong>
-    </div>
-  </div>
+      <label class="profile-field">
+        <span>New password</span>
+        <div class="password-input">
+          <input
+            [type]="hideNewPassword ? 'password' : 'text'"
+            formControlName="newPassword"
+            autocomplete="new-password"
+            placeholder="Minimum 6 characters"
+          />
+          <button
+            type="button"
+            class="password-toggle"
+            (click)="hideNewPassword = !hideNewPassword"
+            [attr.aria-label]="hideNewPassword ? 'Show new password' : 'Hide new password'"
+          >
+            <mat-icon>{{ hideNewPassword ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+        </div>
+        <small *ngIf="passwordForm.controls['newPassword'].touched && passwordForm.controls['newPassword'].invalid">
+          {{ getPasswordErrorMessage('newPassword') }}
+        </small>
+      </label>
+
+      <label class="profile-field">
+        <span>Confirm password</span>
+        <div class="password-input">
+          <input
+            [type]="hideConfirmPassword ? 'password' : 'text'"
+            formControlName="confirmPassword"
+            autocomplete="new-password"
+            placeholder="Repeat the new password"
+          />
+          <button
+            type="button"
+            class="password-toggle"
+            (click)="hideConfirmPassword = !hideConfirmPassword"
+            [attr.aria-label]="hideConfirmPassword ? 'Show password confirmation' : 'Hide password confirmation'"
+          >
+            <mat-icon>{{ hideConfirmPassword ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+        </div>
+        <small
+          *ngIf="passwordForm.controls['confirmPassword'].touched && (passwordForm.controls['confirmPassword'].invalid || passwordForm.hasError('passwordMismatch'))"
+        >
+          {{ getPasswordErrorMessage('confirmPassword') }}
+        </small>
+      </label>
+
+      <div class="password-form__actions">
+        <button type="submit" class="pm-btn-primary" [disabled]="isSubmittingPassword">
+          <mat-icon>{{ isSubmittingPassword ? 'hourglass_top' : 'lock_reset' }}</mat-icon>
+          {{ isSubmittingPassword ? 'Updating...' : 'Change password' }}
+        </button>
+      </div>
+    </form>
+  </section>
 </section>
-

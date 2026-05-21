@@ -78,7 +78,6 @@ export class UserForm implements OnInit {
         lastName: value.lastName.trim(),
         email: value.email.trim(),
         password: value.password,
-        roleId: value.roleId,
       })
       .subscribe({
         next: (user) => {

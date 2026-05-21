@@ -66,8 +66,13 @@
         <form class="files-upload-form" [formGroup]="uploadForm" (ngSubmit)="submitUpload()">
           <label class="pm-field">
             <span class="pm-field__label">Select file</span>
-            <input type="file" (change)="onUploadFileChange($event)" />
+            <input
+              type="file"
+              accept=".pdf,.xlsx,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+              (change)="onUploadFileChange($event)"
+            />
             <small class="pm-field__hint" *ngIf="uploadFile">{{ uploadFile.name }}</small>
+            <small class="pm-field__hint" *ngIf="uploadFileError">{{ uploadFileError }}</small>
           </label>
 
           <label class="pm-field">
@@ -203,8 +208,13 @@
         <form class="files-version-form" [formGroup]="versionForm" (ngSubmit)="uploadNewVersion()">
           <label class="pm-field">
             <span class="pm-field__label">New version file</span>
-            <input type="file" (change)="onVersionFileChange($event)" />
+            <input
+              type="file"
+              accept=".pdf,.xlsx,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+              (change)="onVersionFileChange($event)"
+            />
             <small class="pm-field__hint" *ngIf="versionFile">{{ versionFile.name }}</small>
+            <small class="pm-field__hint" *ngIf="versionFileError">{{ versionFileError }}</small>
           </label>
 
           <label class="pm-field">

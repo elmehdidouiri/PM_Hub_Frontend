@@ -14,6 +14,7 @@ import { TokenStoreService } from './token-store.service';
 import {
   ApiResponse,
   AuthResponse,
+  ChangePasswordRequest,
   ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
@@ -198,6 +199,19 @@ export class AuthService {
         }
 
         throw new Error(response.message || 'Password reset failed');
+      }),
+      catchError((error) => this.handleError(error))
+    );
+  }
+
+  changePassword(data: ChangePasswordRequest): Observable<string> {
+    return this.http.post<ApiResponse<unknown>>(`${this.apiUrl}/change-password`, data).pipe(
+      map((response) => {
+        if (response.success) {
+          return response.message || 'Your password has been changed successfully.';
+        }
+
+        throw new Error(response.message || 'Password change failed');
       }),
       catchError((error) => this.handleError(error))
     );

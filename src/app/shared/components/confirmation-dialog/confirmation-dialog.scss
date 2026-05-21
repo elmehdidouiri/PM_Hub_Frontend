@@ -5,7 +5,9 @@
 }
 
 .pm-dialog {
-  width: min(92vw, 460px);
+  width: 100%;
+  max-width: 460px;
+  box-sizing: border-box;
   padding: 1.25rem;
   display: grid;
   gap: 1rem;

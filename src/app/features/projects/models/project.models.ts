@@ -16,6 +16,8 @@ export interface SelectOption {
   email?: string;
   roleId?: string;
   roleName?: string;
+  businessUnitName?: string;
+  plantName?: string;
 }
 
 export interface ProjectMemberPayload {
@@ -88,6 +90,7 @@ export interface CreateProjectDto {
   businessUnitIds: string[];
   plantName: string | null;
   departmentId: string;
+  departmentIds?: string[];
   costCenter: string | null;
   costSaving: number | null;
   technologyIds: string[];

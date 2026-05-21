@@ -12,6 +12,7 @@ import { ProjectForm } from './pages/project-form/project-form';
 import { ProjectCreatePage } from './pages/project-create-page/project-create-page';
 import { ProjectEditPage } from './pages/project-edit-page/project-edit-page';
 import { ProjectDetailsPage } from './pages/project-details-page/project-details-page';
+import { ProjectAllocationsPage } from './pages/project-allocations-page/project-allocations-page';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 
@@ -22,7 +23,8 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
     ProjectForm,
     ProjectCreatePage,
     ProjectEditPage,
-    ProjectDetailsPage
+    ProjectDetailsPage,
+    ProjectAllocationsPage
   ],
   imports: [
     CommonModule,

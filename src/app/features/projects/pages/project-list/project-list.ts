@@ -96,6 +96,7 @@ export class ProjectList implements OnInit, AfterViewInit {
   isRefreshing = false;
   deletingProjectId: string | null = null;
   errorMessage = '';
+  selectedProjectIds = new Set<string>();
   private hasTriggeredInitialLoad = false;
   private loadSubscription?: Subscription;
 
@@ -188,6 +189,21 @@ export class ProjectList implements OnInit, AfterViewInit {
     return this.displayProjects;
   }
 
+  get selectedProjectCount(): number {
+    return this.selectedProjectIds.size;
+  }
+
+  get areAllPageProjectsSelected(): boolean {
+    const visibleIds = this.getVisibleProjectIds();
+    return visibleIds.length > 0 && visibleIds.every((id) => this.selectedProjectIds.has(id));
+  }
+
+  get isPageSelectionIndeterminate(): boolean {
+    const visibleIds = this.getVisibleProjectIds();
+    const selectedVisibleCount = visibleIds.filter((id) => this.selectedProjectIds.has(id)).length;
+    return selectedVisibleCount > 0 && selectedVisibleCount < visibleIds.length;
+  }
+
   onPageChange(page: number): void {
     if (page >= 1 && page <= this.totalPagesCount) {
       this.currentPage = page;
@@ -250,6 +266,36 @@ export class ProjectList implements OnInit, AfterViewInit {
     }
   ): string {
     return project.id;
+  }
+
+  isProjectSelected(projectId: string): boolean {
+    return this.selectedProjectIds.has(projectId);
+  }
+
+  toggleProjectSelection(projectId: string, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+
+    if (checked) {
+      this.selectedProjectIds.add(projectId);
+    } else {
+      this.selectedProjectIds.delete(projectId);
+    }
+  }
+
+  toggleSelectAllVisible(event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    const visibleIds = this.getVisibleProjectIds();
+
+    if (checked) {
+      visibleIds.forEach((id) => this.selectedProjectIds.add(id));
+      return;
+    }
+
+    visibleIds.forEach((id) => this.selectedProjectIds.delete(id));
+  }
+
+  clearSelection(): void {
+    this.selectedProjectIds.clear();
   }
 
   refreshProjects(): void {
@@ -388,6 +434,7 @@ export class ProjectList implements OnInit, AfterViewInit {
     this.projectService.deleteProject(project.id).subscribe({
       next: () => {
         this.projects = this.projects.filter((item) => item.id !== project.id);
+        this.selectedProjectIds.delete(project.id);
         this.deletingProjectId = null;
         this.notificationService.showSuccess('Project deleted successfully.');
       },
@@ -409,73 +456,40 @@ export class ProjectList implements OnInit, AfterViewInit {
   }
 
   onExport(): void {
-    if (!this.hasFilteredProjects) {
-      this.notificationService.showError('No projects to export.');
+    if (this.selectedProjectCount === 0) {
+      this.notificationService.showError('Select at least one project to export.');
       return;
     }
 
-    this.notificationService.showInfo('Preparing Excel report... please wait.');
-    this.isRefreshing = true;
+    const selectedProjects = this.projects.filter((project) => this.selectedProjectIds.has(project.id));
 
-    // We fetch all filtered projects using the all=true parameter to ensure the export is complete
-    const params: ProjectFilterParams = {
-      all: true,
-      Search: this.searchTerm.trim() || undefined,
-      Status: this.selectedStatus !== 'all' ? Number(this.selectedStatus) : undefined,
-      Phase: this.selectedPhase !== 'all' ? Number(this.selectedPhase) : undefined,
-      ProjectManagementType: this.selectedManagementType !== 'all' ? Number(this.selectedManagementType) : undefined,
-      IncompleteOnly: this.selectedIncompleteOnly ? true : undefined,
-    };
+    if (!selectedProjects.length) {
+      this.notificationService.showError('Selected projects are no longer available.');
+      this.clearSelection();
+      return;
+    }
 
-    this.projectService.getProjectsPaged(params).subscribe({
-      next: (response) => {
-        this.isRefreshing = false;
-        const dataToExport = response.data.map(p => ({
-          'Project Name': p.name,
-          'Department': p.departmentName || '-',
-          'Type': this.getManagementTypeLabel(p),
-          'Phase': this.getPhaseLabel(p),
-          'Status': this.getStatusLabel(p),
-          'Sponsor': this.getSponsorDisplay(p),
-          'Estimated Hours': this.getEstimatedHoursDisplay(p),
-          'Actual Hours': p.actualHours || 0,
-          'Description': p.description || 'No description provided yet.',
-          'Start Date': p.startDate ? new Date(p.startDate).toLocaleDateString() : '-',
-          'Estimated Due Date': p.estimatedDueDate ? new Date(p.estimatedDueDate).toLocaleDateString() : '-'
-        }));
+    const dataToExport = selectedProjects.map((project) => this.toExportRow(project));
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Projects');
 
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Projects');
+    worksheet['!cols'] = [
+      { wch: 30 },
+      { wch: 20 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 40 },
+      { wch: 12 },
+      { wch: 18 },
+    ];
 
-        // Adjust column widths for better readability
-        const wscols = [
-          { wch: 30 }, // Name
-          { wch: 40 }, // Description
-          { wch: 20 }, // Department
-          { wch: 25 }, // Manager
-          { wch: 25 }, // Sponsor
-          { wch: 20 }, // Category
-          { wch: 15 }, // Type
-          { wch: 15 }, // Phase
-          { wch: 15 }, // Status
-          { wch: 12 }, // Budget
-          { wch: 12 }, // Progress
-          { wch: 15 }, // Est Hours
-          { wch: 15 }, // Act Hours
-          { wch: 12 }, // Start
-          { wch: 12 }  // End
-        ];
-        worksheet['!cols'] = wscols;
-
-        XLSX.writeFile(workbook, `PMHUB_Projects_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        this.notificationService.showSuccess('Export generated successfully with full labels.');
-      },
-      error: (error) => {
-        this.isRefreshing = false;
-        this.notificationService.showError('Unable to fetch projects for export.');
-      }
-    });
+    XLSX.writeFile(workbook, `PMHUB_Selected_Projects_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    this.notificationService.showSuccess('Selected projects exported successfully.');
   }
 
   exportToCsv(): void {
@@ -491,6 +505,22 @@ export class ProjectList implements OnInit, AfterViewInit {
     if (value === undefined || value === null) return '-';
 
     return this.statusLabels[value as ProjectStatus] || String(value);
+  }
+
+  private toExportRow(project: ProjectSummaryDto): Record<string, string | number> {
+    return {
+      'Project Name': project.name,
+      Department: project.departmentName || '-',
+      Type: this.getManagementTypeLabel(project),
+      Phase: this.getPhaseLabel(project),
+      Status: this.getStatusLabel(project),
+      Sponsor: this.getSponsorDisplay(project),
+      'Estimated Hours': this.getEstimatedHoursDisplay(project),
+      'Actual Hours': project.actualHours || 0,
+      Description: project.description || 'No description provided yet.',
+      'Start Date': project.startDate ? new Date(project.startDate).toLocaleDateString() : '-',
+      'Estimated Due Date': project.estimatedDueDate ? new Date(project.estimatedDueDate).toLocaleDateString() : '-',
+    };
   }
 
   private getPhaseLabel(project: ProjectSummaryDto): string {
@@ -658,6 +688,7 @@ export class ProjectList implements OnInit, AfterViewInit {
           this.currentPage = response.pageNumber;
 
           this.rebuildDisplayProjects();
+          this.pruneSelection();
           this.cdr.detectChanges();
         },
         error: (error) => {
@@ -767,6 +798,19 @@ export class ProjectList implements OnInit, AfterViewInit {
       dataCompletionPercentage: project.dataCompletionPercentage !== undefined ? project.dataCompletionPercentage : 100,
       missingFields: project.missingFields || [],
     }));
+  }
+
+  private getVisibleProjectIds(): string[] {
+    return this.paginatedProjects.map((project) => project.id);
+  }
+
+  private pruneSelection(): void {
+    const currentIds = new Set(this.projects.map((project) => project.id));
+    this.selectedProjectIds.forEach((id) => {
+      if (!currentIds.has(id)) {
+        this.selectedProjectIds.delete(id);
+      }
+    });
   }
 
   private asRecord(value: unknown): Record<string, unknown> {

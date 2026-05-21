@@ -1,9 +1,15 @@
 <section class="notifications-page pm-page-enter">
   <header class="notifications-header pm-surface">
-    <div class="notifications-header__copy">
-      <span class="eyebrow">Administration</span>
-      <h1>Booking Notifications</h1>
-      <p>Send targeted email reminders for missing bookings, monthly targets and inactive users.</p>
+    <div class="notifications-header__left">
+      <div class="header-icon">
+        <mat-icon>notifications_active</mat-icon>
+      </div>
+
+      <div class="notifications-header__copy">
+        <span class="eyebrow">Administration</span>
+        <h1>Booking Notifications</h1>
+        <p>Send targeted email reminders for missing bookings, monthly targets and inactive users.</p>
+      </div>
     </div>
 
     <button type="button" class="refresh-action" (click)="refresh()" [disabled]="isLoading">
@@ -84,10 +90,52 @@
   <section
     class="notifications-table-card pm-surface"
     *ngIf="!isLoading && !activeAudience.errorMessage && filteredUsers.length > 0">
+    <div class="selection-toolbar" [class.selection-toolbar--active]="selectedUserCount > 0">
+      <label class="selection-control selection-control--all">
+        <input
+          type="checkbox"
+          [checked]="areAllFilteredUsersSelected"
+          [indeterminate]="isFilteredSelectionIndeterminate"
+          (change)="toggleSelectAllFiltered($event)"
+          aria-label="Select all visible users" />
+        <span class="selection-box" aria-hidden="true"></span>
+        <span class="selection-label">Select all</span>
+      </label>
+
+      <div class="selection-toolbar__summary">
+        <strong>{{ selectedUserCount }}</strong>
+        <span>{{ selectedUserCount === 1 ? 'user selected' : 'users selected' }}</span>
+      </div>
+
+      <div class="selection-toolbar__actions">
+        <button
+          type="button"
+          class="selection-clear-btn"
+          *ngIf="selectedUserCount > 0"
+          (click)="clearSelection()"
+          [disabled]="sendingKey !== null">
+          <mat-icon>close</mat-icon>
+          <span>Clear</span>
+        </button>
+
+        <button
+          type="button"
+          class="send-selected-action"
+          (click)="sendSelectedReminders()"
+          [disabled]="selectedUserCount === 0 || sendingKey !== null">
+          <mat-icon>{{ sendingKey ? 'hourglass_top' : 'outgoing_mail' }}</mat-icon>
+          <span>{{ sendingKey ? 'Sending...' : 'Send selected' }}</span>
+        </button>
+      </div>
+    </div>
+
     <div class="table-shell">
       <table class="notifications-table">
         <thead>
           <tr>
+            <th class="selection-column">
+              <span class="sr-only">Selection</span>
+            </th>
             <th>User</th>
             <th>Role</th>
             <th>Last booking</th>
@@ -97,7 +145,18 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let user of filteredUsers">
+          <tr *ngFor="let user of filteredUsers" [class.notification-row--selected]="isUserSelected(user.userId)">
+            <td class="selection-column" data-label="Select">
+              <label class="selection-control selection-control--row">
+                <input
+                  type="checkbox"
+                  [checked]="isUserSelected(user.userId)"
+                  (change)="toggleUserSelection(user.userId, $event)"
+                  [disabled]="sendingKey !== null || !user.userId"
+                  [attr.aria-label]="'Select ' + (user.fullName || user.email)" />
+                <span class="selection-box" aria-hidden="true"></span>
+              </label>
+            </td>
             <td data-label="User">
               <div class="user-cell">
                 <div class="user-cell__avatar">{{ getInitials(user) }}</div>

@@ -115,7 +115,6 @@
               </div>
               <div class="flex flex-col">
                 <span class="text-sm font-extrabold text-navy-500">{{ intern.name }}</span>
-                <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-tighter">{{ intern.id }}</span>
               </div>
             </div>
           </td>
@@ -141,8 +140,14 @@
               <button class="pm-action-btn" (click)="openIntern(intern.id)" title="View Profile">
                 <mat-icon>visibility</mat-icon>
               </button>
+              <button class="pm-action-btn pm-action-btn--indigo" (click)="viewPerformance(intern)" title="View Performance">
+                <mat-icon>analytics</mat-icon>
+              </button>
               <button class="pm-action-btn pm-action-btn--indigo" (click)="editIntern(intern.id)" title="Edit Records">
                 <mat-icon>edit</mat-icon>
+              </button>
+              <button class="pm-action-btn pm-action-btn--rose" (click)="deleteIntern(intern)" title="Delete Intern" [disabled]="deletingInternId === intern.id">
+                <mat-icon>delete</mat-icon>
               </button>
             </div>
           </td>

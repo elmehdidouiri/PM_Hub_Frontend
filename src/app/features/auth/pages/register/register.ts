@@ -4,7 +4,6 @@ import { Router } from '@angular/router';
 
 import { NotificationService } from '../../../../core/services/notification.service';
 import { AuthService } from '../../../../core/services/auth';
-import { RoleService } from '../../../../core/services/role.service';
 
 @Component({
   selector: 'app-register',
@@ -17,15 +16,12 @@ export class Register implements OnInit {
   private authService = inject(AuthService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
-  private roleService = inject(RoleService);
   private cdr = inject(ChangeDetectorRef);
 
   registerForm!: FormGroup;
   isLoading = false;
   hidePassword = true;
   hideConfirmPassword = true;
-
-  roles$ = this.roleService.getRoles();
 
   ngOnInit(): void {
     this.initForm();
@@ -39,7 +35,6 @@ export class Register implements OnInit {
         email: ['', [Validators.required, Validators.email]],
         password: ['', [Validators.required, Validators.minLength(6)]],
         confirmPassword: ['', [Validators.required]],
-        roleId: ['', [Validators.required]],
         acceptTerms: [false, [Validators.requiredTrue]],
       },
       {
@@ -76,7 +71,6 @@ export class Register implements OnInit {
       lastName: formValue.lastName,
       email: formValue.email,
       password: formValue.password,
-      roleId: formValue.roleId.toString(),
     };
 
     this.authService.register(registerData).subscribe({
@@ -109,7 +103,7 @@ export class Register implements OnInit {
       return 0;
     }
 
-    const fields = ['firstName', 'lastName', 'email', 'password', 'confirmPassword', 'roleId', 'acceptTerms'];
+    const fields = ['firstName', 'lastName', 'email', 'password', 'confirmPassword', 'acceptTerms'];
     const completedFields = fields.filter((field) => {
       const value = this.registerForm.get(field)?.value;
 

@@ -8,6 +8,7 @@ import { ProjectForm } from './pages/project-form/project-form';
 import { ProjectCreatePage } from './pages/project-create-page/project-create-page';
 import { ProjectEditPage } from './pages/project-edit-page/project-edit-page';
 import { ProjectDetailsPage } from './pages/project-details-page/project-details-page';
+import { ProjectAllocationsPage } from './pages/project-allocations-page/project-allocations-page';
 import { projectDetailsResolver } from './resolvers/project-details.resolver';
 import { projectEditorResolver } from './resolvers/project-editor.resolver';
 import { projectReferencesResolver } from './resolvers/project-references.resolver';
@@ -27,6 +28,13 @@ const routes: Routes = [
     },
     data: {
       mode: 'create',
+    },
+  },
+  {
+    path: ':id/allocations',
+    component: ProjectAllocationsPage,
+    resolve: {
+      project: projectDetailsResolver,
     },
   },
   {

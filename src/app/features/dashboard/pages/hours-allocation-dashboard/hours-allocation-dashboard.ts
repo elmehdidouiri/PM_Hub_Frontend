@@ -13,7 +13,7 @@ import {
 import { HoursAllocationDashboardService } from '../../services/hours-allocation-dashboard.service';
 
 type QuickSelect = 'month' | 'year' | 'ytd';
-type AnalysisMode = 'resourcesCapacity' | 'workedDays' | 'allocationDetails';
+type AnalysisMode = 'resourcesCapacity' | 'team' | 'details' | 'projects' | 'roles';
 
 interface SummaryCard extends DashboardMetric {}
 
@@ -51,6 +51,11 @@ export class HoursAllocationDashboard implements OnInit {
   selectedMonth = this.now.getMonth() + 1;
   fromDate = this.toDateInputValue(new Date(this.now.getFullYear(), this.now.getMonth(), 1));
   toDate = this.toDateInputValue(new Date(this.now.getFullYear(), this.now.getMonth() + 1, 0));
+
+  currentPage = 1;
+  pageSize = 10;
+  all = false;
+  readonly availablePageSizes = [5, 10, 20, 100];
 
   private latestRequest = 0;
 
@@ -153,7 +158,42 @@ export class HoursAllocationDashboard implements OnInit {
   }
 
   reload(): void {
+    this.currentPage = 1;
     this.loadDashboard(false);
+  }
+
+  onAnalysisChanged(): void {
+    this.currentPage = 1;
+    this.reload();
+  }
+
+  onPageChange(page: number): void {
+    const totalPages = this.dashboard?.pagination?.totalPages ?? 1;
+    if (page >= 1 && page <= totalPages) {
+      this.currentPage = page;
+      this.loadDashboard(false);
+    }
+  }
+
+  onPageSizeChange(newSize: number): void {
+    this.pageSize = newSize;
+    this.currentPage = 1;
+    this.loadDashboard(false);
+  }
+
+  getVisiblePages(): number[] {
+    const total = this.dashboard?.pagination?.totalPages ?? 0;
+    const current = this.currentPage;
+
+    if (total <= 5) {
+      return Array.from({ length: total }, (_, index) => index + 1);
+    }
+
+    const start = Math.max(1, current - 2);
+    const end = Math.min(total, start + 4);
+    const adjustedStart = Math.max(1, end - 4);
+
+    return Array.from({ length: end - adjustedStart + 1 }, (_, index) => adjustedStart + index);
   }
 
   selectQuick(value: QuickSelect): void {
@@ -287,6 +327,10 @@ export class HoursAllocationDashboard implements OnInit {
         next: (dashboard) => {
           if (requestId === this.latestRequest) {
             this.dashboard = dashboard;
+            if (dashboard.pagination) {
+              this.currentPage = dashboard.pagination.pageNumber;
+              this.pageSize = dashboard.pagination.pageSize;
+            }
           }
         },
         error: () => {
@@ -299,17 +343,21 @@ export class HoursAllocationDashboard implements OnInit {
   }
 
   private buildParams(): HoursAllocationDashboardParams {
+    const isMonth = this.selectedQuickSelect === 'month';
     return {
       userId: this.selectedUserId,
       memberId: null,
       projectId: this.selectedProjectId,
       roleId: this.selectedRoleId,
       year: this.selectedYear,
-      month: this.selectedQuickSelect === 'month' ? this.selectedMonth : null,
-      fromDate: this.fromDate,
-      toDate: this.toDate,
+      month: isMonth ? this.selectedMonth : null,
+      fromDate: isMonth ? this.fromDate : null,
+      toDate: isMonth ? this.toDate : null,
       quickSelect: this.selectedQuickSelect,
       analysis: this.selectedAnalysis,
+      pageNumber: this.currentPage,
+      pageSize: this.pageSize,
+      all: this.all ? true : null,
     };
   }
 

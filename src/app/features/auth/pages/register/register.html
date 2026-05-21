@@ -119,16 +119,7 @@
             </div>
           </div>
 
-          <div class="form-field">
-            <label for="roleId">Role <span>*</span></label>
-            <select id="roleId" formControlName="roleId" class="register-input">
-              <option value="" disabled selected>Select a role</option>
-              <option *ngFor="let role of roles$ | async" [value]="role.id">{{ role.name }}</option>
-            </select>
-            <p *ngIf="registerForm.get('roleId')?.touched && registerForm.get('roleId')?.invalid" class="field-error">
-              Role is required
-            </p>
-          </div>
+
 
           <div class="register-panel-box">
             <label class="register-terms">

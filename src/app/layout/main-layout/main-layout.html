@@ -44,13 +44,82 @@
 
             <div class="app-header__toolbar">
               <div class="app-header__actions">
-                <button
-                  type="button"
-                  class="app-header__icon-btn app-header__icon-btn--notification"
-                  aria-label="Notifications">
-                  <mat-icon>notifications_none</mat-icon>
-                  <span class="app-header__dot"></span>
-                </button>
+                <div class="app-notifications" (click)="$event.stopPropagation()">
+                  <button
+                    type="button"
+                    class="app-header__icon-btn app-header__icon-btn--notification"
+                    aria-label="Notifications"
+                    aria-haspopup="true"
+                    [attr.aria-expanded]="notificationMenuOpen"
+                    (click)="toggleNotificationMenu($event)">
+                    <mat-icon>notifications_none</mat-icon>
+                    <span class="app-header__badge" *ngIf="notifications?.totalCount">
+                      {{ notifications?.totalCount }}
+                    </span>
+                  </button>
+
+                  <div class="app-notification-panel" *ngIf="notificationMenuOpen">
+                    <div class="app-notification-panel__summary">
+                      <div>
+                        <strong>{{ notifications?.totalCount || 0 }} notifications</strong>
+                        <span>{{ notifications?.criticalCount || 0 }} urgent</span>
+                      </div>
+                      <button type="button" aria-label="Refresh notifications" (click)="loadNotifications()">
+                        <mat-icon>refresh</mat-icon>
+                      </button>
+                    </div>
+
+                    <ng-container *ngIf="notifications?.groups?.length; else noNotifications">
+                      <section class="app-notification-group" *ngFor="let group of notifications?.groups">
+                        <button
+                          type="button"
+                          class="app-notification-group__toggle"
+                          [class.app-notification-group__toggle--open]="isNotificationGroupExpanded(group.key)"
+                          [attr.aria-expanded]="isNotificationGroupExpanded(group.key)"
+                          (click)="toggleNotificationGroup(group.key)">
+                          <span class="app-notification-group__main">
+                            <strong>{{ group.label }}</strong>
+                            <small>{{ group.count }} notification{{ group.count > 1 ? 's' : '' }}</small>
+                          </span>
+
+                          <span class="app-notification-group__counts">
+                            <span class="app-notification-count app-notification-count--critical" *ngIf="group.criticalCount">
+                              {{ group.criticalCount }}
+                            </span>
+                            <span class="app-notification-count app-notification-count--warning" *ngIf="group.warningCount">
+                              {{ group.warningCount }}
+                            </span>
+                            <span class="app-notification-count app-notification-count--info" *ngIf="group.infoCount">
+                              {{ group.infoCount }}
+                            </span>
+                            <mat-icon>expand_more</mat-icon>
+                          </span>
+                        </button>
+
+                        <div class="app-notification-group__details" *ngIf="isNotificationGroupExpanded(group.key)">
+                          <button
+                            type="button"
+                            class="app-notification-item"
+                            *ngFor="let item of itemsForGroup(group.key)"
+                            [class.app-notification-item--critical]="item.severity === 'critical'"
+                            [class.app-notification-item--warning]="item.severity === 'warning'"
+                            [class.app-notification-item--info]="item.severity === 'info'"
+                            (click)="onNotificationClick(item)">
+                            <strong>{{ item.title }}</strong>
+                            <span>{{ item.message }}</span>
+                          </button>
+                        </div>
+                      </section>
+                    </ng-container>
+
+                    <ng-template #noNotifications>
+                      <div class="app-notification-empty">
+                        <mat-icon>notifications_off</mat-icon>
+                        <span>No notifications</span>
+                      </div>
+                    </ng-template>
+                  </div>
+                </div>
               </div>
 
               <div class="app-header__user">

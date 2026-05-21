@@ -5,6 +5,8 @@ import { finalize } from 'rxjs/operators';
 
 import { AuthApprovalsApiService, PendingUserDto } from '../../../../core/services/auth-approvals-api.service';
 import { NotificationService } from '../../../../core/services/notification.service';
+import { RoleService } from '../../../../core/services/role.service';
+import { Role } from '../../../../core/models';
 
 @Component({
   selector: 'app-user-approvals',
@@ -17,8 +19,11 @@ export class UserApprovalsPage implements OnInit {
   private readonly notifications = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly roleService = inject(RoleService);
 
   pendingUsers: PendingUserDto[] = [];
+  roles: Role[] = [];
+  selectedRoleIds: { [userId: string]: string } = {};
   isLoading = true;
   errorMessage = '';
   processingId: string | null = null;
@@ -26,6 +31,7 @@ export class UserApprovalsPage implements OnInit {
   searchTerm = '';
 
   ngOnInit(): void {
+    this.loadRoles();
     this.loadPendingUsers();
   }
 
@@ -41,7 +47,12 @@ export class UserApprovalsPage implements OnInit {
   }
 
   approve(user: PendingUserDto): void {
-    this.processAction(user, true);
+    const roleId = this.selectedRoleIds[user.id];
+    if (!roleId) {
+      this.notifications.showError('Please select a role before approving.');
+      return;
+    }
+    this.processAction(user, true, roleId);
   }
 
   reject(user: PendingUserDto): void {
@@ -70,13 +81,13 @@ export class UserApprovalsPage implements OnInit {
     this.loadPendingUsers();
   }
 
-  private processAction(user: PendingUserDto, isApproved: boolean): void {
+  private processAction(user: PendingUserDto, isApproved: boolean, roleId?: string): void {
     if (this.processingId) return;
     this.processingId = user.id;
     this.cdr.markForCheck();
 
     this.api
-      .approveUser({ userId: user.id, isApproved })
+      .approveUser({ userId: user.id, isApproved, roleId })
       .pipe(finalize(() => {
         this.processingId = null;
         this.cdr.markForCheck();
@@ -89,6 +100,7 @@ export class UserApprovalsPage implements OnInit {
           );
           // Remove from list
           this.pendingUsers = this.pendingUsers.filter((u) => u.id !== user.id);
+          delete this.selectedRoleIds[user.id];
           this.cdr.markForCheck();
         },
         error: () => {
@@ -97,6 +109,18 @@ export class UserApprovalsPage implements OnInit {
           );
         },
       });
+  }
+
+  private loadRoles(): void {
+    this.roleService.getRoles().subscribe({
+      next: (roles) => {
+        this.roles = roles;
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Failed to load roles', err);
+      }
+    });
   }
 
   private loadPendingUsers(): void {
@@ -113,6 +137,12 @@ export class UserApprovalsPage implements OnInit {
       .subscribe({
         next: (users) => {
           this.pendingUsers = users;
+          // Initialize selectedRoleIds
+          users.forEach((user) => {
+            if (user.roleId) {
+              this.selectedRoleIds[user.id] = user.roleId;
+            }
+          });
           this.cdr.markForCheck();
         },
         error: () => {

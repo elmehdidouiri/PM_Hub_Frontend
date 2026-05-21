@@ -40,6 +40,20 @@ export class InternService {
     );
   }
 
+  deleteIntern(id: string): Observable<void> {
+    return this.http.delete<ApiResponse<void>>(`${this.apiUrl}/${id}`).pipe(
+      map((response) => {
+        if (this.isApiResponse(response)) {
+          if (response.success) {
+            return;
+          }
+          throw new Error(response.message || 'Unable to delete intern');
+        }
+        return;
+      })
+    );
+  }
+
   private unwrapList(response: ApiResponse<unknown[]> | unknown[]): unknown[] {
     if (Array.isArray(response)) {
       return response;

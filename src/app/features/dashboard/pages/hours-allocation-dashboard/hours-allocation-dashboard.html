@@ -60,12 +60,12 @@
           </div>
         </div>
 
-        <div class="filter-field">
+        <div class="filter-field" *ngIf="selectedQuickSelect === 'month'">
           <label><mat-icon>event_available</mat-icon> From</label>
           <input type="date" [(ngModel)]="fromDate" (ngModelChange)="reload()" />
         </div>
 
-        <div class="filter-field">
+        <div class="filter-field" *ngIf="selectedQuickSelect === 'month'">
           <label><mat-icon>event_busy</mat-icon> To</label>
           <input type="date" [(ngModel)]="toDate" (ngModelChange)="reload()" />
         </div>
@@ -90,10 +90,12 @@
 
         <div class="filter-field">
           <label>Analysis Mode</label>
-          <select [(ngModel)]="selectedAnalysis" (ngModelChange)="reload()">
-            <option value="resourcesCapacity">Capacity</option>
-            <option value="workedDays">Worked days</option>
-            <option value="allocationDetails">Allocation details</option>
+          <select [(ngModel)]="selectedAnalysis" (ngModelChange)="onAnalysisChanged()">
+            <option value="resourcesCapacity">Hours by User (Capacity)</option>
+            <option value="team">Team Performance</option>
+            <option value="details">Detailed Allocations</option>
+            <option value="projects">Hours by Project</option>
+            <option value="roles">Hours by Role</option>
           </select>
         </div>
 
@@ -104,7 +106,7 @@
           </select>
         </div>
 
-        <div class="filter-field">
+        <div class="filter-field" *ngIf="selectedQuickSelect === 'month'">
           <label>Specific Month</label>
           <select [(ngModel)]="selectedMonth" (ngModelChange)="onMonthChanged()">
             <option *ngFor="let month of months" [ngValue]="month.value">{{ month.label }}</option>
@@ -138,16 +140,45 @@
         </article>
       </section>
 
+      <!-- ANALYSIS MODE TABS -->
+      <nav class="analysis-tabs">
+        <button type="button" class="analysis-tab" [class.active]="selectedAnalysis === 'resourcesCapacity'" (click)="selectedAnalysis = 'resourcesCapacity'; onAnalysisChanged()">
+          <mat-icon>groups</mat-icon>
+          <span>Capacity (Users)</span>
+        </button>
+        <button type="button" class="analysis-tab" [class.active]="selectedAnalysis === 'projects'" (click)="selectedAnalysis = 'projects'; onAnalysisChanged()">
+          <mat-icon>folder</mat-icon>
+          <span>Projects</span>
+        </button>
+        <button type="button" class="analysis-tab" [class.active]="selectedAnalysis === 'roles'" (click)="selectedAnalysis = 'roles'; onAnalysisChanged()">
+          <mat-icon>work</mat-icon>
+          <span>Roles</span>
+        </button>
+        <button type="button" class="analysis-tab" [class.active]="selectedAnalysis === 'team'" (click)="selectedAnalysis = 'team'; onAnalysisChanged()">
+          <mat-icon>groups_2</mat-icon>
+          <span>Team Performance</span>
+        </button>
+        <button type="button" class="analysis-tab" [class.active]="selectedAnalysis === 'details'" (click)="selectedAnalysis = 'details'; onAnalysisChanged()">
+          <mat-icon>table_chart</mat-icon>
+          <span>Detailed Allocations</span>
+        </button>
+      </nav>
+
       <!-- DETAILED TABLE -->
-      <section class="panel">
+      <section class="panel" [class.panel--active-analysis]="selectedAnalysis === 'details'" *ngIf="selectedAnalysis === 'details'">
         <header class="panel__header">
           <div>
             <mat-icon>table_chart</mat-icon>
             <strong>Detailed Allocations - {{ selectedYear }}</strong>
+            <span class="active-analysis-badge" *ngIf="selectedAnalysis === 'details'">
+              <span class="pulse-dot"></span>
+              Active
+            </span>
           </div>
           <div class="panel__chips">
             <span><mat-icon>schedule</mat-icon> {{ formatHours(totalDetailedHours) }}</span>
-            <span><mat-icon>assignment</mat-icon> {{ data.details.length }} rows</span>
+            <span *ngIf="selectedAnalysis === 'details' && data.pagination"><mat-icon>assignment</mat-icon> {{ data.pagination.totalCount }} total rows</span>
+            <span *ngIf="selectedAnalysis !== 'details' || !data.pagination"><mat-icon>assignment</mat-icon> {{ data.details.length }} rows</span>
           </div>
         </header>
 
@@ -194,6 +225,36 @@
             </tfoot>
           </table>
         </div>
+
+        <!-- Detailed Allocations Pagination -->
+        <div class="table-pagination" *ngIf="selectedAnalysis === 'details' && data.pagination && data.pagination.totalPages > 0">
+          <div class="table-pagination__info">
+            <div class="page-size-selector">
+              <span>Rows per page:</span>
+              <select [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)" class="page-size-select">
+                <option *ngFor="let size of availablePageSizes" [value]="size">{{ size }}</option>
+              </select>
+            </div>
+            <div class="table-pagination__summary">
+              Showing {{ (currentPage - 1) * pageSize + 1 }}-{{ ((currentPage * pageSize) > data.pagination.totalCount ? data.pagination.totalCount : (currentPage * pageSize)) }} of {{ data.pagination.totalCount }} detailed rows
+            </div>
+          </div>
+
+          <div class="table-pagination__controls" *ngIf="data.pagination.totalPages > 1">
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage - 1)" [disabled]="currentPage === 1">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+
+            <button type="button" class="pagination-btn" *ngFor="let page of getVisiblePages()"
+              [class.pagination-btn--active]="page === currentPage" (click)="onPageChange(page)">
+              {{ page }}
+            </button>
+
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage + 1)" [disabled]="currentPage === data.pagination.totalPages">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
       </section>
 
       <!-- MONTHLY BREAKDOWN -->
@@ -218,11 +279,19 @@
       </section>
 
       <!-- HOURS BY USER -->
-      <section class="panel">
+      <section class="panel" [class.panel--active-analysis]="selectedAnalysis === 'resourcesCapacity'" *ngIf="selectedAnalysis === 'resourcesCapacity'">
         <header class="panel__header">
           <div>
             <mat-icon>groups</mat-icon>
             <strong>Hours by User</strong>
+            <span class="active-analysis-badge" *ngIf="selectedAnalysis === 'resourcesCapacity'">
+              <span class="pulse-dot"></span>
+              Active
+            </span>
+          </div>
+          <div class="panel__chips">
+            <span *ngIf="selectedAnalysis === 'resourcesCapacity' && data.pagination"><mat-icon>groups</mat-icon> {{ data.pagination.totalCount }} total users</span>
+            <span *ngIf="selectedAnalysis !== 'resourcesCapacity' || !data.pagination"><mat-icon>groups</mat-icon> {{ data.hoursByUser.length }} users</span>
           </div>
         </header>
         <div class="table-wrap">
@@ -261,14 +330,52 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Hours by User Pagination -->
+        <div class="table-pagination" *ngIf="selectedAnalysis === 'resourcesCapacity' && data.pagination && data.pagination.totalPages > 0">
+          <div class="table-pagination__info">
+            <div class="page-size-selector">
+              <span>Rows per page:</span>
+              <select [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)" class="page-size-select">
+                <option *ngFor="let size of availablePageSizes" [value]="size">{{ size }}</option>
+              </select>
+            </div>
+            <div class="table-pagination__summary">
+              Showing {{ (currentPage - 1) * pageSize + 1 }}-{{ ((currentPage * pageSize) > data.pagination.totalCount ? data.pagination.totalCount : (currentPage * pageSize)) }} of {{ data.pagination.totalCount }} users
+            </div>
+          </div>
+
+          <div class="table-pagination__controls" *ngIf="data.pagination.totalPages > 1">
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage - 1)" [disabled]="currentPage === 1">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+
+            <button type="button" class="pagination-btn" *ngFor="let page of getVisiblePages()"
+              [class.pagination-btn--active]="page === currentPage" (click)="onPageChange(page)">
+              {{ page }}
+            </button>
+
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage + 1)" [disabled]="currentPage === data.pagination.totalPages">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
       </section>
 
       <!-- HOURS BY PROJECT -->
-      <section class="panel">
+      <section class="panel" [class.panel--active-analysis]="selectedAnalysis === 'projects'" *ngIf="selectedAnalysis === 'projects'">
         <header class="panel__header">
           <div>
             <mat-icon>folder</mat-icon>
             <strong>Hours by Project</strong>
+            <span class="active-analysis-badge" *ngIf="selectedAnalysis === 'projects'">
+              <span class="pulse-dot"></span>
+              Active
+            </span>
+          </div>
+          <div class="panel__chips">
+            <span *ngIf="selectedAnalysis === 'projects' && data.pagination"><mat-icon>folder</mat-icon> {{ data.pagination.totalCount }} total projects</span>
+            <span *ngIf="selectedAnalysis !== 'projects' || !data.pagination"><mat-icon>folder</mat-icon> {{ data.hoursByProject.length }} projects</span>
           </div>
         </header>
         <div class="table-wrap">
@@ -295,13 +402,52 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Hours by Project Pagination -->
+        <div class="table-pagination" *ngIf="selectedAnalysis === 'projects' && data.pagination && data.pagination.totalPages > 0">
+          <div class="table-pagination__info">
+            <div class="page-size-selector">
+              <span>Rows per page:</span>
+              <select [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)" class="page-size-select">
+                <option *ngFor="let size of availablePageSizes" [value]="size">{{ size }}</option>
+              </select>
+            </div>
+            <div class="table-pagination__summary">
+              Showing {{ (currentPage - 1) * pageSize + 1 }}-{{ ((currentPage * pageSize) > data.pagination.totalCount ? data.pagination.totalCount : (currentPage * pageSize)) }} of {{ data.pagination.totalCount }} projects
+            </div>
+          </div>
+
+          <div class="table-pagination__controls" *ngIf="data.pagination.totalPages > 1">
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage - 1)" [disabled]="currentPage === 1">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+
+            <button type="button" class="pagination-btn" *ngFor="let page of getVisiblePages()"
+              [class.pagination-btn--active]="page === currentPage" (click)="onPageChange(page)">
+              {{ page }}
+            </button>
+
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage + 1)" [disabled]="currentPage === data.pagination.totalPages">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
       </section>
+
       <!-- HOURS BY ROLE -->
-      <section class="panel">
+      <section class="panel" [class.panel--active-analysis]="selectedAnalysis === 'roles'" *ngIf="selectedAnalysis === 'roles'">
         <header class="panel__header">
           <div>
             <mat-icon>work</mat-icon>
             <strong>Hours by Role</strong>
+            <span class="active-analysis-badge" *ngIf="selectedAnalysis === 'roles'">
+              <span class="pulse-dot"></span>
+              Active
+            </span>
+          </div>
+          <div class="panel__chips">
+            <span *ngIf="selectedAnalysis === 'roles' && data.pagination"><mat-icon>work</mat-icon> {{ data.pagination.totalCount }} total roles</span>
+            <span *ngIf="selectedAnalysis !== 'roles' || !data.pagination"><mat-icon>work</mat-icon> {{ data.hoursByRole.length }} roles</span>
           </div>
         </header>
         <div class="table-wrap">
@@ -328,18 +474,53 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Hours by Role Pagination -->
+        <div class="table-pagination" *ngIf="selectedAnalysis === 'roles' && data.pagination && data.pagination.totalPages > 0">
+          <div class="table-pagination__info">
+            <div class="page-size-selector">
+              <span>Rows per page:</span>
+              <select [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)" class="page-size-select">
+                <option *ngFor="let size of availablePageSizes" [value]="size">{{ size }}</option>
+              </select>
+            </div>
+            <div class="table-pagination__summary">
+              Showing {{ (currentPage - 1) * pageSize + 1 }}-{{ ((currentPage * pageSize) > data.pagination.totalCount ? data.pagination.totalCount : (currentPage * pageSize)) }} of {{ data.pagination.totalCount }} roles
+            </div>
+          </div>
+
+          <div class="table-pagination__controls" *ngIf="data.pagination.totalPages > 1">
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage - 1)" [disabled]="currentPage === 1">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+
+            <button type="button" class="pagination-btn" *ngFor="let page of getVisiblePages()"
+              [class.pagination-btn--active]="page === currentPage" (click)="onPageChange(page)">
+              {{ page }}
+            </button>
+
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage + 1)" [disabled]="currentPage === data.pagination.totalPages">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        </div>
       </section>
 
       <!-- HOURS BY TEAM -->
-      <section class="panel">
+      <section class="panel" [class.panel--active-analysis]="selectedAnalysis === 'team'" *ngIf="selectedAnalysis === 'team'">
         <header class="panel__header">
           <div>
             <mat-icon>groups_2</mat-icon>
             <strong>Team Performance</strong>
+            <span class="active-analysis-badge" *ngIf="selectedAnalysis === 'team'">
+              <span class="pulse-dot"></span>
+              Active
+            </span>
           </div>
           <div class="panel__chips">
             <span><mat-icon>schedule</mat-icon> {{ formatHours(data.summary.totalHours) }}</span>
-            <span><mat-icon>calendar_today</mat-icon> {{ data.summary.workedDays }} worked days</span>
+            <span *ngIf="selectedAnalysis === 'team' && data.pagination"><mat-icon>calendar_today</mat-icon> {{ data.pagination.totalCount }} total entries</span>
+            <span *ngIf="selectedAnalysis !== 'team' || !data.pagination"><mat-icon>calendar_today</mat-icon> {{ data.summary.workedDays }} worked days</span>
           </div>
         </header>
         
@@ -372,6 +553,36 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Team Performance Pagination -->
+        <div class="table-pagination" *ngIf="selectedAnalysis === 'team' && data.pagination && data.pagination.totalPages > 0">
+          <div class="table-pagination__info">
+            <div class="page-size-selector">
+              <span>Rows per page:</span>
+              <select [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)" class="page-size-select">
+                <option *ngFor="let size of availablePageSizes" [value]="size">{{ size }}</option>
+              </select>
+            </div>
+            <div class="table-pagination__summary">
+              Showing {{ (currentPage - 1) * pageSize + 1 }}-{{ ((currentPage * pageSize) > data.pagination.totalCount ? data.pagination.totalCount : (currentPage * pageSize)) }} of {{ data.pagination.totalCount }} team entries
+            </div>
+          </div>
+
+          <div class="table-pagination__controls" *ngIf="data.pagination.totalPages > 1">
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage - 1)" [disabled]="currentPage === 1">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+
+            <button type="button" class="pagination-btn" *ngFor="let page of getVisiblePages()"
+              [class.pagination-btn--active]="page === currentPage" (click)="onPageChange(page)">
+              {{ page }}
+            </button>
+
+            <button type="button" class="pagination-btn" (click)="onPageChange(currentPage + 1)" [disabled]="currentPage === data.pagination.totalPages">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
         </div>
       </section>
     </ng-container>

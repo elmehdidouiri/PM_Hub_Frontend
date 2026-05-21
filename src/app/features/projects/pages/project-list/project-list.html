@@ -122,10 +122,40 @@
 
   <!-- Modern Clean Table Card -->
   <section class="table-card" *ngIf="!isLoading && !errorMessage && hasFilteredProjects">
+    <div class="selection-toolbar" [class.selection-toolbar--active]="selectedProjectCount > 0">
+      <label class="selection-control selection-control--all">
+        <input
+          type="checkbox"
+          [checked]="areAllPageProjectsSelected"
+          [indeterminate]="isPageSelectionIndeterminate"
+          (change)="toggleSelectAllVisible($event)"
+          aria-label="Select all visible projects" />
+        <span class="selection-box" aria-hidden="true"></span>
+        <span class="selection-label">Select all</span>
+      </label>
+
+      <div class="selection-toolbar__summary">
+        <strong>{{ selectedProjectCount }}</strong>
+        <span>{{ selectedProjectCount === 1 ? 'project selected' : 'projects selected' }}</span>
+      </div>
+
+      <button
+        type="button"
+        class="selection-clear-btn"
+        *ngIf="selectedProjectCount > 0"
+        (click)="clearSelection()">
+        <mat-icon>close</mat-icon>
+        <span>Clear</span>
+      </button>
+    </div>
+
     <div class="table-shell">
       <table class="projects-table">
         <thead>
           <tr>
+            <th class="selection-column">
+              <span class="sr-only">Selection</span>
+            </th>
             <th>Project</th>
             <th>Department</th>
             <th>Type</th>
@@ -140,26 +170,38 @@
         </thead>
 
         <tbody>
-          <tr *ngFor="let project of paginatedProjects; trackBy: trackByProjectId">
-            <td class="project-name-cell">
+          <tr
+            *ngFor="let project of paginatedProjects; trackBy: trackByProjectId"
+            [class.project-row--selected]="isProjectSelected(project.id)">
+            <td class="selection-column" data-label="Select">
+              <label class="selection-control selection-control--row">
+                <input
+                  type="checkbox"
+                  [checked]="isProjectSelected(project.id)"
+                  (change)="toggleProjectSelection(project.id, $event)"
+                  [attr.aria-label]="'Select ' + project.name" />
+                <span class="selection-box" aria-hidden="true"></span>
+              </label>
+            </td>
+            <td class="project-name-cell" data-label="Project">
               <div class="project-cell">
                 <span class="project-name">{{ project.name }}</span>
               </div>
             </td>
-            <td>{{ project.departmentName }}</td>
-            <td>
+            <td data-label="Department">{{ project.departmentName }}</td>
+            <td data-label="Type">
               <span class="type-badge">{{ project.managementTypeLabel }}</span>
             </td>
-            <td>
+            <td data-label="Phase">
               <span class="phase-badge">{{ project.phaseLabel }}</span>
             </td>
-            <td>
+            <td data-label="Status">
               <div class="status-badge" [ngClass]="project.statusClass">
                 <span class="status-indicator"></span>
                 <span class="status-label">{{ project.statusLabel }}</span>
               </div>
             </td>
-            <td class="text-center">
+            <td class="text-center" data-label="Completion">
               <div class="completion-wrapper" [matTooltip]="project.isDataComplete ? 'All details complete' : 'Missing fields: ' + project.missingFields?.join(', ')" matTooltipPosition="above">
                 <div class="completion-header">
                   <span class="completion-label" [class.completion-label--complete]="project.isDataComplete">
@@ -175,18 +217,18 @@
                 </div>
               </div>
             </td>
-            <td>
+            <td data-label="Sponsor">
               <div class="sponsor-cell">
                 <span>{{ project.sponsorDisplay }}</span>
               </div>
             </td>
-            <td class="text-right font-mono">{{ project.estimatedHours }}h</td>
-            <td class="text-right font-mono">
+            <td class="text-right font-mono" data-label="Est. Hours">{{ project.estimatedHours }}h</td>
+            <td class="text-right font-mono" data-label="Act. Hours">
               <strong [class.hours-over]="project.actualHours > project.estimatedHours">
                 {{ project.actualHours }}h
               </strong>
             </td>
-            <td class="text-right">
+            <td class="text-right" data-label="Actions">
               <div class="action-cell-wrapper">
                 <button type="button" class="action-trigger-btn" [matMenuTriggerFor]="actionMenu" aria-label="Project actions">
                   <mat-icon>more_vert</mat-icon>
