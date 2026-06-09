@@ -15,4 +15,5 @@ export interface DashboardMetric {
   note: string;
   icon: string;
   tone: MetricTone;
+  actionLabel?: string;
 }

@@ -141,10 +141,7 @@ export class DashboardHome implements OnInit {
   activeDrillDownTicket: FilterTicket | null = null;
 
   activeDrillDownSection: FilterSection | null = null;
-
-
-
-
+  expandedSections = new Set<FilterKind>();
 
   private readonly departmentIdByName = new Map<string, string>();
 
@@ -227,6 +224,7 @@ export class DashboardHome implements OnInit {
         icon: 'inventory_2',
 
         tone: 'blue',
+        actionLabel: 'Open matching projects',
 
       },
 
@@ -241,6 +239,7 @@ export class DashboardHome implements OnInit {
         icon: 'verified',
 
         tone: this.averageOtd >= 90 ? 'green' : 'orange',
+        actionLabel: 'Open KPI analytics',
 
       },
 
@@ -255,6 +254,7 @@ export class DashboardHome implements OnInit {
         icon: 'auto_graph',
 
         tone: this.averageEffectiveness >= 90 ? 'green' : 'orange',
+        actionLabel: 'Open KPI analytics',
 
       },
 
@@ -269,6 +269,7 @@ export class DashboardHome implements OnInit {
         icon: 'timer_off',
 
         tone: this.delayedProjects > 0 ? 'red' : 'green',
+        actionLabel: 'Open delayed projects',
 
       },
 
@@ -298,96 +299,51 @@ export class DashboardHome implements OnInit {
 
 
 
+  private buildSection(
+    kind: FilterKind,
+    title: string,
+    icon: string,
+    allTickets: FilterTicket[],
+    selectedId: string
+  ): FilterSection {
+    const validTickets = allTickets.filter(t => t.id !== 'all' && (t.count > 0 || t.id === selectedId));
+    let visibleTickets = validTickets;
+    let hiddenCount = 0;
+
+    if (validTickets.length > 4) {
+      hiddenCount = validTickets.length - 4;
+      if (!this.expandedSections.has(kind)) {
+        visibleTickets = validTickets.slice(0, 4);
+        // Ensure selected item is visible
+        if (selectedId !== 'all' && !visibleTickets.some(t => t.id === selectedId)) {
+          const selItem = validTickets.find(t => t.id === selectedId);
+          if (selItem) {
+            visibleTickets[3] = selItem;
+          }
+        }
+      }
+    }
+
+    return {
+      kind,
+      title,
+      icon,
+      tickets: validTickets,
+      selectedId,
+      visibleTickets,
+      hiddenCount
+    };
+  }
+
   get filterSections(): FilterSection[] {
-
     return [
-
-      {
-
-        kind: 'projectManagement',
-
-        title: 'Project Management',
-
-        icon: 'manage_accounts',
-
-        tickets: this.projectManagementTickets.filter((ticket) => ticket.id !== 'all'),
-
-        selectedId: this.filterState.selectedProjectManagementType,
-
-      },
-
-      {
-
-        kind: 'status',
-
-        title: 'Project Status',
-
-        icon: 'radio_button_checked',
-
-        tickets: this.statusTickets.filter((ticket) => ticket.id !== 'all'),
-
-        selectedId: this.filterState.selectedProjectStatus,
-
-      },
-
-      {
-
-        kind: 'phase',
-
-        title: 'Project Phases',
-
-        icon: 'layers',
-
-        tickets: this.phaseTickets.filter((ticket) => ticket.id !== 'all'),
-
-        selectedId: this.filterState.selectedProjectPhase,
-
-      },
-
-      {
-
-        kind: 'businessUnit',
-
-        title: 'Business Units',
-
-        icon: 'corporate_fare',
-
-        tickets: this.businessUnitTickets,
-
-        selectedId: this.filterState.selectedBusinessUnit,
-
-      },
-
-      {
-
-        kind: 'department',
-
-        title: 'Departments',
-
-        icon: 'business',
-
-        tickets: this.departmentTickets,
-
-        selectedId: this.filterState.selectedDepartment,
-
-      },
-
-      {
-
-        kind: 'plant',
-
-        title: 'Plants',
-
-        icon: 'factory',
-
-        tickets: this.plantTickets,
-
-        selectedId: this.filterState.selectedPlant,
-
-      },
-
+      this.buildSection('projectManagement', 'Project Management', 'manage_accounts', this.projectManagementTickets, this.filterState.selectedProjectManagementType),
+      this.buildSection('status', 'Project Status', 'radio_button_checked', this.statusTickets, this.filterState.selectedProjectStatus),
+      this.buildSection('phase', 'Project Phases', 'layers', this.phaseTickets, this.filterState.selectedProjectPhase),
+      this.buildSection('businessUnit', 'Business Units', 'corporate_fare', this.businessUnitTickets, this.filterState.selectedBusinessUnit),
+      this.buildSection('department', 'Departments', 'business', this.departmentTickets, this.filterState.selectedDepartment),
+      this.buildSection('plant', 'Plants', 'factory', this.plantTickets, this.filterState.selectedPlant),
     ];
-
   }
 
 
@@ -396,6 +352,19 @@ export class DashboardHome implements OnInit {
 
     this.loadReferenceData();
 
+  }
+
+  toggleSection(kind: FilterKind): void {
+    if (this.expandedSections.has(kind)) {
+      this.expandedSections.delete(kind);
+    } else {
+      this.expandedSections.add(kind);
+    }
+    this.cdr.markForCheck();
+  }
+
+  isSectionExpanded(kind: FilterKind): boolean {
+    return this.expandedSections.has(kind);
   }
 
 
@@ -471,7 +440,7 @@ export class DashboardHome implements OnInit {
     this.loadDashboard();
   }
 
-  navigateToProjectsWithFilters(): void {
+  navigateToProjectsWithFilters(extraQueryParams: Record<string, unknown> = {}): void {
     const queryParams: any = {};
 
     if (this.filterState.selectedBusinessUnit !== 'all') {
@@ -484,13 +453,13 @@ export class DashboardHome implements OnInit {
       queryParams.PlantId = this.filterState.selectedPlant;
     }
     if (this.filterState.selectedProjectManagementType !== 'all') {
-      queryParams.ProjectManagementType = this.filterState.selectedProjectManagementType;
+      queryParams.ProjectManagementType = this.projectManagementTypeIdToNumber(this.filterState.selectedProjectManagementType);
     }
     if (this.filterState.selectedProjectPhase !== 'all') {
       queryParams.Phase = this.projectPhaseIdToNumber(this.filterState.selectedProjectPhase);
     }
     if (this.filterState.selectedProjectStatus !== 'all') {
-      queryParams.Status = this.filterState.selectedProjectStatus;
+      queryParams.Status = this.projectStatusIdToNumber(this.filterState.selectedProjectStatus);
     }
     if (this.filterState.selectedStartDate) {
       queryParams.startDate = this.filterState.selectedStartDate;
@@ -505,7 +474,50 @@ export class DashboardHome implements OnInit {
       queryParams.month = this.filterState.selectedMonth;
     }
 
-    void this.router.navigate(['/projects'], { queryParams });
+    void this.router.navigate(['/projects'], { queryParams: { ...queryParams, ...extraQueryParams } });
+  }
+
+  openMetricTarget(metric: DashboardMetric): void {
+    const label = metric.label.toLowerCase();
+
+    if (label === 'delayed') {
+      this.navigateToProjectsWithFilters({ DelayedOnly: true });
+      return;
+    }
+
+    if (label === 'projects') {
+      this.navigateToProjectsWithFilters();
+      return;
+    }
+
+    void this.router.navigate(['/dashboard/analytics']);
+  }
+
+  openTicketProjects(section: FilterSection, ticket: FilterTicket): void {
+    const extraQueryParams: Record<string, unknown> = {};
+
+    switch (section.kind) {
+      case 'businessUnit':
+        extraQueryParams['BusinessUnitId'] = ticket.id;
+        break;
+      case 'department':
+        extraQueryParams['DepartmentId'] = ticket.id;
+        break;
+      case 'plant':
+        extraQueryParams['PlantId'] = ticket.id;
+        break;
+      case 'projectManagement':
+        extraQueryParams['ProjectManagementType'] = this.projectManagementTypeIdToNumber(ticket.id);
+        break;
+      case 'phase':
+        extraQueryParams['Phase'] = this.projectPhaseIdToNumber(ticket.id);
+        break;
+      case 'status':
+        extraQueryParams['Status'] = this.projectStatusIdToNumber(ticket.id);
+        break;
+    }
+
+    this.navigateToProjectsWithFilters(extraQueryParams);
   }
 
   sectionHasActiveFilter(section: FilterSection): boolean {
@@ -1698,6 +1710,44 @@ export class DashboardHome implements OnInit {
 
 
     return map[phaseId] ?? Number(phaseId);
+
+  }
+
+  private projectStatusIdToNumber(statusId: string): number {
+
+    const map: Record<string, number> = {
+
+      ongoing: 0,
+
+      onhold: 1,
+
+      done: 2,
+
+      planned: 3,
+
+    };
+
+    return map[statusId] ?? Number(statusId);
+
+  }
+
+  private projectManagementTypeIdToNumber(typeId: string): number {
+
+    const map: Record<string, number> = {
+
+      DigitalOperation: 0,
+
+      DigitalSolution: 1,
+
+      Infrastructure: 2,
+
+      ProcessSimplification: 3,
+
+      Other: 4,
+
+    };
+
+    return map[typeId] ?? Number(typeId);
 
   }
 

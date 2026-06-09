@@ -88,16 +88,7 @@
           </select>
         </div>
 
-        <div class="filter-field">
-          <label>Analysis Mode</label>
-          <select [(ngModel)]="selectedAnalysis" (ngModelChange)="onAnalysisChanged()">
-            <option value="resourcesCapacity">Hours by User (Capacity)</option>
-            <option value="team">Team Performance</option>
-            <option value="details">Detailed Allocations</option>
-            <option value="projects">Hours by Project</option>
-            <option value="roles">Hours by Role</option>
-          </select>
-        </div>
+        
 
         <div class="filter-field">
           <label>Specific Year</label>
@@ -128,7 +119,13 @@
     <ng-container *ngIf="dashboard as data">
       <!-- SUMMARY METRICS -->
       <section class="summary-grid">
-        <article class="summary-card" *ngFor="let card of summaryCards" [attr.data-tone]="card.tone">
+        <button
+          type="button"
+          class="summary-card summary-card--clickable"
+          *ngFor="let card of summaryCards"
+          [attr.data-tone]="card.tone"
+          (click)="openSummaryCardTarget(card)"
+          [attr.aria-label]="card.actionLabel || ('Open ' + card.label)">
           <div class="summary-card__icon">
             <mat-icon>{{ card.icon }}</mat-icon>
           </div>
@@ -136,8 +133,12 @@
             <span>{{ card.label }}</span>
             <strong>{{ card.value }}</strong>
             <small>{{ card.note }}</small>
+            <em>
+              {{ card.actionLabel || 'Open details' }}
+              <mat-icon>arrow_forward</mat-icon>
+            </em>
           </div>
-        </article>
+        </button>
       </section>
 
       <!-- ANALYSIS MODE TABS -->
@@ -175,10 +176,16 @@
               Active
             </span>
           </div>
-          <div class="panel__chips">
-            <span><mat-icon>schedule</mat-icon> {{ formatHours(totalDetailedHours) }}</span>
-            <span *ngIf="selectedAnalysis === 'details' && data.pagination"><mat-icon>assignment</mat-icon> {{ data.pagination.totalCount }} total rows</span>
-            <span *ngIf="selectedAnalysis !== 'details' || !data.pagination"><mat-icon>assignment</mat-icon> {{ data.details.length }} rows</span>
+          <div class="panel__actions">
+            <button type="button" class="export-table-btn" [disabled]="!hasExportRows('details')" (click)="exportDisplayedTable('details')">
+              <mat-icon>download</mat-icon>
+              Export
+            </button>
+            <div class="panel__chips">
+              <span><mat-icon>schedule</mat-icon> {{ formatHours(totalDetailedHours) }}</span>
+              <span *ngIf="selectedAnalysis === 'details' && data.pagination"><mat-icon>assignment</mat-icon> {{ data.pagination.totalCount }} total rows</span>
+              <span *ngIf="selectedAnalysis !== 'details' || !data.pagination"><mat-icon>assignment</mat-icon> {{ data.details.length }} rows</span>
+            </div>
           </div>
         </header>
 
@@ -289,9 +296,15 @@
               Active
             </span>
           </div>
-          <div class="panel__chips">
-            <span *ngIf="selectedAnalysis === 'resourcesCapacity' && data.pagination"><mat-icon>groups</mat-icon> {{ data.pagination.totalCount }} total users</span>
-            <span *ngIf="selectedAnalysis !== 'resourcesCapacity' || !data.pagination"><mat-icon>groups</mat-icon> {{ data.hoursByUser.length }} users</span>
+          <div class="panel__actions">
+            <button type="button" class="export-table-btn" [disabled]="!hasExportRows('resourcesCapacity')" (click)="exportDisplayedTable('resourcesCapacity')">
+              <mat-icon>download</mat-icon>
+              Export
+            </button>
+            <div class="panel__chips">
+              <span *ngIf="selectedAnalysis === 'resourcesCapacity' && data.pagination"><mat-icon>groups</mat-icon> {{ data.pagination.totalCount }} total users</span>
+              <span *ngIf="selectedAnalysis !== 'resourcesCapacity' || !data.pagination"><mat-icon>groups</mat-icon> {{ data.hoursByUser.length }} users</span>
+            </div>
           </div>
         </header>
         <div class="table-wrap">
@@ -373,9 +386,15 @@
               Active
             </span>
           </div>
-          <div class="panel__chips">
-            <span *ngIf="selectedAnalysis === 'projects' && data.pagination"><mat-icon>folder</mat-icon> {{ data.pagination.totalCount }} total projects</span>
-            <span *ngIf="selectedAnalysis !== 'projects' || !data.pagination"><mat-icon>folder</mat-icon> {{ data.hoursByProject.length }} projects</span>
+          <div class="panel__actions">
+            <button type="button" class="export-table-btn" [disabled]="!hasExportRows('projects')" (click)="exportDisplayedTable('projects')">
+              <mat-icon>download</mat-icon>
+              Export
+            </button>
+            <div class="panel__chips">
+              <span *ngIf="selectedAnalysis === 'projects' && data.pagination"><mat-icon>folder</mat-icon> {{ data.pagination.totalCount }} total projects</span>
+              <span *ngIf="selectedAnalysis !== 'projects' || !data.pagination"><mat-icon>folder</mat-icon> {{ data.hoursByProject.length }} projects</span>
+            </div>
           </div>
         </header>
         <div class="table-wrap">
@@ -445,9 +464,15 @@
               Active
             </span>
           </div>
-          <div class="panel__chips">
-            <span *ngIf="selectedAnalysis === 'roles' && data.pagination"><mat-icon>work</mat-icon> {{ data.pagination.totalCount }} total roles</span>
-            <span *ngIf="selectedAnalysis !== 'roles' || !data.pagination"><mat-icon>work</mat-icon> {{ data.hoursByRole.length }} roles</span>
+          <div class="panel__actions">
+            <button type="button" class="export-table-btn" [disabled]="!hasExportRows('roles')" (click)="exportDisplayedTable('roles')">
+              <mat-icon>download</mat-icon>
+              Export
+            </button>
+            <div class="panel__chips">
+              <span *ngIf="selectedAnalysis === 'roles' && data.pagination"><mat-icon>work</mat-icon> {{ data.pagination.totalCount }} total roles</span>
+              <span *ngIf="selectedAnalysis !== 'roles' || !data.pagination"><mat-icon>work</mat-icon> {{ data.hoursByRole.length }} roles</span>
+            </div>
           </div>
         </header>
         <div class="table-wrap">
@@ -517,10 +542,16 @@
               Active
             </span>
           </div>
-          <div class="panel__chips">
-            <span><mat-icon>schedule</mat-icon> {{ formatHours(data.summary.totalHours) }}</span>
-            <span *ngIf="selectedAnalysis === 'team' && data.pagination"><mat-icon>calendar_today</mat-icon> {{ data.pagination.totalCount }} total entries</span>
-            <span *ngIf="selectedAnalysis !== 'team' || !data.pagination"><mat-icon>calendar_today</mat-icon> {{ data.summary.workedDays }} worked days</span>
+          <div class="panel__actions">
+            <button type="button" class="export-table-btn" [disabled]="!hasExportRows('team')" (click)="exportDisplayedTable('team')">
+              <mat-icon>download</mat-icon>
+              Export
+            </button>
+            <div class="panel__chips">
+              <span><mat-icon>schedule</mat-icon> {{ formatHours(data.summary.totalHours) }}</span>
+              <span *ngIf="selectedAnalysis === 'team' && data.pagination"><mat-icon>calendar_today</mat-icon> {{ data.pagination.totalCount }} total entries</span>
+              <span *ngIf="selectedAnalysis !== 'team' || !data.pagination"><mat-icon>calendar_today</mat-icon> {{ data.summary.workedDays }} worked days</span>
+            </div>
           </div>
         </header>
         

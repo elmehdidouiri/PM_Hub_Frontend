@@ -67,7 +67,7 @@
               <option [ngValue]="null">All projects</option>
               <option *ngFor="let project of filters.projects" [ngValue]="project.id">{{ project.label }}</option>
             </select>
-          </label>
+          </label> 
 
           <label>
             <span>Department</span>
@@ -100,11 +100,17 @@
     </div>
 
 
-    <div class="analytics-content-container" style="position: relative; display: grid; gap: 1rem; min-height: 250px;">
+    <div class="analytics-content-container">
       <app-loading-spinner *ngIf="isLoading || isRefreshing" [fullPage]="false"></app-loading-spinner>
 
       <section class="metric-strip" *ngIf="dashboard">
-      <article class="metric-card" *ngFor="let metric of metrics" [style.--metric-tone]="getToneColor(metric.tone)">
+      <button
+        type="button"
+        class="metric-card metric-card--clickable"
+        *ngFor="let metric of metrics"
+        [style.--metric-tone]="getToneColor(metric.tone)"
+        (click)="openMetricTarget(metric)"
+        [attr.aria-label]="metric.actionLabel || ('Open ' + metric.label)">
         <span class="metric-card__line"></span>
         <div class="metric-card__head">
           <div class="metric-card__info">
@@ -112,10 +118,6 @@
               <mat-icon>{{ metric.icon }}</mat-icon>
             </div>
             <span class="metric-card__label">{{ metric.label }}</span>
-          </div>
-          <div class="metric-card__trend" *ngIf="metric.change" [class.up]="metric.isUp" [class.down]="!metric.isUp">
-            <mat-icon>{{ metric.isUp ? 'trending_up' : 'trending_down' }}</mat-icon>
-            <span>{{ metric.change }}</span>
           </div>
         </div>
 
@@ -134,10 +136,14 @@
 
         <footer class="metric-card__footer">
           <p>{{ metric.note }}</p>
+          <span>
+            {{ metric.actionLabel || 'Open details' }}
+            <mat-icon>arrow_forward</mat-icon>
+          </span>
         </footer>
 
         <mat-icon class="metric-card__watermark">{{ metric.icon }}</mat-icon>
-      </article>
+      </button>
     </section>
 
     <nav class="analytics-tabs" aria-label="Analytics sections">
@@ -163,18 +169,20 @@
           <span>{{ kpiTrend.length }} months</span>
         </header>
 
-        <div class="performance-grid">
+        <div class="performance-grid performance-grid--kpis">
           <article class="chart-card performance-card" *ngFor="let chart of kpiCharts; let i = index" [attr.data-tone]="chart.tone">
-            <header>
-              <div>
+            <header class="kpi-card-header">
+              <div class="kpi-card-header__title">
                 <mat-icon>{{ chart.icon }}</mat-icon>
-                <strong>{{ chart.title }}</strong>
+                <div>
+                  <strong>{{ chart.title }}</strong>
+                  <span>{{ chart.subtitle }}</span>
+                </div>
               </div>
-              <span>{{ chart.subtitle }}</span>
             </header>
 
             <div class="kpi-chart-wrapper">
-              <div #kpiEchart class="chart-container" [hidden]="!hasKpiData(chart.key)" style="width: 100%; height: 260px; border: 0; background: transparent;"></div>
+              <div #kpiEchart class="chart-container kpi-chart-container" [hidden]="!hasKpiData(chart.key)"></div>
               <div class="chart-no-data" *ngIf="!hasKpiData(chart.key)">
                 <mat-icon>query_stats</mat-icon>
                 <span>No {{ chart.title }} data available for this selection</span>

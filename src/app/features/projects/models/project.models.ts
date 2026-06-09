@@ -361,6 +361,7 @@ export interface ProjectSummaryDto {
   projectManagementType: ProjectManagementType;
   projectManagementTypeLabel?: string;
   progress?: number | null;
+  isDelayed?: boolean;
   isDataComplete?: boolean;
   dataCompletionPercentage?: number;
   missingFields?: string[];
@@ -594,6 +595,8 @@ export interface ProjectFilterParams {
   UserId?: string;
   InternId?: string;
   IncompleteOnly?: boolean;
+  DelayedOnly?: boolean;
+  delayedOnly?: boolean;
   all?: boolean;
   All?: boolean;
 }

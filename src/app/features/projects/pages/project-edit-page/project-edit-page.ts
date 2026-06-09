@@ -1,6 +1,7 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 
 import { NotificationService } from '../../../../core/services/notification.service';
 import { AuthService } from '../../../../core/services/auth';
@@ -87,6 +88,8 @@ export class ProjectEditPage implements OnInit {
   readonly phaseOptions = Object.values(ProjectPhase).filter((v): v is ProjectPhase => typeof v === 'number');
   readonly statusOptions = Object.values(ProjectStatus).filter((v): v is ProjectStatus => typeof v === 'number');
   readonly processStatusOptions = Object.values(ProcessStatus).filter((v): v is ProcessStatus => typeof v === 'number');
+  private formSubscriptions = new Subscription();
+  private routeDataSubscription?: Subscription;
 
   constructor(
     private readonly fb: FormBuilder,
@@ -116,17 +119,36 @@ export class ProjectEditPage implements OnInit {
   }
 
   ngOnInit(): void {
-    this.route.data.subscribe(data => {
+    this.routeDataSubscription = this.route.data.subscribe(data => {
       this.mode = data['mode'] || 'details';
+      this.applyResolvedProjectData(data);
     });
-    this.project = this.route.snapshot.data['project'];
-    const refs = this.route.snapshot.data['refs'];
+
+    this.memberDraft.controls['userId'].valueChanges.subscribe((userId) => this.syncMemberRole(userId));
+  }
+
+  ngOnDestroy(): void {
+    this.formSubscriptions.unsubscribe();
+    this.routeDataSubscription?.unsubscribe();
+  }
+
+  private applyResolvedProjectData(data: Record<string, unknown>): void {
+    const project = data['project'] as ProjectDto | null | undefined;
+    const refs = data['refs'] as ProjectReferenceData | null | undefined;
+
+    if (!project) {
+      return;
+    }
+
+    this.project = this.normalizeProjectResponse(project);
     if (refs) {
       this.references = refs;
     }
+
+    this.editingSection = null;
     this.initForms();
     this.loadDeliverables();
-    this.memberDraft.controls['userId'].valueChanges.subscribe((userId) => this.syncMemberRole(userId));
+    this.cdr.detectChanges();
   }
 
   initForms(): void {
@@ -147,8 +169,14 @@ export class ProjectEditPage implements OnInit {
       technologyIds: [this.project.technologies?.map(l => this.findReferenceId('technologies', l)) || []],
       solutionDomainIds: [this.project.solutionDomains?.map(l => this.findReferenceId('solutionDomains', l)) || []],
     }, { validators: this.identityValidator });
-    this.identityForm.controls['projectManagerId'].valueChanges.subscribe((pmUserId) => this.onProjectManagerChange(pmUserId));
-    this.identityForm.controls['projectType'].valueChanges.subscribe(() => this.updateIdentityDynamicValidators());
+    this.formSubscriptions.unsubscribe();
+    this.formSubscriptions = new Subscription();
+    this.formSubscriptions.add(
+      this.identityForm.controls['projectManagerId'].valueChanges.subscribe((pmUserId) => this.onProjectManagerChange(pmUserId))
+    );
+    this.formSubscriptions.add(
+      this.identityForm.controls['projectType'].valueChanges.subscribe(() => this.updateIdentityDynamicValidators())
+    );
     this.updateIdentityDynamicValidators();
 
     // ── Execution State (Status & Phase) ──

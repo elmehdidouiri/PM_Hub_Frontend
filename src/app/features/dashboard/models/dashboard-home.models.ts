@@ -14,6 +14,8 @@ export interface FilterSection {
   icon: string;
   tickets: FilterTicket[];
   selectedId: string;
+  visibleTickets?: FilterTicket[];
+  hiddenCount?: number;
 }
 
 export interface DashboardStatsSnapshot {

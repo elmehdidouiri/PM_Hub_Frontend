@@ -1,0 +1,227 @@
+<section class="target-page pm-page-enter">
+  <header class="target-hero">
+    <div class="target-hero__copy">
+      <span class="eyebrow">Admin settings</span>
+      <h1>Target Settings</h1>
+      <p>Configure the company workload targets and the default KPI catalog used by projects, dashboards, analytics and notifications.</p>
+    </div>
+
+    <div class="target-hero__actions">
+      <button type="button" class="ghost-action" (click)="refresh()" [disabled]="isRefreshing">
+        <mat-icon>{{ isRefreshing ? 'hourglass_top' : 'refresh' }}</mat-icon>
+        <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
+      </button>
+      <button type="button" class="primary-action" (click)="openCreate()">
+        <mat-icon>add</mat-icon>
+        <span>New KPI</span>
+      </button>
+    </div>
+  </header>
+
+  <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
+
+  <div class="state-card state-card--error" *ngIf="!isLoading && errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <div>
+      <strong>Target settings could not be loaded</strong>
+      <p>{{ errorMessage }}</p>
+    </div>
+    <button type="button" class="inline-action" (click)="refresh()">Try again</button>
+  </div>
+
+  <ng-container *ngIf="!isLoading && !errorMessage">
+    <section class="summary-grid">
+      <article class="summary-tile">
+        <mat-icon>timer</mat-icon>
+        <div>
+          <strong>{{ companyForm.controls.hoursPerDay.value }}</strong>
+          <span>Hours per day</span>
+        </div>
+      </article>
+      <article class="summary-tile">
+        <mat-icon>event_available</mat-icon>
+        <div>
+          <strong>{{ companyForm.controls.workingDaysPerMonth.value }}</strong>
+          <span>Working days / month</span>
+        </div>
+      </article>
+      <article class="summary-tile">
+        <mat-icon>calendar_today</mat-icon>
+        <div>
+          <strong>{{ fiscalYearStartLabel }}</strong>
+          <span>Fiscal year start</span>
+        </div>
+      </article>
+      <article class="summary-tile">
+        <mat-icon>schedule</mat-icon>
+        <div>
+          <strong>{{ companySettings?.monthlyHoursTarget || 0 }}</strong>
+          <span>Monthly hours target</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="settings-layout">
+      <article class="settings-panel company-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="panel-kicker">Company targets</span>
+            <h2>Operational baseline</h2>
+          </div>
+          <span class="sync-chip" *ngIf="companySettings?.updatedAt">Updated {{ companySettings?.updatedAt | date:'mediumDate' }}</span>
+        </div>
+
+        <form class="target-form" [formGroup]="companyForm" (ngSubmit)="saveCompany()">
+          <label class="metric-field">
+            <span>Hours per day</span>
+            <input type="number" min="0.01" step="0.25" formControlName="hoursPerDay" />
+          </label>
+
+          <label class="metric-field">
+            <span>Annual hours target</span>
+            <input type="number" min="0.01" step="0.25" formControlName="annualHoursTarget" />
+          </label>
+
+          <label class="metric-field">
+            <span>Working days per month</span>
+            <input type="number" min="1" max="31" formControlName="workingDaysPerMonth" />
+          </label>
+
+          <label class="metric-field">
+            <span>Fiscal year start month</span>
+            <input type="number" min="1" max="12" formControlName="fiscalYearStartMonth" />
+          </label>
+
+          <button type="submit" class="primary-action primary-action--wide" [disabled]="isSavingCompany">
+            <mat-icon>{{ isSavingCompany ? 'hourglass_top' : 'save' }}</mat-icon>
+            <span>{{ isSavingCompany ? 'Saving...' : 'Save company targets' }}</span>
+          </button>
+        </form>
+      </article>
+
+      <article class="settings-panel kpi-panel">
+        <div class="panel-heading panel-heading--stacked">
+          <div>
+            <span class="panel-kicker">KPI defaults</span>
+            <h2>Project target catalog</h2>
+          </div>
+
+          <div class="kpi-toolbar">
+            <div class="toolbar-search">
+              <mat-icon>search</mat-icon>
+              <input
+                type="text"
+                [ngModel]="searchTerm"
+                (ngModelChange)="onSearchTermChange($event)"
+                placeholder="Search KPI name or description" />
+              <button type="button" *ngIf="searchTerm" (click)="clearSearch()" aria-label="Clear search">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+
+            <div class="toolbar-counts">
+              <span>{{ kpis.length }} total</span>
+              <span>{{ inactiveKpisCount }} inactive</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="state-card state-card--empty" *ngIf="!hasKpis">
+          <mat-icon>track_changes</mat-icon>
+          <div>
+            <strong>No KPI targets yet</strong>
+            <p>Create the first KPI target to seed new projects.</p>
+          </div>
+          <button type="button" class="inline-action" (click)="openCreate()">Create KPI</button>
+        </div>
+
+        <div class="state-card state-card--empty" *ngIf="hasKpis && !hasFilteredKpis">
+          <mat-icon>filter_alt_off</mat-icon>
+          <div>
+            <strong>No matching KPI</strong>
+            <p>Adjust your search to view more target settings.</p>
+          </div>
+          <button type="button" class="inline-action" (click)="clearSearch()">Clear search</button>
+        </div>
+
+        <div class="kpi-list" *ngIf="hasFilteredKpis">
+          <article class="kpi-row" *ngFor="let kpi of filteredKpis; trackBy: trackByKpiId" [class.kpi-row--inactive]="!kpi.isActive">
+            <div class="kpi-row__rank">{{ kpi.displayOrder }}</div>
+            <div class="kpi-row__main">
+              <div class="kpi-row__title">
+                <strong>{{ kpi.name }}</strong>
+                <span>#{{ kpi.displayOrder }}</span>
+              </div>
+              <p>{{ kpi.description || 'No description provided.' }}</p>
+            </div>
+            <div class="kpi-row__target">
+              <strong>{{ kpi.targetValue }}</strong>
+              <span>target</span>
+            </div>
+            <span class="status-badge" [class.status-badge--inactive]="!kpi.isActive">
+              {{ kpi.isActive ? 'Active' : 'Inactive' }}
+            </span>
+            <div class="row-actions">
+              <button type="button" class="icon-action" (click)="openEdit(kpi)" aria-label="Edit KPI">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button type="button" class="icon-action icon-action--delete" (click)="delete(kpi)" [disabled]="deletingId === kpi.id" aria-label="Delete KPI">
+                <mat-icon>{{ deletingId === kpi.id ? 'hourglass_top' : 'delete' }}</mat-icon>
+              </button>
+            </div>
+          </article>
+        </div>
+      </article>
+    </section>
+  </ng-container>
+
+  <div class="drawer" *ngIf="isDrawerOpen" (click)="closeDrawer()">
+    <aside class="drawer__panel" (click)="$event.stopPropagation()">
+      <header class="drawer__header">
+        <div>
+          <strong>{{ editingKpiId ? 'Edit KPI target' : 'Create KPI target' }}</strong>
+          <span>These values become the default KPIs for newly created projects.</span>
+        </div>
+        <button type="button" class="drawer__close" (click)="closeDrawer()" [disabled]="savingKpi" aria-label="Close">
+          <mat-icon>close</mat-icon>
+        </button>
+      </header>
+
+      <form class="drawer__body" [formGroup]="kpiForm" (ngSubmit)="saveKpi()">
+        <label class="field">
+          <span>Name</span>
+          <input type="text" maxlength="100" formControlName="name" placeholder="Quality" />
+        </label>
+
+        <label class="field">
+          <span>Description</span>
+          <textarea rows="3" maxlength="500" formControlName="description" placeholder="Quality target percentage"></textarea>
+        </label>
+
+        <div class="field-grid">
+          <label class="field">
+            <span>Target value</span>
+            <input type="number" min="0.01" step="0.01" formControlName="targetValue" />
+          </label>
+          <label class="field">
+            <span>Display order</span>
+            <input type="number" min="0" formControlName="displayOrder" />
+          </label>
+        </div>
+
+        <label class="toggle">
+          <input type="checkbox" formControlName="isActive" />
+          <span>Active KPI target</span>
+        </label>
+
+        <div class="drawer__footer">
+          <button type="button" class="inline-action" (click)="closeDrawer()" [disabled]="savingKpi">Cancel</button>
+          <button type="submit" class="primary-action" [disabled]="savingKpi">
+            <mat-icon>{{ savingKpi ? 'hourglass_top' : 'save' }}</mat-icon>
+            <span>{{ savingKpi ? 'Saving...' : 'Save KPI' }}</span>
+          </button>
+        </div>
+      </form>
+    </aside>
+  </div>
+</section>

@@ -4,16 +4,29 @@ import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { catchError, finalize, of } from 'rxjs';
+import * as XLSX from 'xlsx';
 
 import {
+  HoursAllocationByProjectDto,
+  HoursAllocationByRoleDto,
+  HoursAllocationByTeamDto,
+  HoursAllocationByUserDto,
   HoursAllocationDashboardDto,
   HoursAllocationDashboardParams,
+  HoursAllocationDetailDto,
   HoursAllocationFiltersDto,
 } from '../../models/hours-allocation-dashboard.models';
 import { HoursAllocationDashboardService } from '../../services/hours-allocation-dashboard.service';
 
 type QuickSelect = 'month' | 'year' | 'ytd';
 type AnalysisMode = 'resourcesCapacity' | 'team' | 'details' | 'projects' | 'roles';
+type ExportTableKey = AnalysisMode;
+type ExportCell = string | number | boolean | null;
+
+interface ExportColumn<T> {
+  header: string;
+  value: (row: T) => ExportCell;
+}
 
 interface SummaryCard extends DashboardMetric {}
 
@@ -72,13 +85,7 @@ export class HoursAllocationDashboard implements OnInit {
         note: String(this.selectedYear),
         icon: 'schedule',
         tone: 'orange',
-      },
-      {
-        label: 'Active Users',
-        value: this.formatNumber(summary?.activeUsers),
-        note: 'Users with hours',
-        icon: 'groups',
-        tone: 'amber',
+        actionLabel: 'Open details',
       },
       {
         label: 'Projects',
@@ -86,6 +93,7 @@ export class HoursAllocationDashboard implements OnInit {
         note: 'Active projects',
         icon: 'folder',
         tone: 'orange',
+        actionLabel: 'Open projects analysis',
       },
       {
         label: 'Allocations',
@@ -93,6 +101,7 @@ export class HoursAllocationDashboard implements OnInit {
         note: 'Allocation rows',
         icon: 'assignment',
         tone: 'amber',
+        actionLabel: 'Open allocations',
       },
       {
         label: 'Avg Utilization',
@@ -100,20 +109,16 @@ export class HoursAllocationDashboard implements OnInit {
         note: 'Capacity usage',
         icon: 'trending_up',
         tone: 'green',
+        actionLabel: 'Open capacity',
       },
-      {
-        label: 'Year-to-Date',
-        value: this.formatHours(summary?.yearToDateHours),
-        note: String(this.selectedYear),
-        icon: 'calendar_today',
-        tone: 'neutral',
-      },
+    
       {
         label: 'Avg Monthly',
         value: this.formatHours(summary?.averageMonthlyHours),
         note: `${this.dashboard?.monthlyBreakdown?.length ?? 0} months`,
         icon: 'equalizer',
         tone: 'neutral',
+        actionLabel: 'Open details',
       },
     ];
   }
@@ -165,6 +170,25 @@ export class HoursAllocationDashboard implements OnInit {
   onAnalysisChanged(): void {
     this.currentPage = 1;
     this.reload();
+  }
+
+  openSummaryCardTarget(card: SummaryCard): void {
+    const label = card.label.toLowerCase();
+
+    if (label === 'projects') {
+      this.selectedAnalysis = 'projects';
+      this.onAnalysisChanged();
+      return;
+    }
+
+    if (label === 'avg utilization') {
+      this.selectedAnalysis = 'resourcesCapacity';
+      this.onAnalysisChanged();
+      return;
+    }
+
+    this.selectedAnalysis = 'details';
+    this.onAnalysisChanged();
   }
 
   onPageChange(page: number): void {
@@ -247,6 +271,43 @@ export class HoursAllocationDashboard implements OnInit {
           this.errorMessage = 'Unable to send reminders right now.';
         },
       });
+  }
+
+  exportDisplayedTable(table: ExportTableKey): void {
+    if (!this.dashboard) {
+      return;
+    }
+
+    const exportConfig = this.getExportConfig(table, this.dashboard);
+    if (!exportConfig.rows.length) {
+      this.errorMessage = 'No rows to export for the displayed table.';
+      return;
+    }
+
+    const rows = exportConfig.rows.map((row) =>
+      exportConfig.columns.reduce<Record<string, ExportCell>>((acc, column) => {
+        acc[column.header] = column.value(row);
+        return acc;
+      }, {}),
+    );
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = exportConfig.columns.map((column) => ({
+      wch: Math.max(14, column.header.length + 2),
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, this.toSheetName(exportConfig.title));
+    XLSX.writeFile(workbook, `${this.toFileName(exportConfig.title)}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    this.successMessage = `${exportConfig.title} exported successfully.`;
+  }
+
+  hasExportRows(table: ExportTableKey): boolean {
+    if (!this.dashboard) {
+      return false;
+    }
+
+    return this.getRowsForExport(table, this.dashboard).length > 0;
   }
 
   trackById(_: number, item: { userId?: string; projectId?: string; roleId?: string; memberId?: string }): string {
@@ -359,6 +420,112 @@ export class HoursAllocationDashboard implements OnInit {
       pageSize: this.pageSize,
       all: this.all ? true : null,
     };
+  }
+
+  private getExportConfig(table: ExportTableKey, dashboard: HoursAllocationDashboardDto): {
+    title: string;
+    rows: Array<HoursAllocationDetailDto | HoursAllocationByUserDto | HoursAllocationByProjectDto | HoursAllocationByRoleDto | HoursAllocationByTeamDto>;
+    columns: Array<ExportColumn<HoursAllocationDetailDto | HoursAllocationByUserDto | HoursAllocationByProjectDto | HoursAllocationByRoleDto | HoursAllocationByTeamDto>>;
+  } {
+    switch (table) {
+      case 'details':
+        return {
+          title: 'Detailed Allocations',
+          rows: dashboard.details,
+          columns: [
+            { header: 'Date', value: (row) => this.formatDate((row as HoursAllocationDetailDto).date) },
+            { header: 'User', value: (row) => (row as HoursAllocationDetailDto).userName },
+            { header: 'Project', value: (row) => (row as HoursAllocationDetailDto).projectName },
+            { header: 'Type', value: (row) => (row as HoursAllocationDetailDto).type || 'Daily' },
+            { header: 'Execution', value: (row) => (row as HoursAllocationDetailDto).executionHours },
+            { header: 'Tech Lead', value: (row) => (row as HoursAllocationDetailDto).techLeadHours },
+            { header: 'Process', value: (row) => (row as HoursAllocationDetailDto).processHours },
+            { header: 'Project Mgmt', value: (row) => (row as HoursAllocationDetailDto).projectManagementHours },
+            { header: 'R&D', value: (row) => (row as HoursAllocationDetailDto).researchAndDevHours },
+            { header: 'Workshop', value: (row) => (row as HoursAllocationDetailDto).workshopHours },
+            { header: 'Total', value: (row) => (row as HoursAllocationDetailDto).totalHours },
+          ],
+        };
+      case 'resourcesCapacity':
+        return {
+          title: 'Hours by User',
+          rows: dashboard.hoursByUser,
+          columns: [
+            { header: 'User', value: (row) => (row as HoursAllocationByUserDto).userName },
+            { header: 'Role', value: (row) => (row as HoursAllocationByUserDto).role },
+            { header: 'Department', value: (row) => (row as HoursAllocationByUserDto).department },
+            { header: 'Allocated', value: (row) => (row as HoursAllocationByUserDto).allocatedHours },
+            { header: 'Available', value: (row) => (row as HoursAllocationByUserDto).availableHours },
+            { header: 'Utilization', value: (row) => (row as HoursAllocationByUserDto).utilizationPercentage },
+            { header: 'Execution', value: (row) => (row as HoursAllocationByUserDto).executionHours },
+            { header: 'Project Mgmt', value: (row) => (row as HoursAllocationByUserDto).projectManagementHours },
+            { header: 'R&D', value: (row) => (row as HoursAllocationByUserDto).researchAndDevHours },
+            { header: 'Projects', value: (row) => (row as HoursAllocationByUserDto).projectCount },
+          ],
+        };
+      case 'projects':
+        return {
+          title: 'Hours by Project',
+          rows: dashboard.hoursByProject,
+          columns: [
+            { header: 'Project', value: (row) => (row as HoursAllocationByProjectDto).projectName },
+            { header: 'Total Hours', value: (row) => (row as HoursAllocationByProjectDto).totalHours },
+            { header: 'PM Hours', value: (row) => (row as HoursAllocationByProjectDto).projectManagerHours },
+            { header: 'Team Hours', value: (row) => (row as HoursAllocationByProjectDto).teamHours },
+            { header: 'Team Members', value: (row) => (row as HoursAllocationByProjectDto).teamMembers },
+            { header: 'Allocations', value: (row) => (row as HoursAllocationByProjectDto).allocations },
+          ],
+        };
+      case 'roles':
+        return {
+          title: 'Hours by Role',
+          rows: dashboard.hoursByRole,
+          columns: [
+            { header: 'Role', value: (row) => (row as HoursAllocationByRoleDto).role },
+            { header: 'Total Hours', value: (row) => (row as HoursAllocationByRoleDto).totalHours },
+            { header: 'Members', value: (row) => (row as HoursAllocationByRoleDto).teamMembers },
+            { header: 'Percentage', value: (row) => (row as HoursAllocationByRoleDto).percentage },
+          ],
+        };
+      case 'team':
+        return {
+          title: 'Team Performance',
+          rows: dashboard.hoursByTeam,
+          columns: [
+            { header: 'Member', value: (row) => (row as HoursAllocationByTeamDto).memberName },
+            { header: 'Project', value: (row) => (row as HoursAllocationByTeamDto).projectName },
+            { header: 'Total Hours', value: (row) => (row as HoursAllocationByTeamDto).totalHours },
+            { header: 'Worked Days', value: (row) => (row as HoursAllocationByTeamDto).workedDays },
+            { header: 'Allocations', value: (row) => (row as HoursAllocationByTeamDto).allocationCount },
+          ],
+        };
+    }
+  }
+
+  private getRowsForExport(
+    table: ExportTableKey,
+    dashboard: HoursAllocationDashboardDto,
+  ): Array<HoursAllocationDetailDto | HoursAllocationByUserDto | HoursAllocationByProjectDto | HoursAllocationByRoleDto | HoursAllocationByTeamDto> {
+    switch (table) {
+      case 'details':
+        return dashboard.details;
+      case 'resourcesCapacity':
+        return dashboard.hoursByUser;
+      case 'projects':
+        return dashboard.hoursByProject;
+      case 'roles':
+        return dashboard.hoursByRole;
+      case 'team':
+        return dashboard.hoursByTeam;
+    }
+  }
+
+  private toFileName(value: string): string {
+    return `PMHUB_${value.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '')}`;
+  }
+
+  private toSheetName(value: string): string {
+    return value.replace(/[\\/?*[\]:]/g, '').slice(0, 31) || 'Export';
   }
 
   private normalizeFilters(filters: HoursAllocationFiltersDto): HoursAllocationFiltersDto {

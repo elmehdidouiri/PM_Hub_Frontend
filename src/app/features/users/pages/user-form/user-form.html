@@ -14,6 +14,9 @@
       <article class="user-form-hero__stat">
         <span class="user-form-hero__stat-label">Progress</span>
         <strong>{{ calculateProgress() | number: '1.0-0' }}%</strong>
+        <span class="user-form-hero__track">
+          <span [style.width.%]="calculateProgress()"></span>
+        </span>
       </article>
       <button type="button" class="pm-btn-secondary" (click)="goBack()">
         <mat-icon>arrow_back</mat-icon>
@@ -30,52 +33,85 @@
   <div class="user-shell">
     <section class="user-panel user-panel--form">
       <div class="panel-heading">
-        <h2>Account information</h2>
-        <p>Set identity, access role and initial credentials for the new collaborator.</p>
+        <div class="panel-heading__icon">
+          <mat-icon>manage_accounts</mat-icon>
+        </div>
+        <div>
+          <h2>Account information</h2>
+          <p>Set identity, access role and initial credentials for the collaborator.</p>
+        </div>
       </div>
 
-      <app-loading-spinner *ngIf="isLoadingRoles"></app-loading-spinner>
+      <app-loading-spinner *ngIf="isLoadingRoles || isLoadingUser"></app-loading-spinner>
 
-      <form *ngIf="!isLoadingRoles" class="user-form-grid" [formGroup]="form" (ngSubmit)="submit()">
-        <label class="pm-field">
+      <form *ngIf="!isLoadingRoles && !isLoadingUser" class="user-form-grid" [formGroup]="form" (ngSubmit)="submit()">
+        <label class="pm-field" [class.pm-field--invalid]="controlIsInvalid('firstName')" [class.pm-field--complete]="controlIsComplete('firstName')">
           <span class="pm-field__label">First name</span>
-          <input type="text" formControlName="firstName" placeholder="Ex. Sara" autocomplete="given-name" />
+          <span class="pm-field__control">
+            <mat-icon>person</mat-icon>
+            <input type="text" formControlName="firstName" placeholder="Ex. Sara" autocomplete="given-name" />
+            <mat-icon class="pm-field__state">check_circle</mat-icon>
+          </span>
           <small class="pm-field__error" *ngIf="form.controls['firstName'].touched && form.controls['firstName'].invalid">
             {{ getErrorMessage('firstName') }}
           </small>
         </label>
 
-        <label class="pm-field">
+        <label class="pm-field" [class.pm-field--invalid]="controlIsInvalid('lastName')" [class.pm-field--complete]="controlIsComplete('lastName')">
           <span class="pm-field__label">Last name</span>
-          <input type="text" formControlName="lastName" placeholder="Ex. Benali" autocomplete="family-name" />
+          <span class="pm-field__control">
+            <mat-icon>badge</mat-icon>
+            <input type="text" formControlName="lastName" placeholder="Ex. Benali" autocomplete="family-name" />
+            <mat-icon class="pm-field__state">check_circle</mat-icon>
+          </span>
           <small class="pm-field__error" *ngIf="form.controls['lastName'].touched && form.controls['lastName'].invalid">
             {{ getErrorMessage('lastName') }}
           </small>
         </label>
 
-        <label class="pm-field user-form-grid__full">
+        <label class="pm-field user-form-grid__full" [class.pm-field--invalid]="controlIsInvalid('email')" [class.pm-field--complete]="controlIsComplete('email')">
           <span class="pm-field__label">Email</span>
-          <input type="email" formControlName="email" placeholder="name@company.com" autocomplete="email" />
+          <span class="pm-field__control">
+            <mat-icon>alternate_email</mat-icon>
+            <input type="email" formControlName="email" placeholder="name@company.com" autocomplete="email" />
+            <mat-icon class="pm-field__state">check_circle</mat-icon>
+          </span>
           <small class="pm-field__error" *ngIf="form.controls['email'].touched && form.controls['email'].invalid">
             {{ getErrorMessage('email') }}
           </small>
         </label>
 
-        <label class="pm-field">
+        <label class="pm-field" [class.pm-field--invalid]="controlIsInvalid('password')" [class.pm-field--complete]="controlIsComplete('password')">
           <span class="pm-field__label">Password</span>
-          <input [type]="hidePassword ? 'password' : 'text'" formControlName="password" placeholder="Minimum 6 characters" />
+          <span class="pm-field__control">
+            <mat-icon>lock</mat-icon>
+            <input [type]="hidePassword ? 'password' : 'text'" formControlName="password" placeholder="Minimum 6 characters" />
+            <button type="button" class="pm-field__toggle" (click)="hidePassword = !hidePassword" [attr.aria-label]="hidePassword ? 'Show password' : 'Hide password'">
+              <mat-icon>{{ hidePassword ? 'visibility' : 'visibility_off' }}</mat-icon>
+            </button>
+          </span>
+          <span class="password-meter" [class.password-meter--active]="passwordStrengthPercent > 0">
+            <span [style.width.%]="passwordStrengthPercent"></span>
+          </span>
+          <small class="pm-field__hint">{{ passwordStrengthLabel }}</small>
           <small class="pm-field__error" *ngIf="form.controls['password'].touched && form.controls['password'].invalid">
             {{ getErrorMessage('password') }}
           </small>
         </label>
 
-        <label class="pm-field">
+        <label class="pm-field" [class.pm-field--invalid]="controlIsInvalid('confirmPassword')" [class.pm-field--complete]="controlIsComplete('confirmPassword') && !form.hasError('passwordMismatch')">
           <span class="pm-field__label">Confirm password</span>
-          <input
-            [type]="hideConfirmPassword ? 'password' : 'text'"
-            formControlName="confirmPassword"
-            placeholder="Repeat the password"
-          />
+          <span class="pm-field__control">
+            <mat-icon>verified_user</mat-icon>
+            <input
+              [type]="hideConfirmPassword ? 'password' : 'text'"
+              formControlName="confirmPassword"
+              placeholder="Repeat the password"
+            />
+            <button type="button" class="pm-field__toggle" (click)="hideConfirmPassword = !hideConfirmPassword" [attr.aria-label]="hideConfirmPassword ? 'Show password' : 'Hide password'">
+              <mat-icon>{{ hideConfirmPassword ? 'visibility' : 'visibility_off' }}</mat-icon>
+            </button>
+          </span>
           <small
             class="pm-field__error"
             *ngIf="form.controls['confirmPassword'].touched && (form.controls['confirmPassword'].invalid || form.hasError('passwordMismatch'))"
@@ -84,12 +120,16 @@
           </small>
         </label>
 
-        <label class="pm-field user-form-grid__full">
+        <label class="pm-field user-form-grid__full" [class.pm-field--invalid]="controlIsInvalid('roleId')" [class.pm-field--complete]="controlIsComplete('roleId')">
           <span class="pm-field__label">Role</span>
-          <select formControlName="roleId">
-            <option value="">Select a role</option>
-            <option *ngFor="let role of roles" [value]="role.id">{{ role.name }}</option>
-          </select>
+          <span class="pm-field__control">
+            <mat-icon>admin_panel_settings</mat-icon>
+            <select formControlName="roleId">
+              <option value="">Select a role</option>
+              <option *ngFor="let role of roles" [value]="role.id">{{ role.name }}</option>
+            </select>
+            <mat-icon class="pm-field__state">check_circle</mat-icon>
+          </span>
           <small class="pm-field__error" *ngIf="form.controls['roleId'].touched && form.controls['roleId'].invalid">
             {{ getErrorMessage('roleId') }}
           </small>
@@ -107,20 +147,33 @@
 
     <aside class="user-panel user-panel--preview">
       <div class="panel-heading">
-        <h2>Live preview</h2>
-        <p>A quick summary of the account that will be created from this form.</p>
+        <div class="panel-heading__icon panel-heading__icon--accent">
+          <mat-icon>id_card</mat-icon>
+        </div>
+        <div>
+          <h2>Live preview</h2>
+          <p>A quick summary of the account context from this form.</p>
+        </div>
       </div>
 
       <article class="user-preview-card">
-        <div class="user-preview-card__accent"></div>
+        <div class="user-preview-card__top">
+          <span>{{ accountStatusLabel }}</span>
+          <mat-icon>more_horiz</mat-icon>
+        </div>
         <div class="user-preview-card__body">
+          <div class="user-preview-card__avatar">{{ displayInitials }}</div>
           <span class="user-preview-card__tag">{{ isEditMode ? 'Edit mode' : 'New account' }}</span>
-          <h3>{{ (form.controls['firstName'].value || '') + ' ' + (form.controls['lastName'].value || '') || 'User name' }}</h3>
+          <h3>{{ displayName }}</h3>
           <p>{{ form.controls['email'].value || 'Email address' }}</p>
           <div class="user-preview-card__meta">
             <span>
               <mat-icon>badge</mat-icon>
               {{ selectedRoleLabel }}
+            </span>
+            <span>
+              <mat-icon>shield</mat-icon>
+              Professional access
             </span>
           </div>
         </div>

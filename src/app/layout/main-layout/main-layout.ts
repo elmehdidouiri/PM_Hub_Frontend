@@ -31,6 +31,16 @@ export interface NavItem {
   userOnly?: boolean;
 }
 
+interface NotificationPageContext {
+  id: string;
+  route: string;
+  severity: HeaderNotification['severity'];
+  targetLabel: string;
+  title: string;
+  message: string;
+  occurredAtLabel: string;
+}
+
 @Component({
   selector: 'app-main-layout',
   standalone: false,
@@ -52,7 +62,11 @@ export class MainLayout implements OnInit {
   profileMenuOpen = false;
   notificationMenuOpen = false;
   notifications?: HeaderNotificationSummary;
+  activeNotificationContext: NotificationPageContext | null = null;
   expandedNotificationGroups = new Set<string>();
+  private readonly notificationContextStorageKey = 'pmhub.activeNotificationContext';
+  private readonly readNotificationStorageKey = 'pmhub.readNotifications';
+  private readNotificationIds = new Set<string>();
 
   readonly navItems: NavItem[] = [
     {
@@ -129,6 +143,7 @@ export class MainLayout implements OnInit {
         { label: 'Plants', route: '/admin/plants' },
         { label: 'Technologies', route: '/admin/technologies' },
         { label: 'Solution Domains', route: '/admin/solution-domains' },
+        { label: 'Target Settings', route: '/admin/target-settings' },
       ]
     }
   ];
@@ -153,8 +168,10 @@ export class MainLayout implements OnInit {
       this.isLoadingUser = false;
     }
 
+    this.readNotificationIds = this.loadReadNotificationIds();
     this.updateViewportState();
     this.loadNotifications();
+    this.syncActiveNotificationContext(this.router.url);
 
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
@@ -165,6 +182,7 @@ export class MainLayout implements OnInit {
         this.user = this.authService.getCurrentUser();
         this.refreshFilteredNavItems();
         this.notificationMenuOpen = false;
+        this.syncActiveNotificationContext(this.router.url);
       });
   }
 
@@ -393,7 +411,7 @@ export class MainLayout implements OnInit {
   loadNotifications(): void {
     this.notificationService.getHeaderNotifications().subscribe({
       next: (response) => {
-        this.notifications = response.data ?? undefined;
+        this.notifications = this.withLocalReadState(response.data ?? undefined);
         this.expandedNotificationGroups.clear();
       },
       error: (err) => {
@@ -419,9 +437,308 @@ export class MainLayout implements OnInit {
     return this.notifications?.items.filter((item) => item.groupKey === groupKey) ?? [];
   }
 
+  isNotificationRead(item: HeaderNotification): boolean {
+    return item.isRead || this.readNotificationIds.has(item.id);
+  }
+
   onNotificationClick(item: HeaderNotification): void {
+    const route = this.resolveNotificationRoute(item);
+
+    if (!route) {
+      this.notificationService.showWarning(
+        `No destination is available for this ${this.notificationTargetLabel(item)} notification.`
+      );
+      return;
+    }
+
     this.notificationMenuOpen = false;
-    this.router.navigateByUrl(item.actionUrl);
+    this.markNotificationAsRead(item.id);
+    this.activeNotificationContext = this.toNotificationPageContext(item, route);
+    this.storeNotificationContext(this.activeNotificationContext);
+
+    this.router.navigateByUrl(route).catch(() => {
+      this.notificationService.showWarning(
+        `Unable to open ${this.notificationTargetLabel(item)} from this notification.`
+      );
+    });
+  }
+
+  dismissNotificationContext(): void {
+    this.activeNotificationContext = null;
+    this.clearNotificationContext();
+  }
+
+  notificationTargetLabel(item: HeaderNotification): string {
+    switch (this.normalizedNotificationTargetType(item)) {
+      case 'Project':
+        return 'project';
+      case 'User':
+        return 'user';
+      case 'Intern':
+        return 'intern';
+      case 'Roadblock':
+        return 'roadblock';
+      default:
+        return 'item';
+    }
+  }
+
+  notificationDestinationLabel(item: HeaderNotification): string {
+    const route = this.resolveNotificationRoute(item);
+
+    if (route?.startsWith('/projects/')) {
+      return 'Open project details';
+    }
+    if (route?.startsWith('/users/')) {
+      return 'Open user profile';
+    }
+    if (route?.startsWith('/interns/')) {
+      return 'Open intern profile';
+    }
+    if (route === '/admin/hour-booking-notifications') {
+      return 'Open booking notifications';
+    }
+
+    return route ? 'Open related page' : 'No destination';
+  }
+
+  notificationSeverityIcon(item: HeaderNotification): string {
+    switch (item.severity) {
+      case 'critical':
+        return 'error';
+      case 'warning':
+        return 'schedule';
+      case 'info':
+        return 'info';
+      default:
+        return 'notifications';
+    }
+  }
+
+  notificationWhen(item: HeaderNotification): string {
+    const value = item.occurredAt || item.createdAt;
+    if (!value) {
+      return 'Date unavailable';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Date unavailable';
+    }
+
+    return date.toLocaleDateString(undefined, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+
+  private resolveNotificationRoute(item: HeaderNotification): string | null {
+    const explicitRoute = this.normalizeNotificationRoute(item.actionUrl);
+    if (explicitRoute) {
+      return explicitRoute;
+    }
+
+    const targetType = this.normalizedNotificationTargetType(item);
+    const projectId = item.projectId || (targetType === 'Project' ? item.targetId : undefined);
+
+    switch (targetType) {
+      case 'Project':
+        return item.targetId ? `/projects/${encodeURIComponent(item.targetId)}` : null;
+      case 'Roadblock':
+        return projectId ? `/projects/${encodeURIComponent(projectId)}` : null;
+      case 'User':
+        return item.targetId ? `/users/${encodeURIComponent(item.targetId)}` : null;
+      case 'Intern':
+        return item.targetId ? `/interns/${encodeURIComponent(item.targetId)}` : null;
+      default:
+        return null;
+    }
+  }
+
+  private normalizeNotificationRoute(actionUrl?: string): string | null {
+    if (!actionUrl?.trim()) {
+      return null;
+    }
+
+    const trimmedUrl = actionUrl.trim();
+
+    try {
+      const origin = typeof window === 'undefined' ? 'http://localhost' : window.location.origin;
+      const parsedUrl = new URL(trimmedUrl, origin);
+      if (parsedUrl.origin !== origin) {
+        return null;
+      }
+
+      return this.normalizeKnownAppRoute(`${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`);
+    } catch {
+      return this.normalizeKnownAppRoute(trimmedUrl);
+    }
+  }
+
+  private normalizeKnownAppRoute(route: string): string | null {
+    const normalizedRoute = route.startsWith('/') ? route : `/${route}`;
+    const normalizedRouteLower = normalizedRoute.toLowerCase();
+
+    if (normalizedRouteLower.startsWith('/project/')) {
+      return `/projects/${normalizedRoute.slice('/project/'.length)}`;
+    }
+    if (normalizedRouteLower.startsWith('/user/')) {
+      return `/users/${normalizedRoute.slice('/user/'.length)}`;
+    }
+    if (normalizedRouteLower.startsWith('/intern/')) {
+      return `/interns/${normalizedRoute.slice('/intern/'.length)}`;
+    }
+
+    const knownPrefixes = ['/projects', '/users', '/interns', '/hours', '/dashboard', '/reports', '/admin', '/profile'];
+    return knownPrefixes.some((prefix) => normalizedRouteLower === prefix || normalizedRouteLower.startsWith(`${prefix}/`))
+      ? normalizedRoute
+      : null;
+  }
+
+  private normalizedNotificationTargetType(item: HeaderNotification): HeaderNotification['targetType'] | null {
+    const value = String(item.targetType).toLowerCase();
+
+    if (value === 'project') {
+      return 'Project';
+    }
+    if (value === 'user') {
+      return 'User';
+    }
+    if (value === 'intern') {
+      return 'Intern';
+    }
+    if (value === 'roadblock') {
+      return 'Roadblock';
+    }
+
+    return null;
+  }
+
+  private toNotificationPageContext(item: HeaderNotification, route: string): NotificationPageContext {
+    return {
+      id: item.id,
+      route: this.routePath(route),
+      severity: item.severity,
+      targetLabel: this.notificationTargetLabel(item),
+      title: item.title,
+      message: item.message,
+      occurredAtLabel: this.notificationWhen(item),
+    };
+  }
+
+  private markNotificationAsRead(notificationId: string): void {
+    if (!notificationId) {
+      return;
+    }
+
+    this.readNotificationIds.add(notificationId);
+    this.persistReadNotificationIds();
+
+    if (!this.notifications?.items.length) {
+      return;
+    }
+
+    this.notifications = {
+      ...this.notifications,
+      items: this.notifications.items.map((item) =>
+        item.id === notificationId ? { ...item, isRead: true } : item
+      ),
+    };
+  }
+
+  private withLocalReadState(summary?: HeaderNotificationSummary): HeaderNotificationSummary | undefined {
+    if (!summary?.items?.length) {
+      return summary;
+    }
+
+    return {
+      ...summary,
+      items: summary.items.map((item) => ({
+        ...item,
+        isRead: item.isRead || this.readNotificationIds.has(item.id),
+      })),
+    };
+  }
+
+  private loadReadNotificationIds(): Set<string> {
+    if (typeof localStorage === 'undefined') {
+      return new Set<string>();
+    }
+
+    const rawValue = localStorage.getItem(this.readNotificationStorageKey);
+    if (!rawValue) {
+      return new Set<string>();
+    }
+
+    try {
+      const ids = JSON.parse(rawValue);
+      return Array.isArray(ids) ? new Set(ids.filter((id): id is string => typeof id === 'string')) : new Set<string>();
+    } catch {
+      localStorage.removeItem(this.readNotificationStorageKey);
+      return new Set<string>();
+    }
+  }
+
+  private persistReadNotificationIds(): void {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+
+    localStorage.setItem(this.readNotificationStorageKey, JSON.stringify([...this.readNotificationIds]));
+  }
+
+  private syncActiveNotificationContext(currentRoute: string): void {
+    const storedContext = this.readStoredNotificationContext();
+    const currentPath = this.routePath(currentRoute);
+
+    if (storedContext && storedContext.route === currentPath) {
+      this.activeNotificationContext = storedContext;
+      return;
+    }
+
+    if (this.activeNotificationContext && this.activeNotificationContext.route !== currentPath) {
+      this.activeNotificationContext = null;
+      this.clearNotificationContext();
+    }
+  }
+
+  private storeNotificationContext(context: NotificationPageContext): void {
+    if (typeof sessionStorage === 'undefined') {
+      return;
+    }
+
+    sessionStorage.setItem(this.notificationContextStorageKey, JSON.stringify(context));
+  }
+
+  private readStoredNotificationContext(): NotificationPageContext | null {
+    if (typeof sessionStorage === 'undefined') {
+      return null;
+    }
+
+    const rawValue = sessionStorage.getItem(this.notificationContextStorageKey);
+    if (!rawValue) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(rawValue) as NotificationPageContext;
+    } catch {
+      this.clearNotificationContext();
+      return null;
+    }
+  }
+
+  private clearNotificationContext(): void {
+    if (typeof sessionStorage === 'undefined') {
+      return;
+    }
+
+    sessionStorage.removeItem(this.notificationContextStorageKey);
+  }
+
+  private routePath(route: string): string {
+    return route.split('?')[0].split('#')[0];
   }
 
   logoutFromMenu(): void {

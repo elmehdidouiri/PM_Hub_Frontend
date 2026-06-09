@@ -17,6 +17,13 @@
   font-family: $font-family-base;
 }
 
+.analytics-content-container {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  min-height: 250px;
+}
+
 .filter-panel,
 .analytics-section,
 .wide-chart-card {
@@ -158,8 +165,8 @@
 
 .metric-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(12.25rem, 1fr));
+  gap: 0.85rem;
   background: transparent;
   border: 0;
 }
@@ -169,14 +176,21 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 7.25rem;
-  padding: 0.75rem 0.9rem;
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  border-radius: 14px !important;
-  background: #ffffff;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.02);
+  width: 100%;
+  min-height: 7.75rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid #dbe4ee;
+  border-radius: 12px !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--metric-tone, #{$primary-500}) 5%, white) 0%, #ffffff 48%),
+    #ffffff;
+  box-shadow: 0 12px 22px -16px rgba(15, 23, 42, 0.28);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 
   &:hover {
     transform: translateY(-2px);
@@ -189,16 +203,24 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
+    height: 4px;
     background: var(--metric-tone, #{$primary-500});
     opacity: 0.8;
   }
 
   &__head {
+    position: relative;
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding-right: 3.5rem;
+    margin-bottom: 0.65rem;
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--metric-tone, #{$primary-500}) 24%, transparent);
+    outline-offset: 3px;
   }
 
   &__info {
@@ -227,6 +249,10 @@
 
   &__label {
     @include type.type-kpi-label;
+    color: #64748b;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow-wrap: normal;
   }
 
   &__body {
@@ -247,6 +273,9 @@
   }
 
   &__trend {
+    position: absolute;
+    top: 0;
+    right: 0;
     display: inline-flex;
     align-items: center;
     gap: 0.2rem;
@@ -254,6 +283,7 @@
     border-radius: 6px;
     font-size: type.$type-body-sm-size;
     font-weight: type.$type-ui-semibold;
+    flex-shrink: 0;
 
     &.up { 
       background: #ecfdf5;
@@ -311,6 +341,22 @@
       line-height: 1.4;
       margin: 0;
       letter-spacing: 0.04em;
+    }
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-top: 0.45rem;
+      color: color-mix(in srgb, var(--metric-tone, #{$primary-500}) 78%, #101828);
+      font-size: 0.72rem;
+      font-weight: 800;
+
+      mat-icon {
+        width: 0.9rem;
+        height: 0.9rem;
+        font-size: 0.9rem;
+      }
     }
   }
 
@@ -445,6 +491,18 @@
   padding: 1rem 1.25rem;
   background: #f8fafc;
 
+  > div {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  mat-icon {
+    flex: 0 0 auto;
+    color: $navy-900;
+  }
+
   h2 {
     margin: 0;
     @include type.type-section-title;
@@ -458,6 +516,7 @@
     letter-spacing: 0.06em;
     border-radius: 999px;
     border: 1px solid #cbd5e1;
+    white-space: nowrap;
   }
 }
 
@@ -468,6 +527,12 @@
   padding: 1.5rem;
 }
 
+.performance-grid--kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  padding: 1.25rem;
+}
+
 .performance-card {
   border: 1px solid #e2e8f0;
   border-radius: 16px;
@@ -476,6 +541,59 @@
 
 .performance-card:last-child {
   border-right: 0;
+}
+
+.kpi-card-header {
+  min-height: 6rem;
+}
+
+.kpi-card-header__title {
+  display: grid !important;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  align-items: start !important;
+  gap: 0.8rem !important;
+  width: 100%;
+  min-width: 0;
+
+  mat-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin-top: 0.05rem;
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+
+  > div {
+    display: grid !important;
+    gap: 0.35rem !important;
+    min-width: 0;
+  }
+
+  .chart-card & strong {
+    max-width: 100%;
+    color: $navy-900;
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .chart-card & span {
+    max-width: 100%;
+    color: #475467;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.45;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+  }
+}
+
+.kpi-chart-container {
+  width: 100%;
+  height: 260px;
+  border: 0;
+  background: transparent;
 }
 
 .chart-no-data {

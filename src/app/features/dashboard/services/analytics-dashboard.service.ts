@@ -21,7 +21,7 @@ export class AnalyticsDashboardService {
   getDashboard(params: AnalyticsDashboardParams): Observable<AnalyticsDashboardDto> {
     return this.http
       .get<ApiResponse<AnalyticsDashboardDto> | AnalyticsDashboardDto>(`${this.apiUrl}/dashboard`, {
-        params: this.buildParams(params),
+        params: buildAnalyticsQueryParams(params),
       })
       .pipe(map((response) => this.normalizeDashboard(this.unwrap(response))));
   }
@@ -35,7 +35,7 @@ export class AnalyticsDashboardService {
   getKpis(params: AnalyticsDashboardParams): Observable<AnalyticsDashboardDto['kpis']> {
     return this.http
       .get<ApiResponse<AnalyticsDashboardDto['kpis']> | AnalyticsDashboardDto['kpis']>(`${this.apiUrl}/kpis`, {
-        params: this.buildParams(params),
+        params: buildAnalyticsQueryParams(params),
       })
       .pipe(map((response) => this.unwrap(response)));
   }
@@ -43,43 +43,9 @@ export class AnalyticsDashboardService {
   getHours(params: AnalyticsDashboardParams): Observable<AnalyticsDashboardDto['hours']> {
     return this.http
       .get<ApiResponse<AnalyticsDashboardDto['hours']> | AnalyticsDashboardDto['hours']>(`${this.apiUrl}/hours`, {
-        params: this.buildParams(params),
+        params: buildAnalyticsQueryParams(params),
       })
       .pipe(map((response) => this.unwrap(response)));
-  }
-
-  private buildParams(params: AnalyticsDashboardParams): HttpParams {
-    let httpParams = new HttpParams();
-
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        httpParams = httpParams.set(key, String(value));
-      }
-    });
-
-    const aliases: Record<string, string> = {
-      month: 'Month',
-      year: 'Year',
-      fiscalYear: 'FiscalYear',
-      periodMode: 'PeriodMode',
-      quickSelect: 'QuickSelect',
-      userId: 'UserId',
-      projectId: 'ProjectId',
-      departmentId: 'DepartmentId',
-      businessUnitId: 'BusinessUnitId',
-      plantId: 'PlantId',
-      projectStatus: 'ProjectStatus',
-      projectPhase: 'ProjectPhase',
-    };
-
-    Object.entries(aliases).forEach(([key, alias]) => {
-      const value = params[key as keyof AnalyticsDashboardParams];
-      if (value !== undefined && value !== null && value !== '') {
-        httpParams = httpParams.set(alias, String(value));
-      }
-    });
-
-    return httpParams;
   }
 
   private unwrap<T>(response: ApiResponse<T> | T): T {
@@ -142,9 +108,39 @@ export class AnalyticsDashboardService {
         fiscalYearEndDate: this.str(period, ['fiscalYearEndDate', 'FiscalYearEndDate']),
       },
       summary: {
-        averageEffectiveness: this.num(summary, ['averageEffectiveness', 'AverageEffectiveness']),
+        averageEffectiveness: this.num(summary, [
+          'averageEffectiveness',
+          'AverageEffectiveness',
+          'avgEffectiveness',
+          'AvgEffectiveness',
+          'effectiveness',
+          'Effectiveness',
+          'effectivenessPercentage',
+          'EffectivenessPercentage',
+          'averageEffectivenessPercentage',
+          'AverageEffectivenessPercentage',
+          'progress',
+          'Progress',
+        ]),
         averageOtd: this.num(summary, ['averageOtd', 'averageOTD', 'AverageOtd', 'AverageOTD']),
-        averageCsat: this.num(summary, ['averageCsat', 'averageCSAT', 'AverageCsat', 'AverageCSAT']),
+        averageCsat: this.num(summary, [
+          'averageCsat',
+          'averageCSAT',
+          'AverageCsat',
+          'AverageCSAT',
+          'avgCsat',
+          'AvgCsat',
+          'csat',
+          'CSAT',
+          'customerSatisfaction',
+          'CustomerSatisfaction',
+          'customerSatisfactionPercentage',
+          'CustomerSatisfactionPercentage',
+          'averageCustomerSatisfaction',
+          'AverageCustomerSatisfaction',
+          'averageCustomerSatisfactionPercentage',
+          'AverageCustomerSatisfactionPercentage',
+        ]),
         totalProjects: this.num(summary, ['totalProjects', 'TotalProjects']),
         projectsWithData: this.num(summary, ['projectsWithData', 'ProjectsWithData']),
         totalHours: this.num(summary, ['totalHours', 'TotalHours']),
@@ -154,15 +150,70 @@ export class AnalyticsDashboardService {
         activeTeamMembers: this.num(summary, ['activeTeamMembers', 'ActiveTeamMembers']),
       },
       kpis: {
-        monthlyTrend: this.array(this.pick(kpis, ['monthlyTrend', 'MonthlyTrend'])).map((item) => {
+        monthlyTrend: this.array(this.pick(kpis, [
+          'monthlyTrend',
+          'MonthlyTrend',
+          'monthlyKpis',
+          'MonthlyKpis',
+          'monthlyKPIs',
+          'MonthlyKPIs',
+          'kpiTrend',
+          'KpiTrend',
+          'KPITrend',
+          'trend',
+          'Trend',
+        ])).map((item) => {
           const r = this.asRecord(item);
           return {
             year: this.num(r, ['year', 'Year']),
             month: this.num(r, ['month', 'Month']),
             monthName: this.str(r, ['monthName', 'MonthName']),
-            effectiveness: this.num(r, ['effectiveness', 'Effectiveness']),
-            otd: this.num(r, ['otd', 'OTD', 'Otd']),
-            csat: this.num(r, ['csat', 'CSAT', 'Csat']),
+            effectiveness: this.num(r, [
+              'effectiveness',
+              'Effectiveness',
+              'avgEffectiveness',
+              'AvgEffectiveness',
+              'averageEffectiveness',
+              'AverageEffectiveness',
+              'effectivenessPercentage',
+              'EffectivenessPercentage',
+              'averageEffectivenessPercentage',
+              'AverageEffectivenessPercentage',
+              'progress',
+              'Progress',
+            ]),
+            otd: this.num(r, [
+              'otd',
+              'OTD',
+              'Otd',
+              'avgOtd',
+              'AvgOtd',
+              'averageOtd',
+              'averageOTD',
+              'AverageOtd',
+              'AverageOTD',
+              'onTimeDelivery',
+              'OnTimeDelivery',
+              'onTimeDeliveryPercentage',
+              'OnTimeDeliveryPercentage',
+            ]),
+            csat: this.num(r, [
+              'csat',
+              'CSAT',
+              'Csat',
+              'avgCsat',
+              'AvgCsat',
+              'averageCsat',
+              'AverageCsat',
+              'customerSatisfaction',
+              'CustomerSatisfaction',
+              'customerSatisfactionPercentage',
+              'CustomerSatisfactionPercentage',
+              'averageCustomerSatisfaction',
+              'AverageCustomerSatisfaction',
+              'averageCustomerSatisfactionPercentage',
+              'AverageCustomerSatisfactionPercentage',
+            ]),
             projectsWithData: this.num(r, ['projectsWithData', 'ProjectsWithData']),
           };
         }),
@@ -276,4 +327,74 @@ export class AnalyticsDashboardService {
     const parsed = Number(value ?? 0);
     return Number.isFinite(parsed) ? parsed : 0;
   }
+}
+
+export function buildAnalyticsQueryParams(filters: AnalyticsDashboardParams): HttpParams {
+  let httpParams = new HttpParams();
+  const params = normalizeAnalyticsDashboardParams(filters);
+
+  (Object.keys(params) as Array<keyof AnalyticsDashboardParams>).forEach((key) => {
+    const value = params[key];
+    if (value !== undefined && value !== null && value !== '') {
+      httpParams = httpParams.set(key, String(value));
+    }
+  });
+
+  return httpParams;
+}
+
+function normalizeAnalyticsDashboardParams(filters: AnalyticsDashboardParams): AnalyticsDashboardParams {
+  const periodMode = normalizePeriodMode(filters.periodMode);
+  const quickSelect = normalizeQuickSelect(filters.quickSelect);
+  const isYtd = periodMode === 'ytd' || quickSelect === 'YTD';
+
+  const scopeParams: AnalyticsDashboardParams = {
+    userId: filters.userId,
+    projectId: filters.projectId,
+    departmentId: filters.departmentId,
+    businessUnitId: filters.businessUnitId,
+    plantId: filters.plantId,
+    projectStatus: filters.projectStatus,
+    projectPhase: filters.projectPhase,
+  };
+
+  if (isYtd) {
+    return cleanParams({
+      fiscalYear: filters.fiscalYear,
+      periodMode: 'ytd',
+      quickSelect: 'YTD',
+      ...scopeParams,
+    });
+  }
+
+  if (periodMode === 'month') {
+    return cleanParams({
+      year: filters.year,
+      month: filters.month,
+      periodMode: 'month',
+      ...scopeParams,
+    });
+  }
+
+  return cleanParams({
+    year: filters.year,
+    periodMode: periodMode ?? (filters.year ? 'year' : null),
+    ...scopeParams,
+  });
+}
+
+function normalizePeriodMode(value: string | null | undefined): string | null {
+  return value ? String(value).trim().toLowerCase() : null;
+}
+
+function normalizeQuickSelect(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const normalized = String(value).trim();
+  return normalized.toUpperCase() === 'YTD' ? 'YTD' : normalized.toLowerCase();
+}
+
+function cleanParams(params: AnalyticsDashboardParams): AnalyticsDashboardParams {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ) as AnalyticsDashboardParams;
 }

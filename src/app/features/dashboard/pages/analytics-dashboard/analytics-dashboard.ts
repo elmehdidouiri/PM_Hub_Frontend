@@ -59,6 +59,7 @@ export class AnalyticsDashboard implements OnInit {
   private hoursBreakdownChart: echarts.ECharts | null = null;
   private buHoursChart: echarts.ECharts | null = null;
   private kpiChartsInstances: echarts.ECharts[] = [];
+  private resizeObservers: ResizeObserver[] = [];
 
   @ViewChild('utilizationEchart') utilizationEchartContainer!: ElementRef;
   @ViewChild('trendEchart') trendEchartContainer!: ElementRef;
@@ -115,7 +116,7 @@ export class AnalyticsDashboard implements OnInit {
   errorMessage = '';
   private latestDashboardRequest = 0;
 
-  periodFilterMode: PeriodFilterMode = 'month';
+  periodFilterMode: PeriodFilterMode = 'ytd';
   selectedMonth: number | null = null;
   selectedYear: number | null = null;
   selectedUserId: string | null = null;
@@ -126,10 +127,9 @@ export class AnalyticsDashboard implements OnInit {
   private isDefaultFilter = true;
 
   ngOnInit(): void {
-    // Default to current month on initial load
-    this.periodFilterMode = 'month';
-    this.selectedMonth = this.now.getMonth() + 1;
-    this.selectedYear = null;
+    this.periodFilterMode = 'ytd';
+    this.selectedMonth = null;
+    this.selectedYear = this.currentFiscalYear();
     this.isDefaultFilter = true;
     
     this.loadInitialData();
@@ -148,6 +148,8 @@ export class AnalyticsDashboard implements OnInit {
     if (isPlatformBrowser(this.platformId)) {
       window.removeEventListener('resize', this.resizeCharts.bind(this));
     }
+    this.resizeObservers.forEach(o => o.disconnect());
+    this.resizeObservers = [];
     if (this.utilizationChart) {
       this.utilizationChart.dispose();
     }
@@ -190,23 +192,24 @@ export class AnalyticsDashboard implements OnInit {
       };
     };
 
-    const makeMetric = (label: string, value: string, note: string, icon: string, tone: MetricTone, points: number[]): AnalyticsMetric => {
+    const makeMetric = (label: string, value: string, note: string, icon: string, tone: MetricTone, points: number[], actionLabel = 'Open trend'): AnalyticsMetric => {
       const trend = getTrendInfo(points);
       const spark = this.generateSparkline(points);
-      return { label, value, note, icon, tone, ...trend, ...spark };
+      return { label, value, note, icon, tone, actionLabel, ...trend, ...spark };
     };
 
     return [
-      makeMetric('Effectiveness', this.formatPercent(summary?.averageEffectiveness), 'Portfolio average', 'verified', this.percentTone(summary?.averageEffectiveness), getKpiPoints('effectiveness')),
-      makeMetric('OTD', this.formatPercent(summary?.averageOtd), 'On-time delivery', 'schedule', this.percentTone(summary?.averageOtd), getKpiPoints('otd')),
-      makeMetric('CSAT', this.formatPercent(summary?.averageCsat), 'Customer satisfaction', 'star', this.percentTone(summary?.averageCsat), getKpiPoints('csat')),
-      makeMetric('Utilization', this.formatPercent(summary?.averageUtilization), 'Team capacity usage', 'speed', this.percentTone(summary?.averageUtilization), utilTrend.map(t => t.utilizationPercentage || 0)),
+      makeMetric('Effectiveness', this.formatPercent(summary?.averageEffectiveness), 'Portfolio average', 'verified', this.percentTone(summary?.averageEffectiveness), getKpiPoints('effectiveness'), 'Open KPI quality'),
+      makeMetric('OTD', this.formatPercent(summary?.averageOtd), 'On-time delivery', 'schedule', this.percentTone(summary?.averageOtd), getKpiPoints('otd'), 'Open KPI quality'),
+      makeMetric('CSAT', this.formatPercent(summary?.averageCsat), 'Customer satisfaction', 'star', this.percentTone(summary?.averageCsat), getKpiPoints('csat'), 'Open KPI quality'),
+      makeMetric('Utilization', this.formatPercent(summary?.averageUtilization), 'Team capacity usage', 'speed', this.percentTone(summary?.averageUtilization), utilTrend.map(t => t.utilizationPercentage || 0), 'Open utilization'),
       {
         label: 'Total Hours',
         value: this.formatNumber(summary?.totalHours),
         note: `${this.formatNumber(summary?.ytdHours)}h YTD in fiscal year`,
-        icon: 'hourglass',
+        icon: 'hourglass_empty',
         tone: 'purple',
+        actionLabel: 'Open hours',
         ...getTrendInfo(this.dashboard?.hours?.monthlyByCategory?.map(h => Number(h.totalHours)) ?? []),
         ...this.generateSparkline(this.dashboard?.hours?.monthlyByCategory?.map(h => Number(h.totalHours)) ?? [])
       },
@@ -216,13 +219,7 @@ export class AnalyticsDashboard implements OnInit {
         note: 'People with activity',
         icon: 'groups',
         tone: 'teal',
-      },
-      {
-        label: 'Projects',
-        value: this.formatNumber(summary?.totalProjects),
-        note: `${this.formatNumber(summary?.projectsWithData)} with data`,
-        icon: 'folder',
-        tone: 'blue',
+        actionLabel: 'Open utilization',
       },
     ];
   }
@@ -292,7 +289,7 @@ export class AnalyticsDashboard implements OnInit {
     });
 
     const period = this.dashboard?.period;
-    if (period?.fiscalYear) years.add(period.fiscalYear + 1);
+    if (period?.fiscalYear) years.add(period.fiscalYear);
     if (period?.year) years.add(period.year);
 
     this.kpiTrend.forEach((item) => {
@@ -336,8 +333,7 @@ export class AnalyticsDashboard implements OnInit {
       if (!period.fiscalYear && !this.selectedYear) {
         return 'All Time';
       }
-      // Map API Start Year to UI End Year
-      const fy = period.fiscalYear ? period.fiscalYear + 1 : this.selectedYear;
+      const fy = period.fiscalYear || this.selectedYear;
       return `${fy || 'All Time'}`;
     }
 
@@ -354,8 +350,7 @@ export class AnalyticsDashboard implements OnInit {
       return `Portfolio Lifecycle (${this.shortDate(period.startDate)} - ${this.shortDate(period.endDate)})`;
     }
 
-    // Map API Start Year (e.g. 2025) to UI End Year (e.g. 2026)
-    const fy = period.fiscalYear ? period.fiscalYear + 1 : this.selectedYear;
+    const fy = period.fiscalYear || this.selectedYear;
     return `FY${fy} (${this.shortDate(period.fiscalYearStartDate)} - ${this.shortDate(period.fiscalYearEndDate)})`;
   }
 
@@ -368,6 +363,11 @@ export class AnalyticsDashboard implements OnInit {
         this.cdr.markForCheck();
       }, 150);
     }
+  }
+
+  openMetricTarget(metric: AnalyticsMetric): void {
+    const label = metric.label.toLowerCase();
+    this.setTab(label === 'effectiveness' || label === 'otd' || label === 'csat' ? 'kpis' : 'hours');
   }
 
   private disposeCharts(): void {
@@ -404,8 +404,7 @@ export class AnalyticsDashboard implements OnInit {
 
     if (this.periodFilterMode === 'ytd') {
       this.selectedMonth = null;
-      // Do not force a year, let it be null (All years) for "from the beginning"
-      this.selectedYear = null;
+      this.selectedYear = this.selectedYear ?? this.currentFiscalYear();
     }
 
     if (this.periodFilterMode === 'month') {
@@ -461,21 +460,13 @@ export class AnalyticsDashboard implements OnInit {
 
   private clearDefaultIfActive(): void {
     if (this.isDefaultFilter) {
-      this.selectedMonth = null;
-      this.selectedYear = null;
-      this.selectedUserId = null;
-      this.selectedProjectId = null;
-      this.selectedDepartmentId = null;
-      this.selectedBusinessUnitId = null;
-      this.selectedPlantId = null;
-      this.periodFilterMode = 'ytd';
       this.isDefaultFilter = false;
     }
   }
 
   resetFilters(): void {
-    this.periodFilterMode = 'month';
-    this.selectedMonth = this.now.getMonth() + 1;
+    this.periodFilterMode = 'ytd';
+    this.selectedMonth = null;
     this.selectedYear = this.currentFiscalYear();
     this.isDefaultFilter = true;
     
@@ -590,14 +581,14 @@ export class AnalyticsDashboard implements OnInit {
       .pipe(finalize(() => {
         this.isLoading = false;
         this.cdr.markForCheck();
+        if (isPlatformBrowser(this.platformId)) {
+          setTimeout(() => this.updateCharts(), 200);
+        }
       }))
       .subscribe({
         next: (dashboard) => {
           this.dashboard = dashboard;
           this.syncSelectionFromDashboard(dashboard);
-          if (isPlatformBrowser(this.platformId)) {
-            setTimeout(() => this.updateCharts(), 100);
-          }
         },
         error: () => {
           this.dashboard = null;
@@ -656,6 +647,7 @@ export class AnalyticsDashboard implements OnInit {
 
     if (!this.utilizationChart) {
       this.utilizationChart = echarts.init(this.utilizationEchartContainer.nativeElement);
+      this.setupResizeObserver(this.utilizationEchartContainer.nativeElement, this.utilizationChart);
     }
 
     const totalLoggedHours = this.dashboard?.summary?.totalHours || 1;
@@ -736,6 +728,7 @@ export class AnalyticsDashboard implements OnInit {
       if (!chart) {
         chart = echarts.init(container.nativeElement);
         this.kpiChartsInstances[index] = chart;
+        this.setupResizeObserver(container.nativeElement, chart);
       }
 
       const mappedData = fiscalMonths.map(m => {
@@ -797,6 +790,7 @@ export class AnalyticsDashboard implements OnInit {
 
     if (!this.trendChart) {
       this.trendChart = echarts.init(this.trendEchartContainer.nativeElement);
+      this.setupResizeObserver(this.trendEchartContainer.nativeElement, this.trendChart);
     }
 
     const fiscalMonths = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -887,7 +881,7 @@ export class AnalyticsDashboard implements OnInit {
     return {
       month,
       year,
-      fiscalYear: this.selectedYear ? this.selectedYear - 1 : null, // API uses Start Year (FY2025 for 2025-2026), but UI uses End Year (FY2026)
+      fiscalYear: this.periodFilterMode === 'ytd' ? this.selectedYear : null,
       periodMode: this.periodFilterMode,
       quickSelect: this.periodFilterMode === 'ytd' ? 'YTD' : this.periodFilterMode,
       userId: this.selectedUserId,
@@ -899,13 +893,9 @@ export class AnalyticsDashboard implements OnInit {
   }
 
   private normalizeFilters(filters: AnalyticsFiltersDto): AnalyticsFiltersDto {
-    // API uses Start Year (e.g. 2025), UI uses End Year (e.g. 2026).
-    // We map the API years to the UI convention (+1)
-    const apiFiscalYears = (filters.fiscalYears ?? []).map(y => y + 1);
-    
-    const fiscalYears = apiFiscalYears.length
-      ? apiFiscalYears
-      : [this.currentFiscalYear() - 1, this.currentFiscalYear(), this.currentFiscalYear() + 1];
+    const fiscalYears = filters.fiscalYears?.length
+      ? filters.fiscalYears
+      : [this.currentFiscalYear(), this.currentFiscalYear() - 1, this.currentFiscalYear() - 2];
 
     return {
       fiscalYears,
@@ -949,6 +939,7 @@ export class AnalyticsDashboard implements OnInit {
 
     if (!this.hoursBreakdownChart) {
       this.hoursBreakdownChart = echarts.init(this.hoursBreakdownEchartContainer.nativeElement);
+      this.setupResizeObserver(this.hoursBreakdownEchartContainer.nativeElement, this.hoursBreakdownChart);
     }
 
     const rawData = this.dashboard?.hours?.monthlyByCategory ?? [];
@@ -1064,6 +1055,7 @@ export class AnalyticsDashboard implements OnInit {
 
     if (!this.buHoursChart) {
       this.buHoursChart = echarts.init(this.buHoursEchartContainer.nativeElement);
+      this.setupResizeObserver(this.buHoursEchartContainer.nativeElement, this.buHoursChart);
     }
 
     const data = this.dashboard?.hours?.byBusinessUnit ?? [];
@@ -1168,8 +1160,7 @@ export class AnalyticsDashboard implements OnInit {
     if (!period) return;
 
     if (this.selectedYear !== null) {
-      // API returns Start Year (e.g., 2025), UI shows End Year (e.g., 2026)
-      this.selectedYear = (period.fiscalYear ? period.fiscalYear + 1 : null) || period.year || this.selectedYear;
+      this.selectedYear = period.fiscalYear || period.year || this.selectedYear;
     }
     
     if (this.periodFilterMode === 'month') {
@@ -1182,11 +1173,7 @@ export class AnalyticsDashboard implements OnInit {
   }
 
   private requestYear(): number | null {
-    if (this.periodFilterMode !== 'month' || !this.selectedYear || !this.selectedMonth) {
-      return this.selectedYear;
-    }
-
-    return this.selectedMonth >= 10 ? this.selectedYear - 1 : this.selectedYear;
+    return this.periodFilterMode === 'month' ? this.selectedYear : null;
   }
 
   private shortDate(value: string): string {
@@ -1198,5 +1185,17 @@ export class AnalyticsDashboard implements OnInit {
       day: '2-digit',
       year: 'numeric',
     }).format(date);
+  }
+
+  private setupResizeObserver(element: HTMLElement, chart: echarts.ECharts): void {
+    if (typeof ResizeObserver !== 'undefined' && element) {
+      const observer = new ResizeObserver(() => {
+        if (chart && !chart.isDisposed()) {
+          chart.resize();
+        }
+      });
+      observer.observe(element);
+      this.resizeObservers.push(observer);
+    }
   }
 }

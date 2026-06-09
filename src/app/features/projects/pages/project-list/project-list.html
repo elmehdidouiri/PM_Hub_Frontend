@@ -66,7 +66,7 @@
         </button>
       </div>
 
-      <button class="export-btn" (click)="onExport()" matTooltip="Export to Excel (XLSX)">
+      <button class="export-btn" (click)="openExportModal()" matTooltip="Export to Excel (XLSX)">
         <mat-icon>download</mat-icon>
         <span>Export</span>
       </button>
@@ -79,6 +79,10 @@
       <span class="active-pill" *ngIf="selectedBusinessUnitId !== 'all'">BU</span>
       <span class="active-pill" *ngIf="selectedDepartmentId !== 'all'">Department</span>
       <span class="active-pill" *ngIf="selectedPlantId !== 'all'">Plant</span>
+      <span class="active-pill" *ngIf="selectedStatus !== 'all'">Status</span>
+      <span class="active-pill" *ngIf="selectedPhase !== 'all'">Phase</span>
+      <span class="active-pill" *ngIf="selectedManagementType !== 'all'">Category</span>
+      <span class="active-pill" *ngIf="selectedDelayedOnly">Delayed</span>
       <span class="active-pill" *ngIf="startDate || endDate || year || month">Date Period</span>
       <button type="button" class="clear-dashboard-filters-btn" (click)="clearDashboardFilters()">
         <mat-icon>close</mat-icon>
@@ -262,11 +266,8 @@
         <div class="page-size-selector">
           <span>Rows per page:</span>
           <select [ngModel]="pageSize" (ngModelChange)="onPageSizeChange($event)" class="page-size-select">
-            <option *ngFor="let size of availablePageSizes" [value]="size">{{ size }}</option>
+            <option *ngFor="let size of availablePageSizes" [value]="size">{{ size === 10000 ? 'All' : size }}</option>
           </select>
-          <div class="custom-page-size">
-            <input type="number" [ngModel]="customPageSize" (change)="onCustomPageSizeChange($event)" placeholder="Custom" class="custom-size-input" />
-          </div>
         </div>
         <div class="table-pagination__summary">
           Showing {{ pageStart }}-{{ pageEnd }} of {{ totalCount }} projects
@@ -289,4 +290,91 @@
       </div>
     </div>
   </section>
+
+  <!-- Premium Glassmorphism Export Modal -->
+  <div class="export-modal-backdrop" *ngIf="showExportModal" (click)="closeExportModal()">
+    <div class="export-modal-card pm-glass" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="header-title-group">
+          <mat-icon class="header-icon">download</mat-icon>
+          <h3>Export Projects</h3>
+        </div>
+        <button class="close-modal-btn" (click)="closeExportModal()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-subtitle">Choose the report format to export. Active filters on status, phase, and category will be applied.</p>
+        
+        <div class="export-options-grid">
+          <!-- Option 1: Standard -->
+          <label class="export-option-card" [class.export-option-card--active]="exportTypeOption === 'standard'">
+            <input type="radio" name="exportOption" [(ngModel)]="exportTypeOption" value="standard" />
+            <div class="card-icon-wrapper">
+              <mat-icon>list_alt</mat-icon>
+            </div>
+            <div class="card-content">
+              <strong>Standard List</strong>
+              <span>General project fields, phase, status, and estimation details.</span>
+            </div>
+          </label>
+
+          <!-- Option 2: MTD -->
+          <label class="export-option-card" [class.export-option-card--active]="exportTypeOption === 'mtd'">
+            <input type="radio" name="exportOption" [(ngModel)]="exportTypeOption" value="mtd" />
+            <div class="card-icon-wrapper">
+              <mat-icon>calendar_today</mat-icon>
+            </div>
+            <div class="card-content">
+              <strong>Month-to-Date (MTD)</strong>
+              <span>Includes standard columns + dynamic total booking hours for the current month.</span>
+            </div>
+          </label>
+
+          <!-- Option 3: YTD -->
+          <label class="export-option-card" [class.export-option-card--active]="exportTypeOption === 'ytd'">
+            <input type="radio" name="exportOption" [(ngModel)]="exportTypeOption" value="ytd" />
+            <div class="card-icon-wrapper">
+              <mat-icon>date_range</mat-icon>
+            </div>
+            <div class="card-content">
+              <strong>Current Fiscal YTD</strong>
+              <span>Detailed monthly hours breakdown from October 1st of the current FY.</span>
+            </div>
+          </label>
+
+          <!-- Option 4: Custom FY -->
+          <label class="export-option-card" [class.export-option-card--active]="exportTypeOption === 'fy'">
+            <input type="radio" name="exportOption" [(ngModel)]="exportTypeOption" value="fy" />
+            <div class="card-icon-wrapper">
+              <mat-icon>event_note</mat-icon>
+            </div>
+            <div class="card-content">
+              <strong>Full Fiscal Year (FY)</strong>
+              <span>Full fiscal year report (Oct - Sep) with monthly tracking breakdowns.</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- Conditional Year Selection -->
+        <div class="year-selection-wrapper" *ngIf="exportTypeOption === 'fy'">
+          <label for="fiscalYearSelect" class="year-select-label">Select Fiscal Year:</label>
+          <div class="select-container">
+            <select id="fiscalYearSelect" [(ngModel)]="selectedFiscalYear" class="list-select select-year-input">
+              <option *ngFor="let year of fiscalYearOptions" [value]="year">FY {{ year }} (Oct {{ year-1 }} - Sep {{ year }})</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="cancel-btn" (click)="closeExportModal()">Cancel</button>
+        <button type="button" class="confirm-export-btn" (click)="confirmAndExport()">
+          <mat-icon>download</mat-icon>
+          <span>Generate Excel</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </section>

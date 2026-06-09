@@ -91,7 +91,11 @@ export class ProjectList implements OnInit, AfterViewInit {
   totalCount = 0;
   totalPagesCount = 0;
   customPageSize: number | null = null;
-  readonly availablePageSizes = [5, 10, 20, 100];
+  readonly availablePageSizes = [5, 10, 20, 50, 100, 10000];
+  showExportModal = false;
+  exportTypeOption: 'standard' | 'mtd' | 'ytd' | 'fy' = 'standard';
+  selectedFiscalYear = 2026;
+  readonly fiscalYearOptions = [2027, 2026, 2025, 2024, 2023];
   isLoading = false;
   isRefreshing = false;
   deletingProjectId: string | null = null;
@@ -104,6 +108,7 @@ export class ProjectList implements OnInit, AfterViewInit {
   selectedPhase: string = 'all';
   selectedManagementType: string = 'all';
   selectedIncompleteOnly: boolean = false;
+  selectedDelayedOnly: boolean = false;
 
   selectedDepartmentId: string = 'all';
   selectedBusinessUnitId: string = 'all';
@@ -213,20 +218,8 @@ export class ProjectList implements OnInit, AfterViewInit {
 
   onPageSizeChange(newSize: number): void {
     this.pageSize = newSize;
-    this.customPageSize = null;
     this.currentPage = 1;
     this.loadProjects();
-  }
-
-  onCustomPageSizeChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const value = parseInt(input.value, 10);
-    if (!isNaN(value) && value > 0) {
-      this.pageSize = value;
-      this.customPageSize = value;
-      this.currentPage = 1;
-      this.loadProjects();
-    }
   }
 
   onFiltersChanged(): void {
@@ -321,6 +314,10 @@ export class ProjectList implements OnInit, AfterViewInit {
     return this.selectedBusinessUnitId !== 'all' ||
            this.selectedDepartmentId !== 'all' ||
            this.selectedPlantId !== 'all' ||
+           this.selectedStatus !== 'all' ||
+           this.selectedPhase !== 'all' ||
+           this.selectedManagementType !== 'all' ||
+           this.selectedDelayedOnly ||
            this.startDate !== null ||
            this.endDate !== null ||
            this.year !== null ||
@@ -331,6 +328,10 @@ export class ProjectList implements OnInit, AfterViewInit {
     this.selectedBusinessUnitId = 'all';
     this.selectedDepartmentId = 'all';
     this.selectedPlantId = 'all';
+    this.selectedStatus = 'all';
+    this.selectedPhase = 'all';
+    this.selectedManagementType = 'all';
+    this.selectedDelayedOnly = false;
     this.startDate = null;
     this.endDate = null;
     this.year = null;
@@ -342,6 +343,14 @@ export class ProjectList implements OnInit, AfterViewInit {
         BusinessUnitId: null,
         DepartmentId: null,
         PlantId: null,
+        Status: null,
+        status: null,
+        Phase: null,
+        phase: null,
+        ProjectManagementType: null,
+        projectManagementType: null,
+        DelayedOnly: null,
+        delayedOnly: null,
         startDate: null,
         endDate: null,
         year: null,
@@ -455,45 +464,55 @@ export class ProjectList implements OnInit, AfterViewInit {
     };
   }
 
-  onExport(): void {
-    if (this.selectedProjectCount === 0) {
-      this.notificationService.showError('Select at least one project to export.');
-      return;
+  openExportModal(): void {
+    this.showExportModal = true;
+    this.exportTypeOption = 'standard';
+  }
+
+  closeExportModal(): void {
+    this.showExportModal = false;
+  }
+
+  confirmAndExport(): void {
+    const isFy = this.exportTypeOption === 'fy';
+    this.onExport(this.exportTypeOption, isFy ? this.selectedFiscalYear : undefined);
+    this.closeExportModal();
+  }
+
+  onExport(exportType: string = 'standard', fiscalYear?: number): void {
+    const typeLabel = exportType === 'fy' ? `FY ${fiscalYear}` : exportType;
+    this.notificationService.showSuccess(`Starting ${typeLabel} export, please wait...`);
+    const filters = this.getFilters();
+    
+    if (exportType !== 'standard') {
+      filters['exportType'] = exportType;
+    }
+    
+    if (fiscalYear) {
+      filters['year'] = fiscalYear;
     }
 
-    const selectedProjects = this.projects.filter((project) => this.selectedProjectIds.has(project.id));
-
-    if (!selectedProjects.length) {
-      this.notificationService.showError('Selected projects are no longer available.');
-      this.clearSelection();
-      return;
-    }
-
-    const dataToExport = selectedProjects.map((project) => this.toExportRow(project));
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Projects');
-
-    worksheet['!cols'] = [
-      { wch: 30 },
-      { wch: 20 },
-      { wch: 25 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 25 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 40 },
-      { wch: 12 },
-      { wch: 18 },
-    ];
-
-    XLSX.writeFile(workbook, `PMHUB_Selected_Projects_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    this.notificationService.showSuccess('Selected projects exported successfully.');
+    this.projectService.exportProjects(filters).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const filenameSuffix = exportType === 'standard' ? '' : (exportType === 'fy' ? `_FY${fiscalYear}` : `_${exportType.toUpperCase()}`);
+        a.download = `PMHUB_Projects_Export${filenameSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        this.notificationService.showSuccess('Export downloaded successfully.');
+      },
+      error: (error) => {
+        this.notificationService.showError('Unable to export projects.');
+      }
+    });
   }
 
   exportToCsv(): void {
-    this.onExport();
+    this.onExport('standard');
   }
 
   private getStatusLabel(project: ProjectSummaryDto): string {
@@ -658,6 +677,7 @@ export class ProjectList implements OnInit, AfterViewInit {
       Phase: this.selectedPhase !== 'all' ? Number(this.selectedPhase) : undefined,
       ProjectManagementType: this.selectedManagementType !== 'all' ? Number(this.selectedManagementType) : undefined,
       IncompleteOnly: this.selectedIncompleteOnly ? true : undefined,
+      DelayedOnly: this.selectedDelayedOnly ? true : undefined,
       DepartmentId: this.selectedDepartmentId !== 'all' ? this.selectedDepartmentId : undefined,
       BusinessUnitId: this.selectedBusinessUnitId !== 'all' ? this.selectedBusinessUnitId : undefined,
       PlantId: this.selectedPlantId !== 'all' ? this.selectedPlantId : undefined,
@@ -720,6 +740,9 @@ export class ProjectList implements OnInit, AfterViewInit {
       }
       if (params['incompleteOnly'] !== undefined || params['IncompleteOnly'] !== undefined) {
         this.selectedIncompleteOnly = String(params['incompleteOnly'] ?? params['IncompleteOnly']) === 'true';
+      }
+      if (params['delayedOnly'] !== undefined || params['DelayedOnly'] !== undefined) {
+        this.selectedDelayedOnly = String(params['delayedOnly'] ?? params['DelayedOnly']) === 'true';
       }
       if (params['BusinessUnitId'] !== undefined || params['businessUnitId'] !== undefined) {
         this.selectedBusinessUnitId = String(params['BusinessUnitId'] ?? params['businessUnitId']);

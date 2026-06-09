@@ -76,7 +76,14 @@
       </section>
 
       <section class="metric-grid" aria-label="Dashboard metrics">
-        <article class="dashboard-metric pm-surface" *ngFor="let metric of metrics; let i = index" [style.--metric-tone]="getToneColor(metric.tone)" [style.--metric-delay.ms]="i * 65">
+        <button
+          type="button"
+          class="dashboard-metric dashboard-metric--clickable pm-surface"
+          *ngFor="let metric of metrics; let i = index"
+          [style.--metric-tone]="getToneColor(metric.tone)"
+          [style.--metric-delay.ms]="i * 65"
+          (click)="openMetricTarget(metric)"
+          [attr.aria-label]="metric.actionLabel || ('Open ' + metric.label)">
           <span class="dashboard-metric__line"></span>
           <div class="dashboard-metric__head">
             <span class="dashboard-metric__icon">
@@ -89,8 +96,12 @@
           </div>
           <strong>{{ metric.value }}</strong>
           <p>{{ metric.note }}</p>
+          <span class="dashboard-metric__action">
+            {{ metric.actionLabel || 'Open details' }}
+            <mat-icon>arrow_forward</mat-icon>
+          </span>
           <mat-icon class="dashboard-metric__watermark">{{ metric.icon }}</mat-icon>
-        </article>
+        </button>
       </section>
 
       <section class="target-grid" aria-label="Target thresholds">
@@ -134,11 +145,10 @@
           </header>
 
           <div class="filter-ticket-grid">
-            <ng-container *ngFor="let ticket of section.tickets; trackBy: trackByTicketId">
+            <ng-container *ngFor="let ticket of section.visibleTickets; trackBy: trackByTicketId">
               <button
                 type="button"
                 class="filter-ticket"
-                *ngIf="ticket.count > 0 || section.selectedId === ticket.id"
                 [class.filter-ticket--active]="section.selectedId === ticket.id"
                 (click)="selectFilterCard(section.kind, ticket.id)"
                 [disabled]="isRefreshing">
@@ -149,14 +159,30 @@
                 <span class="filter-ticket__label">{{ ticket.label }}</span>
                 <small>Projects</small>
 
-                <button *ngIf="ticket.projects?.length" class="filter-ticket__drill-down" (click)="$event.stopPropagation(); toggleDrillDown(section, ticket)">
-                  <mat-icon>list</mat-icon>
+                <button
+                  class="filter-ticket__drill-down"
+                  (click)="$event.stopPropagation(); openTicketProjects(section, ticket)"
+                  [attr.aria-label]="'Open projects filtered by ' + ticket.label"
+                  title="Open filtered projects">
+                  <mat-icon>arrow_forward</mat-icon>
                 </button>
               </button>
             </ng-container>
           </div>
+
+          <div class="filter-section-more" *ngIf="section.hiddenCount && section.hiddenCount > 0" style="margin-top: 1rem; display: flex; justify-content: center;">
+            <button
+              type="button"
+              class="pm-btn-secondary"
+              style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 999px; background: #fff; border: 1px solid #e4e7ec; color: #df6800; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);"
+              (click)="toggleSection(section.kind)">
+              <mat-icon style="font-size: 1.2rem; width: 1.2rem; height: 1.2rem;">{{ isSectionExpanded(section.kind) ? 'expand_less' : 'expand_more' }}</mat-icon>
+              {{ isSectionExpanded(section.kind) ? 'Voir moins' : 'Voir les autres (' + section.hiddenCount + ')' }}
+            </button>
+          </div>
         </article>
       </section>
+
 
     </div>
 

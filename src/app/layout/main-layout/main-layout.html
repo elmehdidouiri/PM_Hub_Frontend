@@ -104,9 +104,26 @@
                             [class.app-notification-item--critical]="item.severity === 'critical'"
                             [class.app-notification-item--warning]="item.severity === 'warning'"
                             [class.app-notification-item--info]="item.severity === 'info'"
+                            [class.app-notification-item--read]="isNotificationRead(item)"
+                            [class.app-notification-item--unread]="!isNotificationRead(item)"
                             (click)="onNotificationClick(item)">
-                            <strong>{{ item.title }}</strong>
-                            <span>{{ item.message }}</span>
+                            <span class="app-notification-item__read-dot" aria-hidden="true"></span>
+                            <span class="app-notification-item__severity">
+                              <mat-icon>{{ notificationSeverityIcon(item) }}</mat-icon>
+                            </span>
+
+                            <span class="app-notification-item__body">
+                              <span class="app-notification-item__meta">
+                                <span class="app-notification-item__target">{{ notificationTargetLabel(item) }}</span>
+                                <span>{{ notificationWhen(item) }}</span>
+                              </span>
+                              <strong>{{ item.title }}</strong>
+                              <span class="app-notification-item__message">{{ item.message }}</span>
+                              <span class="app-notification-item__action">
+                                {{ notificationDestinationLabel(item) }}
+                                <mat-icon>arrow_forward</mat-icon>
+                              </span>
+                            </span>
                           </button>
                         </div>
                       </section>
@@ -172,6 +189,33 @@
       </header>
 
       <div class="app-layout__page flex-1 px-3 py-2 sm:px-4 sm:py-3 lg:px-5 lg:py-3" [class.app-layout__page--dashboard]="isDashboardLanding">
+        <section
+          class="app-notification-context"
+          *ngIf="activeNotificationContext as context"
+          [class.app-notification-context--critical]="context.severity === 'critical'"
+          [class.app-notification-context--warning]="context.severity === 'warning'"
+          [class.app-notification-context--info]="context.severity === 'info'">
+          <div class="app-notification-context__icon">
+            <mat-icon>{{ context.severity === 'critical' ? 'priority_high' : 'notification_important' }}</mat-icon>
+          </div>
+
+          <div class="app-notification-context__copy">
+            <span class="app-notification-context__meta">
+              {{ context.targetLabel }} notification · {{ context.occurredAtLabel }}
+            </span>
+            <strong>{{ context.title }}</strong>
+            <p>{{ context.message }}</p>
+          </div>
+
+          <button
+            type="button"
+            class="app-notification-context__close"
+            aria-label="Dismiss notification context"
+            (click)="dismissNotificationContext()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </section>
+
         <router-outlet></router-outlet>
       </div>
 

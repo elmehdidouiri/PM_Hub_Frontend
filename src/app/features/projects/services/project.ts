@@ -849,6 +849,8 @@ export class ProjectService {
       PlantId: 'plantId',
       IncompleteOnly: 'incompleteOnly',
       incompleteOnly: 'incompleteOnly',
+      DelayedOnly: 'delayedOnly',
+      delayedOnly: 'delayedOnly',
       all: 'all',
       All: 'all',
     };
