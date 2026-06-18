@@ -39,6 +39,16 @@
     </section>
 
     <section class="detail-grid">
+      <article class="detail-card" *ngFor="let card of statisticCards">
+        <h3>{{ card.label }}</h3>
+        <dl class="detail-list">
+          <div>
+            <dt>{{ card.note || 'Indicator' }}</dt>
+            <dd>{{ card.value }}</dd>
+          </div>
+        </dl>
+      </article>
+
       <article class="detail-card">
         <h3>Role assignment</h3>
         <dl class="detail-list">

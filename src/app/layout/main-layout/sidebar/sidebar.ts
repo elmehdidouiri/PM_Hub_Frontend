@@ -36,8 +36,7 @@ export class Sidebar {
 
   get managementItems(): NavItem[] {
     return this.navItems.filter(item => 
-      item.id === 'admin' || 
-      item.id === 'files'
+      item.id === 'admin'
     );
   }
 

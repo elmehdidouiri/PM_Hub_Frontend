@@ -1,32 +1,62 @@
-<section class="report-page">
-  <header class="page-header">
-    <div>
-      <span class="eyebrow">Reports</span>
-      <h1>Hours summary</h1>
-      <p>Monthly, YTD, and per-project breakdown to understand time allocation.</p>
-    </div>
-  </header>
-
-  <section class="report-grid">
-    <article class="report-card">
-      <div class="report-card__icon">
-        <mat-icon>schedule</mat-icon>
-      </div>
-      <div class="report-card__copy">
-        <strong>Ready for API</strong>
-        <p>This route is now working. Next we can connect <code>/api/HourSummary</code> endpoints.</p>
-      </div>
-    </article>
-
-    <article class="report-card report-card--soft">
-      <div class="report-card__icon">
-        <mat-icon>bar_chart</mat-icon>
-      </div>
-      <div class="report-card__copy">
-        <strong>Charts</strong>
-        <p>We can add small animations and charts while keeping the PMHUB orange palette.</p>
-      </div>
-    </article>
-  </section>
-</section>
-
+<section class="report-page">
+  <header class="page-header">
+    <div>
+      <span class="eyebrow">Reports</span>
+      <h1>Hours summary</h1>
+      <p>Monthly, yearly, and project views from your backend hour summary data.</p>
+    </div>
+    <button type="button" class="icon-button" (click)="loadReport()" [disabled]="isLoading" aria-label="Refresh report">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </header>
+
+  <div class="state state--loading" *ngIf="isLoading">
+    <mat-icon>sync</mat-icon>
+    <span>Loading report data...</span>
+  </div>
+
+  <div class="state state--error" *ngIf="!isLoading && errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+
+  <div class="state" *ngIf="!isLoading && !errorMessage && !hasData">
+    <mat-icon>inbox</mat-icon>
+    <span>No hour report data is available for {{ year }}.</span>
+  </div>
+
+  <ng-container *ngIf="!isLoading && !errorMessage && hasData">
+    <section class="metric-grid">
+      <article class="metric-card">
+        <span>Total hours</span>
+        <strong>{{ totalHours | number:'1.0-1' }}</strong>
+      </article>
+      <article class="metric-card">
+        <span>Active months</span>
+        <strong>{{ monthlyRows.length }}</strong>
+      </article>
+      <article class="metric-card">
+        <span>Projects tracked</span>
+        <strong>{{ projectRows.length }}</strong>
+      </article>
+    </section>
+
+    <section class="report-grid">
+      <article class="report-panel">
+        <h2>Monthly hours</h2>
+        <div class="data-row" *ngFor="let row of monthlyRows; trackBy: trackByLabel">
+          <span>{{ row.label }}</span>
+          <strong>{{ row.hours | number:'1.0-1' }} h</strong>
+        </div>
+      </article>
+
+      <article class="report-panel">
+        <h2>Top projects</h2>
+        <div class="data-row" *ngFor="let row of topProjectRows; trackBy: trackByLabel">
+          <span>{{ row.label }}</span>
+          <strong>{{ row.hours | number:'1.0-1' }} h</strong>
+        </div>
+      </article>
+    </section>
+  </ng-container>
+</section>

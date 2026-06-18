@@ -35,12 +35,12 @@ export class HourEntriesMapperService {
       date: this.readString(r, ['date', 'Date']) || undefined,
       totalHours: this.readNumber(r, ['totalHours', 'TotalHours']),
       executionHours: this.readNumber(r, ['executionHours', 'ExecutionHours']),
-      supervisionHours: this.readNumber(r, ['supervisionHours', 'SupervisionHours']),
-      processHours: this.readNumber(r, ['processHours', 'ProcessHours']),
-      managementHours: this.readNumber(r, ['managementHours', 'ManagementHours']),
-      rAndDHours: this.readNumber(r, ['rAndDHours', 'RAndDHours']),
+      supervisionHours: this.readNumber(r, ['supervisionHours', 'SupervisionHours', 'technicalSupervisionHours', 'TechnicalSupervisionHours']),
+      processHours: this.readNumber(r, ['processHours', 'ProcessHours', 'processRelatedHours', 'ProcessRelatedHours']),
+      managementHours: this.readNumber(r, ['managementHours', 'ManagementHours', 'projectManagementHours', 'ProjectManagementHours']),
+      rAndDHours: this.readNumber(r, ['rAndDHours', 'RAndDHours', 'researchAndDevHours', 'ResearchAndDevHours']),
       workshopHours: this.readNumber(r, ['workshopHours', 'WorkshopHours']),
-      otherHours: this.readNumber(r, ['otherHours', 'OtherHours']),
+      otherHours: this.readNumber(r, ['otherHours', 'OtherHours', 'otherActivitiesHours', 'OtherActivitiesHours']),
       internManagementHours: this.readNumber(r, ['internManagementHours', 'InternManagementHours']),
       hourlyRate: this.readNumber(r, ['hourlyRate', 'HourlyRate']),
       totalCost: this.readNumber(r, ['totalCost', 'TotalCost']),
@@ -49,6 +49,8 @@ export class HourEntriesMapperService {
       premiumReason: this.readString(r, ['premiumReason', 'PremiumReason']) || null,
       premiumApprovalStatus: this.readString(r, ['premiumApprovalStatus', 'PremiumApprovalStatus']) || null,
       notes: this.readString(r, ['notes', 'Notes']) || null,
+      createdAt: this.readString(r, ['createdAt', 'CreatedAt']) || undefined,
+      updatedAt: this.readString(r, ['updatedAt', 'UpdatedAt']) || null,
     };
   }
 

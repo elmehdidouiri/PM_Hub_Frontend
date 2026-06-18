@@ -1,32 +1,66 @@
-<section class="report-page">
-  <header class="page-header">
-    <div>
-      <span class="eyebrow">Reports</span>
-      <h1>Project overview</h1>
-      <p>High-level snapshot of projects, phases, and status distribution.</p>
-    </div>
-  </header>
-
-  <section class="report-grid">
-    <article class="report-card">
-      <div class="report-card__icon">
-        <mat-icon>insights</mat-icon>
-      </div>
-      <div class="report-card__copy">
-        <strong>Coming next</strong>
-        <p>This page is routed correctly. We can now plug charts and API data.</p>
-      </div>
-    </article>
-
-    <article class="report-card report-card--soft">
-      <div class="report-card__icon">
-        <mat-icon>folder_open</mat-icon>
-      </div>
-      <div class="report-card__copy">
-        <strong>Projects API</strong>
-        <p>We can aggregate from <code>/api/projects</code> and filters.</p>
-      </div>
-    </article>
-  </section>
-</section>
-
+<section class="report-page">
+  <header class="page-header">
+    <div>
+      <span class="eyebrow">Reports</span>
+      <h1>Project overview</h1>
+      <p>Global view of projects, phases, status distribution, and tracked workload from the backend.</p>
+    </div>
+    <button type="button" class="icon-button" (click)="loadReport()" [disabled]="isLoading" aria-label="Refresh report">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </header>
+
+  <div class="state state--loading" *ngIf="isLoading">
+    <mat-icon>sync</mat-icon>
+    <span>Loading project data...</span>
+  </div>
+
+  <div class="state state--error" *ngIf="!isLoading && errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+
+  <div class="state" *ngIf="!isLoading && !errorMessage && !hasProjects">
+    <mat-icon>folder_off</mat-icon>
+    <span>No projects are available from the backend.</span>
+  </div>
+
+  <ng-container *ngIf="!isLoading && !errorMessage && hasProjects">
+    <section class="metric-grid">
+      <article class="metric-card">
+        <span>Total projects</span>
+        <strong>{{ projects.length }}</strong>
+      </article>
+      <article class="metric-card">
+        <span>Delayed projects</span>
+        <strong>{{ delayedProjects }}</strong>
+      </article>
+      <article class="metric-card">
+        <span>Estimated hours</span>
+        <strong>{{ totalEstimatedHours | number:'1.0-1' }}</strong>
+      </article>
+      <article class="metric-card">
+        <span>Actual hours</span>
+        <strong>{{ totalActualHours | number:'1.0-1' }}</strong>
+      </article>
+    </section>
+
+    <section class="report-grid">
+      <article class="report-panel">
+        <h2>Status distribution</h2>
+        <div class="data-row" *ngFor="let row of statusRows; trackBy: trackByLabel">
+          <span>{{ row.label }}</span>
+          <strong>{{ row.count }}</strong>
+        </div>
+      </article>
+
+      <article class="report-panel">
+        <h2>Phase distribution</h2>
+        <div class="data-row" *ngFor="let row of phaseRows; trackBy: trackByLabel">
+          <span>{{ row.label }}</span>
+          <strong>{{ row.count }}</strong>
+        </div>
+      </article>
+    </section>
+  </ng-container>
+</section>

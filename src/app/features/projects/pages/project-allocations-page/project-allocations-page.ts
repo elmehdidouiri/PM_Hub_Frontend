@@ -1,10 +1,14 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { catchError, finalize, of } from 'rxjs';
+import { Observable, catchError, finalize, of } from 'rxjs';
 
+import { AuthService } from '../../../../core/services/auth';
+import { HourEntriesApiService } from '../../../../core/services/hour-entries-api.service';
+import { HourEntryDto } from '../../../../core/models/hour-entry.model';
 import { ProjectDto } from '../../models';
 import {
   HoursAllocationByProjectUserDto,
+  HoursAllocationDashboardDto,
   HoursAllocationDashboardParams,
 } from '../../../dashboard/models/hours-allocation-dashboard.models';
 import { HoursAllocationDashboardService } from '../../../dashboard/services/hours-allocation-dashboard.service';
@@ -26,6 +30,8 @@ export class ProjectAllocationsPage implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly hoursAllocationDashboard: HoursAllocationDashboardService,
+    private readonly hourEntriesApi: HourEntriesApiService,
+    private readonly authService: AuthService,
     private readonly cdr: ChangeDetectorRef
   ) {}
 
@@ -137,9 +143,8 @@ export class ProjectAllocationsPage implements OnInit {
       return;
     }
 
-    const params: HoursAllocationDashboardParams = {
+    const params: Omit<HoursAllocationDashboardParams, 'projectId'> = {
       analysis: 'projectUsers',
-      projectId,
       search: this.search.trim() || null,
       all: true,
     };
@@ -147,20 +152,72 @@ export class ProjectAllocationsPage implements OnInit {
     this.isLoading = true;
     this.errorMessage = '';
 
-    this.hoursAllocationDashboard
-      .getDashboard(params)
+    const request$: Observable<HoursAllocationDashboardDto | HourEntryDto[] | null> = this.authService.isAdmin()
+      ? this.hoursAllocationDashboard
+          .getProjectDashboard(projectId, params)
+          .pipe(
+            catchError(() => {
+              this.errorMessage = 'Unable to load project allocations.';
+              return of(null);
+            })
+          )
+      : this.hourEntriesApi
+          .getMyByProject(projectId)
+          .pipe(
+            catchError(() => {
+              this.errorMessage = 'Unable to load your project allocations.';
+              return of(null);
+            })
+          );
+
+    request$
       .pipe(
-        catchError(() => {
-          this.errorMessage = 'Unable to load project allocations.';
-          return of(null);
-        }),
         finalize(() => {
           this.isLoading = false;
           this.cdr.detectChanges();
         })
       )
-      .subscribe((dashboard) => {
-        this.allocations = dashboard?.hoursByProjectUser ?? [];
+      .subscribe((result) => {
+        this.allocations = Array.isArray(result)
+          ? this.toMyProjectAllocationRows(result, projectId)
+          : result?.hoursByProjectUser ?? [];
       });
+  }
+
+  private toMyProjectAllocationRows(entries: HourEntryDto[], projectId: string): HoursAllocationByProjectUserDto[] {
+    const query = this.search.trim().toLowerCase();
+    const currentUser = this.authService.getCurrentUser();
+    const userName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ').trim()
+      || entries.find((entry) => entry.userFullName)?.userFullName
+      || currentUser?.email
+      || 'Me';
+    const projectName = this.project?.name || entries.find((entry) => entry.projectName)?.projectName || '';
+
+    if (query && !`${userName} ${projectName}`.toLowerCase().includes(query)) {
+      return [];
+    }
+
+    return [{
+      projectId,
+      projectName,
+      userId: currentUser?.userId || entries.find((entry) => entry.userId)?.userId || '',
+      userName,
+      role: currentUser?.roleName || '',
+      totalHours: this.sumEntries(entries, 'totalHours'),
+      executionHours: this.sumEntries(entries, 'executionHours'),
+      techLeadHours: this.sumEntries(entries, 'supervisionHours'),
+      processHours: this.sumEntries(entries, 'processHours'),
+      projectManagementHours: this.sumEntries(entries, 'managementHours'),
+      researchAndDevHours: this.sumEntries(entries, 'rAndDHours'),
+      workshopHours: this.sumEntries(entries, 'workshopHours'),
+      otherHours: this.sumEntries(entries, 'otherHours') + this.sumEntries(entries, 'internManagementHours'),
+      workedDays: new Set(entries.map((entry) => entry.date).filter(Boolean)).size,
+      allocationCount: entries.length,
+      isProjectManager: false,
+    }];
+  }
+
+  private sumEntries(entries: HourEntryDto[], key: keyof HourEntryDto): number {
+    return entries.reduce((total, entry) => total + (Number(entry[key]) || 0), 0);
   }
 }

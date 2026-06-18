@@ -15,6 +15,7 @@ import {
   HoursAllocationDashboardParams,
   HoursAllocationDetailDto,
   HoursAllocationFiltersDto,
+  ProjectBookingHoursPreviewDto,
 } from '../../models/hours-allocation-dashboard.models';
 import { HoursAllocationDashboardService } from '../../services/hours-allocation-dashboard.service';
 
@@ -48,9 +49,12 @@ export class HoursAllocationDashboard implements OnInit {
 
   filters: HoursAllocationFiltersDto = this.emptyFilters();
   dashboard: HoursAllocationDashboardDto | null = null;
+  bookingHoursPreview: ProjectBookingHoursPreviewDto[] = [];
   isLoading = true;
   isRefreshing = false;
   isSendingReminders = false;
+  isLoadingBookingHoursPreview = false;
+  isExportingBookingHours = false;
   showAdvancedFilters = false;
   errorMessage = '';
   successMessage = '';
@@ -67,10 +71,13 @@ export class HoursAllocationDashboard implements OnInit {
 
   currentPage = 1;
   pageSize = 10;
+  bookingHoursPage = 1;
+  bookingHoursPageSize = 10;
   all = false;
   readonly availablePageSizes = [5, 10, 20, 100];
 
   private latestRequest = 0;
+  private latestBookingHoursPreviewRequest = 0;
 
   ngOnInit(): void {
     this.loadInitialData();
@@ -162,9 +169,40 @@ export class HoursAllocationDashboard implements OnInit {
     return `${from} – ${to}`;
   }
 
+  get bookingHoursTotalHeader(): string {
+    return `Total Booking Hours ${this.headerPeriodLabel}`;
+  }
+
+  get bookedBookingHoursPreview(): ProjectBookingHoursPreviewDto[] {
+    return this.bookingHoursPreview.filter((row) => Number(row.totalBookingHours ?? 0) > 0);
+  }
+
+  get pagedBookingHoursPreview(): ProjectBookingHoursPreviewDto[] {
+    const start = (this.bookingHoursPage - 1) * this.bookingHoursPageSize;
+    return this.bookedBookingHoursPreview.slice(start, start + this.bookingHoursPageSize);
+  }
+
+  get bookingHoursTotalCount(): number {
+    return this.bookedBookingHoursPreview.length;
+  }
+
+  get bookingHoursTotalPages(): number {
+    return Math.max(1, Math.ceil(this.bookingHoursTotalCount / this.bookingHoursPageSize));
+  }
+
+  get bookingHoursPageStart(): number {
+    return this.bookingHoursTotalCount ? (this.bookingHoursPage - 1) * this.bookingHoursPageSize + 1 : 0;
+  }
+
+  get bookingHoursPageEnd(): number {
+    return Math.min(this.bookingHoursPage * this.bookingHoursPageSize, this.bookingHoursTotalCount);
+  }
+
   reload(): void {
     this.currentPage = 1;
+    this.bookingHoursPage = 1;
     this.loadDashboard(false);
+    this.loadBookingHoursPreview();
   }
 
   onAnalysisChanged(): void {
@@ -205,9 +243,35 @@ export class HoursAllocationDashboard implements OnInit {
     this.loadDashboard(false);
   }
 
+  onBookingHoursPageChange(page: number): void {
+    if (page >= 1 && page <= this.bookingHoursTotalPages) {
+      this.bookingHoursPage = page;
+    }
+  }
+
+  onBookingHoursPageSizeChange(newSize: number): void {
+    this.bookingHoursPageSize = Number(newSize);
+    this.bookingHoursPage = 1;
+  }
+
   getVisiblePages(): number[] {
     const total = this.dashboard?.pagination?.totalPages ?? 0;
     const current = this.currentPage;
+
+    if (total <= 5) {
+      return Array.from({ length: total }, (_, index) => index + 1);
+    }
+
+    const start = Math.max(1, current - 2);
+    const end = Math.min(total, start + 4);
+    const adjustedStart = Math.max(1, end - 4);
+
+    return Array.from({ length: end - adjustedStart + 1 }, (_, index) => adjustedStart + index);
+  }
+
+  getVisibleBookingHoursPages(): number[] {
+    const total = this.bookingHoursTotalPages;
+    const current = this.bookingHoursPage;
 
     if (total <= 5) {
       return Array.from({ length: total }, (_, index) => index + 1);
@@ -273,6 +337,77 @@ export class HoursAllocationDashboard implements OnInit {
       });
   }
 
+  loadBookingHoursPreview(): void {
+    const requestId = ++this.latestBookingHoursPreviewRequest;
+    this.isLoadingBookingHoursPreview = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.service
+      .getProjectBookingHoursPreview(this.buildBookingHoursParams())
+      .pipe(
+        finalize(() => {
+          if (requestId === this.latestBookingHoursPreviewRequest) {
+            this.isLoadingBookingHoursPreview = false;
+            this.cdr.markForCheck();
+          }
+        }),
+      )
+      .subscribe({
+        next: (rows) => {
+          if (requestId === this.latestBookingHoursPreviewRequest) {
+            this.bookingHoursPreview = rows;
+            this.bookingHoursPage = 1;
+          }
+        },
+        error: () => {
+          if (requestId === this.latestBookingHoursPreviewRequest) {
+            this.bookingHoursPreview = [];
+            this.errorMessage = 'Unable to load projects booking hours preview.';
+          }
+        },
+      });
+  }
+
+  exportProjectBookingHours(): void {
+    const rows = this.bookedBookingHoursPreview;
+    if (!rows.length) {
+      this.errorMessage = 'No booked projects to export for the selected filters.';
+      return;
+    }
+
+    this.isExportingBookingHours = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    try {
+      const exportRows = rows.map((row) => ({
+        Projects: row.project,
+        Phase: row.phase,
+        'Estimated Hours': row.estimatedHours,
+        Departement: row.department,
+        Sponsor: row.sponsor,
+        'Cost Center': row.costCenter,
+        [this.bookingHoursTotalHeader]: row.totalBookingHours,
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      worksheet['!cols'] = Object.keys(exportRows[0]).map((header) => ({
+        wch: Math.max(16, header.length + 2),
+      }));
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Booking Hours');
+      XLSX.writeFile(workbook, 'Projects_BookingHours_Export.xlsx');
+      this.successMessage = 'Projects booking hours exported successfully.';
+    } catch {
+      this.errorMessage = 'Unable to export projects booking hours right now.';
+    } finally {
+      this.isExportingBookingHours = false;
+      this.cdr.markForCheck();
+    }
+  }
+
   exportDisplayedTable(table: ExportTableKey): void {
     if (!this.dashboard) {
       return;
@@ -322,6 +457,10 @@ export class HoursAllocationDashboard implements OnInit {
     return `${item.year}-${item.month}`;
   }
 
+  trackByBookingHoursProject(index: number, item: ProjectBookingHoursPreviewDto): string {
+    return `${item.project}-${item.phase}-${index}`;
+  }
+
   monthWidth(hours: number): number {
     return Math.max(0, Math.min(100, (Number(hours || 0) / this.maxMonthHours) * 100));
   }
@@ -363,6 +502,7 @@ export class HoursAllocationDashboard implements OnInit {
       });
 
     this.loadDashboard(true);
+    this.loadBookingHoursPreview();
   }
 
   private loadDashboard(initial: boolean): void {
@@ -420,6 +560,60 @@ export class HoursAllocationDashboard implements OnInit {
       pageSize: this.pageSize,
       all: this.all ? true : null,
     };
+  }
+
+  private buildBookingHoursParams(): Record<string, string | number | null | undefined> {
+    return {
+      userId: this.selectedUserId,
+      projectId: this.selectedProjectId,
+      roleId: this.selectedRoleId,
+      year: this.selectedYear,
+      month: this.selectedQuickSelect === 'month' ? this.selectedMonth : null,
+      startDate: this.getExportStartDate(),
+      endDate: this.getExportEndDate(),
+    };
+  }
+
+  private getExportStartDate(): string | null {
+    if (this.selectedQuickSelect === 'ytd') {
+      return `${this.selectedYear}-01-01`;
+    }
+
+    return this.fromDate || null;
+  }
+
+  private getExportEndDate(): string | null {
+    if (this.selectedQuickSelect === 'ytd') {
+      return this.toDate || this.toDateInputValue(this.now);
+    }
+
+    return this.toDate || null;
+  }
+
+  private getFileNameFromContentDisposition(contentDisposition: string | null): string {
+    const fallback = 'Projects_BookingHours_Export.xlsx';
+    if (!contentDisposition) {
+      return fallback;
+    }
+
+    const encodedMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (encodedMatch?.[1]) {
+      return decodeURIComponent(encodedMatch[1].trim());
+    }
+
+    const match = contentDisposition.match(/filename="?([^";]+)"?/i);
+    return match?.[1]?.trim() || fallback;
+  }
+
+  private downloadBlob(blob: Blob, fileName: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   }
 
   private getExportConfig(table: ExportTableKey, dashboard: HoursAllocationDashboardDto): {

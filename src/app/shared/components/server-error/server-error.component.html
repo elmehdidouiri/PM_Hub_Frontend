@@ -1,6 +1,6 @@
 <div class="server-error-container">
   <div class="bg-glow"></div>
-  
+
   <div class="error-card" [class.shake]="showErrorMsg">
     <div class="error-badge">
       <mat-icon>dns</mat-icon>
@@ -20,35 +20,35 @@
         <div class="server-led red"></div>
         <div class="server-led line"></div>
       </div>
-      
+
       <div class="glow-alert">500</div>
     </div>
 
-    <h1>Erreur Serveur 500</h1>
-    <p class="subtitle">Connexion refusée au serveur backend (ECONNREFUSED)</p>
+    <h1>Server Error 500</h1>
+    <p class="subtitle">Connection refused by the backend server (ECONNREFUSED)</p>
 
     <div class="details-panel">
       <mat-icon class="info-icon">warning</mat-icon>
       <div class="details-text">
-        <strong>Statut de la connexion :</strong>
+        <strong>Connection status:</strong>
         <p>{{ errorText }}</p>
       </div>
     </div>
 
     <div class="actions">
-      <button 
-        type="button" 
-        class="btn-retry" 
+      <button
+        type="button"
+        class="btn-retry"
         [disabled]="isChecking"
         (click)="retry()">
         <span class="spinner" *ngIf="isChecking"></span>
         <mat-icon *ngIf="!isChecking">refresh</mat-icon>
-        <span>{{ isChecking ? 'Vérification en cours...' : 'Réessayer la connexion' }}</span>
+        <span>{{ isChecking ? 'Checking...' : 'Retry connection' }}</span>
       </button>
     </div>
 
     <div class="retry-hint" *ngIf="showErrorMsg">
-      Le serveur est toujours hors-ligne. Veuillez vérifier que le service backend est bien démarré.
+      The server is still offline. Please check that the backend service is running.
     </div>
   </div>
 </div>

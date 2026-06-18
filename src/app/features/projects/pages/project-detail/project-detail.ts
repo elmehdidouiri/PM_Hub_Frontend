@@ -1,11 +1,13 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, finalize, of } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
 
 import {
   ProcessStatus,
   ProjectDto,
   ProjectFileDto,
+  ProjectFileVersionDto,
   ProjectFileType,
   ProjectType,
   ProjectManagementType,
@@ -15,6 +17,10 @@ import {
   StrategicCriterionType,
 } from '../../models';
 import { ProjectFilesApiService } from '../../../../core/services/project-files-api.service';
+import { FileService } from '../../../files/services/file';
+import { NotificationService } from '../../../../core/services/notification.service';
+import { AuthService } from '../../../../core/services/auth';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import {
   HoursAllocationByProjectUserDto,
   HoursAllocationDashboardParams,
@@ -106,12 +112,27 @@ export class ProjectDetail implements OnInit {
   allocationSearch = '';
   projectAllocations: HoursAllocationByProjectUserDto[] = [];
 
+  // File management state
+  isUploading: Record<number, boolean> = {};
+  isUploadingVersion: Record<string, boolean> = {};
+  isSavingDescription: Record<string, boolean> = {};
+  isDeleting: Record<string, boolean> = {};
+  editingDescriptionFileId: string | null = null;
+  descriptionEditValue = '';
+  expandedHistoryFileId: string | null = null;
+  fileVersions: Record<string, ProjectFileVersionDto[]> = {};
+  isLoadingVersions: Record<string, boolean> = {};
+
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly projectFilesApi: ProjectFilesApiService,
     private readonly hoursAllocationDashboard: HoursAllocationDashboardService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
+    private readonly fileService: FileService,
+    private readonly notificationService: NotificationService,
+    private readonly authService: AuthService,
+    private readonly dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -126,11 +147,15 @@ export class ProjectDetail implements OnInit {
   }
 
   editProject(): void {
-    if (!this.project) {
+    if (!this.isAdmin || !this.project) {
       return;
     }
 
     this.router.navigate(['/admin/projects', this.project.id, 'edit']);
+  }
+
+  get isAdmin(): boolean {
+    return this.authService.isAdmin();
   }
 
   toggleAllocations(): void {
@@ -569,5 +594,195 @@ export class ProjectDetail implements OnInit {
     }
 
     return '';
+  }
+
+  getFileByType(typeVal: ProjectFileType): ProjectFileDto | undefined {
+    return this.projectFiles.find((f) => f.fileType === typeVal);
+  }
+
+  onUploadFile(event: Event, fileType: ProjectFileType): void {
+    if (!this.isAdmin) return;
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !this.project?.id) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      this.notificationService.showWarning('The file size cannot exceed 10 MB.');
+      input.value = '';
+      return;
+    }
+
+    this.isUploading[fileType] = true;
+    const description = prompt("Entrez une description optionnelle pour ce fichier :") || '';
+
+    this.fileService.upload(this.project.id, {
+      file,
+      fileType,
+      description: description.trim() || null
+    }).subscribe({
+      next: () => {
+        this.isUploading[fileType] = false;
+        input.value = '';
+        this.notificationService.showSuccess('Fichier importé avec succès.');
+        if (this.project?.id) {
+          this.loadProjectFiles(this.project.id);
+        }
+      },
+      error: () => {
+        this.isUploading[fileType] = false;
+        input.value = '';
+        this.notificationService.showError("Unable to upload the file.");
+      }
+    });
+  }
+
+  onUploadNewVersion(event: Event, file: ProjectFileDto): void {
+    if (!this.isAdmin) return;
+    const input = event.target as HTMLInputElement;
+    const newFile = input.files?.[0];
+    if (!newFile || !this.project?.id) return;
+
+    if (newFile.size > 10 * 1024 * 1024) {
+      this.notificationService.showWarning('The file size cannot exceed 10 MB.');
+      input.value = '';
+      return;
+    }
+
+    this.isUploadingVersion[file.id] = true;
+    const description = prompt('Enter an optional version note:') || '';
+
+    this.fileService.uploadVersion(this.project.id, file.id, {
+      file: newFile,
+      description: description.trim() || null
+    }).subscribe({
+      next: () => {
+        this.isUploadingVersion[file.id] = false;
+        input.value = '';
+        this.notificationService.showSuccess('New version uploaded successfully.');
+        if (this.project?.id) {
+          this.loadProjectFiles(this.project.id);
+        }
+        if (this.expandedHistoryFileId === file.id) {
+          this.loadVersions(file.id);
+        }
+      },
+      error: () => {
+        this.isUploadingVersion[file.id] = false;
+        input.value = '';
+        this.notificationService.showSuccess('New version uploaded successfully.');
+      }
+    });
+  }
+
+  downloadFile(file: ProjectFileDto | ProjectFileVersionDto): void {
+    if (!this.project?.id) return;
+    this.fileService.download(this.project.id, file.id).subscribe({
+      next: (blob) => {
+        const blobUrl = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+        anchor.download = file.originalFileName || 'download';
+        anchor.click();
+        window.URL.revokeObjectURL(blobUrl);
+      },
+      error: () => {
+        this.notificationService.showError("Unable to download the file.");
+      }
+    });
+  }
+
+  deleteFile(file: ProjectFileDto): void {
+    if (!this.isAdmin) return;
+    if (!this.project?.id) return;
+
+    const data: ConfirmationDialogData = {
+      title: 'Delete project file',
+      message: `Are you sure you want to delete "${file.originalFileName}"? This will permanently delete the file and all archived versions.`,
+      icon: 'delete_sweep',
+      saveLabel: 'Delete',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === 'save') {
+        this.isDeleting[file.id] = true;
+        this.fileService.delete(this.project!.id, file.id).subscribe({
+          next: () => {
+            this.isDeleting[file.id] = false;
+            this.notificationService.showSuccess('File deleted successfully.');
+            this.loadProjectFiles(this.project!.id);
+            if (this.expandedHistoryFileId === file.id) {
+              this.expandedHistoryFileId = null;
+            }
+          },
+          error: () => {
+            this.isDeleting[file.id] = false;
+            this.notificationService.showError('Unable to delete the file.');
+          }
+        });
+      }
+    });
+  }
+
+  startEditingDescription(file: ProjectFileDto): void {
+    if (!this.isAdmin) return;
+    this.editingDescriptionFileId = file.id;
+    this.descriptionEditValue = file.description || '';
+  }
+
+  cancelEditingDescription(): void {
+    this.editingDescriptionFileId = null;
+    this.descriptionEditValue = '';
+  }
+
+  saveDescription(file: ProjectFileDto): void {
+    if (!this.isAdmin) return;
+    if (!this.project?.id) return;
+    this.isSavingDescription[file.id] = true;
+    this.fileService.update(this.project.id, file.id, {
+      description: this.descriptionEditValue.trim() || null
+    }).subscribe({
+      next: () => {
+        this.isSavingDescription[file.id] = false;
+        this.editingDescriptionFileId = null;
+        this.notificationService.showSuccess('Description updated.');
+        this.loadProjectFiles(this.project!.id);
+      },
+      error: () => {
+        this.isSavingDescription[file.id] = false;
+        this.notificationService.showError('Unable to update the description.');
+      }
+    });
+  }
+
+  toggleVersionsHistory(file: ProjectFileDto): void {
+    if (this.expandedHistoryFileId === file.id) {
+      this.expandedHistoryFileId = null;
+      return;
+    }
+    this.expandedHistoryFileId = file.id;
+    this.loadVersions(file.id);
+  }
+
+  loadVersions(fileId: string): void {
+    if (!this.project?.id) return;
+    this.isLoadingVersions[fileId] = true;
+    this.fileService.listVersions(this.project.id, fileId).subscribe({
+      next: (versions) => {
+        this.fileVersions[fileId] = (versions as ProjectFileVersionDto[]).sort((a, b) => b.versionNumber - a.versionNumber);
+        this.isLoadingVersions[fileId] = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.isLoadingVersions[fileId] = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
 }

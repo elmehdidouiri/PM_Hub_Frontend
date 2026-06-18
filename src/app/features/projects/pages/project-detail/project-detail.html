@@ -28,9 +28,9 @@
     <div class="detail-actions">
       <button type="button" class="allocation-button" (click)="toggleAllocations()">
         <mat-icon>{{ showAllocations ? 'visibility_off' : 'query_stats' }}</mat-icon>
-        <span>{{ showAllocations ? 'Masquer allocations' : 'Voir allocations' }}</span>
+        <span>{{ showAllocations ? 'Hide allocations' : 'View allocations' }}</span>
       </button>
-      <button type="button" class="edit-button" (click)="editProject()">
+      <button *ngIf="isAdmin" type="button" class="edit-button" (click)="editProject()">
         <mat-icon>edit</mat-icon>
         <span>Edit project</span>
       </button>
@@ -190,7 +190,16 @@
         <div class="section-heading allocation-heading">
           <div>
             <span>Decision view</span>
-            <h2>Project Allocations</h2>
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; margin-top: 4px;">
+              <h2 style="margin: 0; line-height: 1;">Project Allocations</h2>
+              <span class="active-analysis-badge">
+                <span class="pulse-dot"></span>
+                Active
+              </span>
+              <span class="badge" style="background: #fff7f0; color: #df6800; border-color: #ffd8bd; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">
+                {{ projectAllocations.length }} total rows
+              </span>
+            </div>
           </div>
           <div class="allocation-search">
             <mat-icon>search</mat-icon>
@@ -340,8 +349,10 @@
           </div>
           <strong>{{ getDocumentCompletionCount() }} / {{ requiredProjectFileTypes.length }}</strong>
         </div>
+        
         <app-loading-spinner *ngIf="isLoadingFiles"></app-loading-spinner>
         <p class="empty-copy" *ngIf="fileLoadError">{{ fileLoadError }}</p>
+        
         <div class="document-status" *ngIf="!isLoadingFiles && !fileLoadError">
           <div class="document-status__bar">
             <i [style.width.%]="(getDocumentCompletionCount() / requiredProjectFileTypes.length) * 100"></i>
@@ -351,23 +362,147 @@
           </p>
           <p *ngIf="!getMissingProjectFileTypes().length">All required document types are available.</p>
         </div>
-        <div class="document-checklist" *ngIf="!isLoadingFiles && !fileLoadError">
-          <span *ngFor="let type of requiredProjectFileTypes" [class.document-checklist__item--missing]="!hasProjectFileType(type.label)">
-            <mat-icon>{{ hasProjectFileType(type.label) ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
-            {{ type.label }}
-          </span>
-        </div>
-        <div class="file-grid" *ngIf="!isLoadingFiles && projectFiles.length; else noFiles">
-          <div class="file-card" *ngFor="let file of projectFiles">
-            <div>
-              <strong>{{ displayValue(file.fileTypeLabel) }}</strong>
-              <span *ngIf="file.description?.trim()">{{ file.description }}</span>
-            </div>
-          </div>
-        </div>
-        <ng-template #noFiles>
-          <p class="empty-copy" *ngIf="!isLoadingFiles && !fileLoadError">(vide)</p>
-        </ng-template>
+
+        <table class="file-manager-table" *ngIf="!isLoadingFiles && !fileLoadError">
+          <tbody>
+            <ng-container *ngFor="let type of requiredProjectFileTypes">
+              <tr class="file-row" [class.file-row--missing]="!getFileByType(type.value)">
+                
+                <!-- Col 1: Type icon and name -->
+                <td class="file-cell file-cell--type">
+                  <mat-icon [class.icon--success]="getFileByType(type.value)" [class.icon--missing]="!getFileByType(type.value)">
+                    {{ getFileByType(type.value) ? 'check_circle' : 'radio_button_unchecked' }}
+                  </mat-icon>
+                  <strong>{{ type.label }}</strong>
+                </td>
+
+                <!-- Col 2: File info / Placeholder -->
+                <td class="file-cell file-cell--info">
+                  <ng-container *ngIf="getFileByType(type.value) as file; else missingPlaceholder">
+                    <span class="file-name">{{ file.originalFileName }}</span>
+                    
+                    <!-- Inline editing description -->
+                    <div *ngIf="editingDescriptionFileId === file.id; else displayDescription" class="edit-desc-form">
+                      <input
+                        type="text" 
+                        [(ngModel)]="descriptionEditValue" 
+                        (keyup.enter)="saveDescription(file)"
+                        (keyup.escape)="cancelEditingDescription()"
+                        placeholder="Add or edit the description..."
+                      />
+                      <button type="button" class="btn-save-desc" (click)="saveDescription(file)" [disabled]="isSavingDescription[file.id]">
+                        {{ isSavingDescription[file.id] ? '...' : 'Save' }}
+                      </button>
+                      <button type="button" class="btn-cancel-desc" (click)="cancelEditingDescription()">Cancel</button>
+                    </div>
+
+                    <ng-template #displayDescription>
+                      <span class="file-desc" *ngIf="file.description?.trim()">{{ file.description }}</span>
+                    </ng-template>
+
+                    <span class="file-meta">
+                      Size: {{ file.fileSizeLabel || (file.fileSize ? (file.fileSize / 1024 | number:'1.0-1') + ' KB' : 'N/A') }} | Updated: {{ file.updatedAt || file.createdAt | date:'dd MMM yyyy HH:mm' }}
+                    </span>
+                  </ng-container>
+
+                  <ng-template #missingPlaceholder>
+                    <span class="no-file">Not provided</span>
+                  </ng-template>
+                </td>
+
+                <!-- Col 3: Actions -->
+                <td class="file-cell file-cell--actions">
+                  <div class="action-group">
+                    <ng-container *ngIf="getFileByType(type.value) as file; else uploadAction">
+                      
+                      <!-- View / Download -->
+                      <button type="button" class="btn-action" (click)="downloadFile(file)" title="View / Download">
+                        <mat-icon>download</mat-icon>
+                      </button>
+
+                      <!-- Upload new version (Modify) -->
+                      <input 
+                        type="file" 
+                        #versionInput 
+                        style="display: none" 
+                        (change)="onUploadNewVersion($event, file)"
+                        accept=".pdf,.xlsx,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                      />
+                      <button *ngIf="isAdmin" type="button" class="btn-action" (click)="versionInput.click()" [disabled]="isUploadingVersion[file.id]" title="Upload a new version">
+                        <mat-icon>{{ isUploadingVersion[file.id] ? 'sync' : 'publish' }}</mat-icon>
+                      </button>
+
+                      <!-- Edit description button -->
+                      <button type="button" class="btn-action" (click)="startEditingDescription(file)" *ngIf="isAdmin && editingDescriptionFileId !== file.id" title="Edit description">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+
+                      <!-- History (archive) -->
+                      <button type="button" class="btn-action" (click)="toggleVersionsHistory(file)" title="Version history">
+                        <mat-icon>history</mat-icon>
+                      </button>
+
+                      <!-- Delete file -->
+                      <button *ngIf="isAdmin" type="button" class="btn-action btn-action--delete" (click)="deleteFile(file)" [disabled]="isDeleting[file.id]" title="Delete document">
+                        <mat-icon>{{ isDeleting[file.id] ? 'sync' : 'delete' }}</mat-icon>
+                      </button>
+
+                    </ng-container>
+
+                    <ng-template #uploadAction>
+                      <!-- Upload first time -->
+                      <ng-container *ngIf="isAdmin; else readonlyUploadMissing">
+                      <input
+                        type="file" 
+                        #fileInput 
+                        style="display: none" 
+                        (change)="onUploadFile($event, type.value)"
+                        accept=".pdf,.xlsx,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                      />
+                      <button type="button" class="btn-action btn-action--upload" (click)="fileInput.click()" [disabled]="isUploading[type.value]">
+                        <mat-icon>{{ isUploading[type.value] ? 'sync' : 'upload' }}</mat-icon>
+                        Upload
+                      </button>
+                      </ng-container>
+                      <ng-template #readonlyUploadMissing>
+                        <span class="no-file">Not provided</span>
+                      </ng-template>
+                    </ng-template>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Version History Expandable Row -->
+              <tr class="history-row" *ngIf="getFileByType(type.value) as file">
+                <td colspan="3" *ngIf="expandedHistoryFileId === file.id">
+                  <div class="history-container">
+                    <h4>Version archive history</h4>
+                    
+                    <app-loading-spinner *ngIf="isLoadingVersions[file.id]"></app-loading-spinner>
+                    
+                    <div class="history-list" *ngIf="!isLoadingVersions[file.id]">
+                      <div class="history-item" *ngFor="let ver of fileVersions[file.id]">
+                        <div class="item-left">
+                          <strong>Version {{ ver.versionNumber }} : {{ ver.originalFileName }}</strong>
+                          <span *ngIf="ver.description?.trim()">Note: {{ ver.description }}</span>
+                        </div>
+                        <div class="item-right">
+                          <span>Uploaded: {{ ver.createdAt | date:'dd MMM yyyy HH:mm' }}</span>
+                          <button type="button" class="btn-action" (click)="downloadFile(ver)" title="Download this version">
+                            <mat-icon>download</mat-icon>
+                          </button>
+                        </div>
+                      </div>
+                      <div *ngIf="!fileVersions[file.id]?.length" class="empty-copy">
+                        No archived version yet.
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
       </article>
 
       <article class="work-panel">

@@ -83,6 +83,12 @@ export class HourEntriesApiService {
       .pipe(map((r) => this.mapper.toHourEntryArray(this.unwrapList(r))));
   }
 
+  getMyByProject(projectId: string): Observable<HourEntryDto[]> {
+    return this.http
+      .get<ApiResponse<HourEntryDto[]> | HourEntryDto[]>(`${this.apiUrl}/my/project/${projectId}`)
+      .pipe(map((r) => this.mapper.toHourEntryArray(this.unwrapList(r))));
+  }
+
   getDashboardMonthly(year: number, month: number): Observable<MonthlyHoursDashboardDto | null> {
     return this.http
       .get<ApiResponse<MonthlyHoursDashboardDto> | MonthlyHoursDashboardDto>(

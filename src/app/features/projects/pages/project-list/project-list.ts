@@ -113,10 +113,15 @@ export class ProjectList implements OnInit, AfterViewInit {
   selectedDepartmentId: string = 'all';
   selectedBusinessUnitId: string = 'all';
   selectedPlantId: string = 'all';
+  selectedProcessStatus: string = 'all';
   startDate: string | null = null;
   endDate: string | null = null;
   year: number | null = null;
   month: number | null = null;
+  selectedYtd = false;
+  showDashboardBackButton = false;
+  selectedProjectScope: 'mine' | 'all' | null = null;
+  dashboardReturnView: 'admin' | 'mine' | 'all' | 'personal' | null = null;
 
   readonly statusOptions = [
     { id: 'all', label: 'All Statuses' },
@@ -154,6 +159,36 @@ export class ProjectList implements OnInit, AfterViewInit {
     { id: '3', label: 'Process Simplification', value: ProjectManagementType.ProcessSimplification },
     { id: '4', label: 'Other', value: ProjectManagementType.Other },
   ];
+
+  get effectiveProjectScope(): 'mine' | 'all' {
+    return this.selectedProjectScope ?? 'all';
+  }
+
+  get pageTitle(): string {
+    if (this.effectiveProjectScope === 'mine') {
+      return 'My projects';
+    }
+
+    return this.isAdmin ? 'Projects directory' : 'All projects';
+  }
+
+  get pageDescription(): string {
+    if (this.effectiveProjectScope === 'mine') {
+      return this.showDashboardBackButton
+        ? 'Projects matching the dashboard filters within your own project scope.'
+        : 'Projects assigned to you as a member or project manager.';
+    }
+
+    if (this.showDashboardBackButton) {
+      return 'All projects matching the dashboard filters.';
+    }
+
+    if (this.isAdmin) {
+      return 'Explore the project portfolio, track execution phases and manage delivery scope.';
+    }
+
+    return 'Projects you are assigned to as a member or project manager. Open a project to see details.';
+  }
   private readonly isBrowser: boolean;
 
   constructor(
@@ -216,8 +251,9 @@ export class ProjectList implements OnInit, AfterViewInit {
     }
   }
 
-  onPageSizeChange(newSize: number): void {
-    this.pageSize = newSize;
+  onPageSizeChange(newSize: number | string): void {
+    const parsedSize = Number(newSize);
+    this.pageSize = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : 5;
     this.currentPage = 1;
     this.loadProjects();
   }
@@ -241,7 +277,11 @@ export class ProjectList implements OnInit, AfterViewInit {
   }
 
   get pageEnd(): number {
-    return Math.min(this.currentPage * this.pageSize, this.filteredProjects.length);
+    if (!this.filteredProjects.length) {
+      return 0;
+    }
+
+    return Math.min(this.pageStart + this.filteredProjects.length - 1, this.totalCount);
   }
 
   get hasProjects(): boolean {
@@ -300,6 +340,30 @@ export class ProjectList implements OnInit, AfterViewInit {
     this.loadProjects(true);
   }
 
+  backToDashboard(): void {
+    void this.router.navigate(['/dashboard'], {
+      queryParams: this.buildDashboardReturnParams(),
+    });
+  }
+
+  setProjectScope(scope: 'mine' | 'all'): void {
+    if (this.effectiveProjectScope === scope || this.isLoading || this.isRefreshing) {
+      return;
+    }
+
+    this.selectedProjectScope = scope;
+    this.currentPage = 1;
+
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        projectScope: scope,
+        all: scope === 'all',
+      },
+      queryParamsHandling: 'merge',
+    });
+  }
+
   navigateToCreateProject(): void {
     void this.router.navigate([this.projectsBasePath(), 'new']);
   }
@@ -311,17 +375,20 @@ export class ProjectList implements OnInit, AfterViewInit {
   }
 
   get hasActiveDashboardFilters(): boolean {
-    return this.selectedBusinessUnitId !== 'all' ||
+    return this.selectedProjectScope !== null ||
+           this.selectedBusinessUnitId !== 'all' ||
            this.selectedDepartmentId !== 'all' ||
            this.selectedPlantId !== 'all' ||
            this.selectedStatus !== 'all' ||
            this.selectedPhase !== 'all' ||
            this.selectedManagementType !== 'all' ||
+           this.selectedProcessStatus !== 'all' ||
            this.selectedDelayedOnly ||
            this.startDate !== null ||
            this.endDate !== null ||
            this.year !== null ||
-           this.month !== null;
+           this.month !== null ||
+           this.selectedYtd;
   }
 
   clearDashboardFilters(): void {
@@ -331,11 +398,14 @@ export class ProjectList implements OnInit, AfterViewInit {
     this.selectedStatus = 'all';
     this.selectedPhase = 'all';
     this.selectedManagementType = 'all';
+    this.selectedProcessStatus = 'all';
     this.selectedDelayedOnly = false;
     this.startDate = null;
     this.endDate = null;
     this.year = null;
     this.month = null;
+    this.selectedYtd = false;
+    this.selectedProjectScope = null;
     
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -349,12 +419,22 @@ export class ProjectList implements OnInit, AfterViewInit {
         phase: null,
         ProjectManagementType: null,
         projectManagementType: null,
+        ProcessStatus: null,
+        processStatus: null,
         DelayedOnly: null,
         delayedOnly: null,
         startDate: null,
         endDate: null,
         year: null,
-        month: null
+        month: null,
+        ytd: null,
+        projectScope: null,
+        ProjectScope: null,
+        dashboardView: null,
+        DashboardView: null,
+        all: null,
+        All: null,
+        source: null
       },
       queryParamsHandling: 'merge'
     });
@@ -513,6 +593,108 @@ export class ProjectList implements OnInit, AfterViewInit {
 
   exportToCsv(): void {
     this.onExport('standard');
+  }
+
+  exportSelectedProjects(): void {
+    const selectedProjects = this.projects.filter((project) => this.selectedProjectIds.has(project.id));
+
+    if (!selectedProjects.length) {
+      this.notificationService.showError('Please select at least one project to export.');
+      return;
+    }
+
+    const bookingHoursHeader = this.getSelectedExportBookingHoursHeader();
+    const rows = selectedProjects.map((project) => this.toSelectedExportRow(project, bookingHoursHeader));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+
+    worksheet['!cols'] = [
+      { wch: 32 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 22 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 28 },
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Selected Projects');
+    XLSX.writeFile(
+      workbook,
+      `PMHUB_Selected_Projects_${selectedProjects.length}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    );
+    this.notificationService.showSuccess(`${selectedProjects.length} selected project(s) exported successfully.`);
+  }
+
+  private toSelectedExportRow(
+    project: ProjectSummaryDto,
+    bookingHoursHeader: string
+  ): Record<string, string | number> {
+    const raw = this.asRecord(project);
+
+    return {
+      Name: project.name,
+      Status: this.getStatusLabel(project),
+      Phase: this.getPhaseLabel(project),
+      Type: this.getManagementTypeLabel(project),
+      'Start Date': this.formatExportDate(project.startDate),
+      'End Date': this.formatExportDate(project.endDate ?? project.estimatedDueDate),
+      Department: project.departmentName || '-',
+      Plant: project.plantName || this.readString(raw, ['plantName', 'PlantName', 'plant', 'Plant']) || '-',
+      Sponsor: this.getSponsorDisplay(project),
+      'Cost Center': this.readString(raw, ['costCenter', 'CostCenter']) || '-',
+      'Est. Hours': this.getEstimatedHoursDisplay(project),
+      'Act. Hours': Number(project.actualHours ?? this.readNumber(raw, ['actualHours', 'ActualHours']) ?? 0),
+      [bookingHoursHeader]: this.getSelectedExportBookingHours(project),
+    };
+  }
+
+  private getSelectedExportBookingHoursHeader(): string {
+    const monthName = new Intl.DateTimeFormat('en', { month: 'long' }).format(
+      new Date(this.year ?? new Date().getFullYear(), (this.month ?? new Date().getMonth() + 1) - 1, 1)
+    );
+
+    return `Total Booking Hours (${monthName})`;
+  }
+
+  private getSelectedExportBookingHours(project: ProjectSummaryDto): string | number {
+    const raw = this.asRecord(project);
+    const monthName = new Intl.DateTimeFormat('en', { month: 'long' })
+      .format(new Date(this.year ?? new Date().getFullYear(), (this.month ?? new Date().getMonth() + 1) - 1, 1));
+    const compactMonth = monthName.replace(/\s+/g, '');
+    const monthKey = compactMonth.charAt(0).toLowerCase() + compactMonth.slice(1);
+
+    return this.readNumber(raw, [
+      `totalBookingHours${compactMonth}`,
+      `TotalBookingHours${compactMonth}`,
+      `${monthKey}BookingHours`,
+      `${monthKey}TotalBookingHours`,
+      'totalBookingHoursForMonth',
+      'TotalBookingHoursForMonth',
+      'monthlyBookingHours',
+      'MonthlyBookingHours',
+      'bookingHours',
+      'BookingHours',
+    ]) ?? '';
+  }
+
+  private formatExportDate(value: string | null | undefined): string {
+    if (!value) {
+      return '-';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toISOString().slice(0, 10);
   }
 
   private getStatusLabel(project: ProjectSummaryDto): string {
@@ -681,7 +863,14 @@ export class ProjectList implements OnInit, AfterViewInit {
       DepartmentId: this.selectedDepartmentId !== 'all' ? this.selectedDepartmentId : undefined,
       BusinessUnitId: this.selectedBusinessUnitId !== 'all' ? this.selectedBusinessUnitId : undefined,
       PlantId: this.selectedPlantId !== 'all' ? this.selectedPlantId : undefined,
+      ProcessStatus: this.selectedProcessStatus !== 'all' ? this.selectedProcessStatus : undefined,
+      ytd: this.selectedYtd ? true : undefined,
     };
+
+    const projectScope = this.getEffectiveProjectScope();
+    if (projectScope) {
+      params.All = projectScope === 'all';
+    }
 
     if (this.startDate) (params as any).startDate = this.startDate;
     if (this.endDate) (params as any).endDate = this.endDate;
@@ -702,10 +891,15 @@ export class ProjectList implements OnInit, AfterViewInit {
       )
       .subscribe({
         next: (response) => {
-          this.projects = response.data;
-          this.totalCount = response.totalCount;
-          this.totalPagesCount = response.totalPages;
-          this.currentPage = response.pageNumber;
+          const requestedPageSize = Number(this.pageSize) || 5;
+          const responseProjects = response.data ?? [];
+
+          this.projects = responseProjects.length > requestedPageSize
+            ? responseProjects.slice(0, requestedPageSize)
+            : responseProjects;
+          this.totalCount = Number(response.totalCount ?? this.projects.length);
+          this.totalPagesCount = Number(response.totalPages) || Math.ceil(this.totalCount / requestedPageSize);
+          this.currentPage = Number(response.pageNumber) || this.currentPage;
 
           this.rebuildDisplayProjects();
           this.pruneSelection();
@@ -726,47 +920,132 @@ export class ProjectList implements OnInit, AfterViewInit {
     this.hasTriggeredInitialLoad = true;
     
     this.route.queryParams.subscribe((params) => {
-      if (params['Search'] !== undefined || params['search'] !== undefined) {
-        this.searchTerm = params['Search'] ?? params['search'] ?? '';
-      }
-      if (params['Status'] !== undefined || params['status'] !== undefined) {
-        this.selectedStatus = String(params['Status'] ?? params['status']);
-      }
-      if (params['Phase'] !== undefined || params['phase'] !== undefined) {
-        this.selectedPhase = String(params['Phase'] ?? params['phase']);
-      }
-      if (params['ProjectManagementType'] !== undefined || params['projectManagementType'] !== undefined) {
-        this.selectedManagementType = String(params['ProjectManagementType'] ?? params['projectManagementType']);
-      }
-      if (params['incompleteOnly'] !== undefined || params['IncompleteOnly'] !== undefined) {
-        this.selectedIncompleteOnly = String(params['incompleteOnly'] ?? params['IncompleteOnly']) === 'true';
-      }
-      if (params['delayedOnly'] !== undefined || params['DelayedOnly'] !== undefined) {
-        this.selectedDelayedOnly = String(params['delayedOnly'] ?? params['DelayedOnly']) === 'true';
-      }
-      if (params['BusinessUnitId'] !== undefined || params['businessUnitId'] !== undefined) {
-        this.selectedBusinessUnitId = String(params['BusinessUnitId'] ?? params['businessUnitId']);
-      }
-      if (params['DepartmentId'] !== undefined || params['departmentId'] !== undefined) {
-        this.selectedDepartmentId = String(params['DepartmentId'] ?? params['departmentId']);
-      }
-      if (params['PlantId'] !== undefined || params['plantId'] !== undefined) {
-        this.selectedPlantId = String(params['PlantId'] ?? params['plantId']);
-      }
-      if (params['startDate'] !== undefined) {
-        this.startDate = String(params['startDate']);
-      }
-      if (params['endDate'] !== undefined) {
-        this.endDate = String(params['endDate']);
-      }
-      if (params['year'] !== undefined) {
-        this.year = Number(params['year']);
-      }
-      if (params['month'] !== undefined) {
-        this.month = Number(params['month']);
-      }
+      this.applyRouteFilters(params);
       this.loadProjects();
     });
+  }
+
+  private applyRouteFilters(params: Record<string, unknown>): void {
+    this.searchTerm = String(params['Search'] ?? params['search'] ?? '');
+    this.selectedStatus = this.readRouteString(params, ['Status', 'status'], 'all');
+    this.selectedPhase = this.readRouteString(params, ['Phase', 'phase'], 'all');
+    this.selectedManagementType = this.readRouteString(params, ['ProjectManagementType', 'projectManagementType'], 'all');
+    this.selectedIncompleteOnly = this.readRouteBoolean(params, ['incompleteOnly', 'IncompleteOnly']);
+    this.selectedDelayedOnly = this.readRouteBoolean(params, ['delayedOnly', 'DelayedOnly']);
+    this.selectedBusinessUnitId = this.readRouteString(params, ['BusinessUnitId', 'businessUnitId'], 'all');
+    this.selectedDepartmentId = this.readRouteString(params, ['DepartmentId', 'departmentId'], 'all');
+    this.selectedPlantId = this.readRouteString(params, ['PlantId', 'plantId'], 'all');
+    this.selectedProcessStatus = this.readRouteString(params, ['ProcessStatus', 'processStatus'], 'all');
+    this.startDate = this.readRouteNullableString(params, ['startDate']);
+    this.endDate = this.readRouteNullableString(params, ['endDate']);
+    this.year = this.readRouteNumber(params, ['year']);
+    this.month = this.readRouteNumber(params, ['month']);
+    this.selectedYtd = this.readRouteBoolean(params, ['ytd']);
+    this.selectedProjectScope = this.readProjectScope(params);
+    this.dashboardReturnView = this.readDashboardReturnView(params);
+    this.showDashboardBackButton = String(params['source'] ?? '').toLowerCase() === 'dashboard';
+  }
+
+  private buildDashboardReturnParams(): Record<string, string | number | boolean> {
+    const queryParams: Record<string, string | number | boolean> = {};
+
+    if (this.selectedBusinessUnitId !== 'all') queryParams['BusinessUnitId'] = this.selectedBusinessUnitId;
+    if (this.selectedDepartmentId !== 'all') queryParams['DepartmentId'] = this.selectedDepartmentId;
+    if (this.selectedPlantId !== 'all') queryParams['PlantId'] = this.selectedPlantId;
+    if (this.selectedStatus !== 'all') queryParams['Status'] = Number(this.selectedStatus);
+    if (this.selectedPhase !== 'all') queryParams['Phase'] = Number(this.selectedPhase);
+    if (this.selectedManagementType !== 'all') queryParams['ProjectManagementType'] = Number(this.selectedManagementType);
+    if (this.selectedProcessStatus !== 'all') queryParams['ProcessStatus'] = this.selectedProcessStatus;
+    if (this.startDate) queryParams['startDate'] = this.startDate;
+    if (this.endDate) queryParams['endDate'] = this.endDate;
+    if (this.year) queryParams['year'] = this.year;
+    if (this.month) queryParams['month'] = this.month;
+    if (this.selectedYtd) queryParams['ytd'] = true;
+    if (this.selectedProjectScope) queryParams['projectScope'] = this.selectedProjectScope;
+    if (this.dashboardReturnView) queryParams['dashboardView'] = this.dashboardReturnView;
+
+    return queryParams;
+  }
+
+  private getEffectiveProjectScope(): 'mine' | 'all' | null {
+    if (this.selectedProjectScope) {
+      return this.selectedProjectScope;
+    }
+
+    return 'all';
+  }
+
+  private readProjectScope(params: Record<string, unknown>): 'mine' | 'all' | null {
+    const explicitScope = String(params['projectScope'] ?? params['ProjectScope'] ?? '').toLowerCase();
+    if (explicitScope === 'mine' || explicitScope === 'my') {
+      return 'mine';
+    }
+    if (explicitScope === 'all') {
+      return 'all';
+    }
+
+    const explicitAll = params['all'] ?? params['All'];
+    if (explicitAll !== undefined) {
+      return String(explicitAll).toLowerCase() === 'true' ? 'all' : 'mine';
+    }
+
+    return null;
+  }
+
+  private readDashboardReturnView(params: Record<string, unknown>): 'admin' | 'mine' | 'all' | 'personal' | null {
+    const view = String(params['dashboardView'] ?? params['DashboardView'] ?? '').toLowerCase();
+
+    if (view === 'admin' || view === 'mine' || view === 'all' || view === 'personal') {
+      return view;
+    }
+
+    const scope = this.readProjectScope(params);
+    return scope;
+  }
+
+  private readRouteString(params: Record<string, unknown>, keys: string[], fallback: string): string {
+    for (const key of keys) {
+      const value = params[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        return String(value);
+      }
+    }
+
+    return fallback;
+  }
+
+  private readRouteNullableString(params: Record<string, unknown>, keys: string[]): string | null {
+    for (const key of keys) {
+      const value = params[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        return String(value);
+      }
+    }
+
+    return null;
+  }
+
+  private readRouteNumber(params: Record<string, unknown>, keys: string[]): number | null {
+    for (const key of keys) {
+      const value = params[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+    }
+
+    return null;
+  }
+
+  private readRouteBoolean(params: Record<string, unknown>, keys: string[]): boolean {
+    for (const key of keys) {
+      const value = params[key];
+      if (value !== undefined && value !== null) {
+        return String(value).toLowerCase() === 'true';
+      }
+    }
+
+    return false;
   }
 
   private extractErrorMessage(error: unknown, fallback: string): string {

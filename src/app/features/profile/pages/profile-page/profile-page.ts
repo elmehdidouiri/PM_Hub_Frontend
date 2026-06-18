@@ -1,8 +1,9 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { AbstractControl, FormBuilder, Validators } from '@angular/forms';
 import { finalize } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/services/auth';
+import { User } from '../../../../core/models';
 import { NotificationService } from '../../../../core/services/notification.service';
 
 @Component({
@@ -11,12 +12,12 @@ import { NotificationService } from '../../../../core/services/notification.serv
   templateUrl: './profile-page.html',
   styleUrl: './profile-page.scss',
 })
-export class ProfilePage {
+export class ProfilePage implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly notificationService = inject(NotificationService);
 
-  readonly user = this.authService.getCurrentUser();
+  user: User | null = this.authService.getCurrentUser();
   isSubmittingPassword = false;
   hideCurrentPassword = true;
   hideNewPassword = true;
@@ -32,6 +33,23 @@ export class ProfilePage {
       validators: this.passwordMatchValidator,
     }
   );
+
+  ngOnInit(): void {
+    const userId = this.user?.userId;
+    if (!userId) {
+      return;
+    }
+
+    this.authService.getAuthUserById(userId).subscribe({
+      next: (profile) => {
+        const normalized = this.toUser(profile);
+        if (normalized) {
+          this.user = normalized;
+        }
+      },
+      error: () => {},
+    });
+  }
 
   get initials(): string {
     const first = this.user?.firstName?.trim().charAt(0) ?? '';
@@ -104,6 +122,52 @@ export class ProfilePage {
     }
 
     return null;
+  }
+
+  private toUser(value: unknown): User | null {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    const record = value as Record<string, unknown>;
+    const userId = this.readString(record, ['userId', 'id', 'Id']);
+    const email = this.readString(record, ['email', 'Email']);
+
+    if (!userId && !email) {
+      return null;
+    }
+
+    return {
+      userId: userId || this.user?.userId || '',
+      firstName: this.readString(record, ['firstName', 'FirstName']) || this.user?.firstName || '',
+      lastName: this.readString(record, ['lastName', 'LastName']) || this.user?.lastName || '',
+      email: email || this.user?.email || '',
+      roleName: this.readString(record, ['roleName', 'RoleName', 'role', 'Role']) || this.user?.roleName || '',
+      isAdmin: this.readBoolean(record, ['isAdmin', 'IsAdmin']) || this.user?.isAdmin || false,
+    };
+  }
+
+  private readString(record: Record<string, unknown>, keys: string[]): string {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+    return '';
+  }
+
+  private readBoolean(record: Record<string, unknown>, keys: string[]): boolean {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'boolean') {
+        return value;
+      }
+      if (typeof value === 'string') {
+        return ['true', '1', 'yes'].includes(value.toLowerCase());
+      }
+    }
+    return false;
   }
 }
 

@@ -583,6 +583,7 @@ export interface ProjectFilterParams {
   Phase?: number;
   ProjectType?: number;
   ProjectManagementType?: number;
+  ProcessStatus?: string | number;
   DepartmentId?: string;
   BusinessUnitId?: string;
   PlantId?: string;
@@ -597,6 +598,8 @@ export interface ProjectFilterParams {
   IncompleteOnly?: boolean;
   DelayedOnly?: boolean;
   delayedOnly?: boolean;
+  ytd?: boolean;
+  Ytd?: boolean;
   all?: boolean;
   All?: boolean;
 }

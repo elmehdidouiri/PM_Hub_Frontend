@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth-guard';
+import { roleGuard } from './core/guards/role-guard';
 import { MainLayout } from './layout/main-layout/main-layout';
 
 const routes: Routes = [
@@ -29,10 +30,14 @@ const routes: Routes = [
       },
       {
         path: 'admin/projects',
+        canActivate: [roleGuard],
+        data: { adminOnly: true },
         loadChildren: () => import('./features/projects/projects-module').then((m) => m.ProjectsModule)
       },
       {
         path: 'admin',
+        canActivate: [roleGuard],
+        data: { adminOnly: true },
         loadChildren: () => import('./features/admin/admin-module').then((m) => m.AdminModule)
       },
       {
@@ -45,6 +50,8 @@ const routes: Routes = [
       },
       {
         path: 'users',
+        canActivate: [roleGuard],
+        data: { adminOnly: true },
         loadChildren: () => import('./features/users/users-module').then((m) => m.UsersModule)
       },
       {
@@ -58,10 +65,6 @@ const routes: Routes = [
       {
         path: 'hours',
         loadChildren: () => import('./features/hours/hours-module').then((m) => m.HoursModule)
-      },
-      {
-        path: 'files',
-        loadChildren: () => import('./features/files/files-module').then((m) => m.FilesModule)
       }
     ]
   },
@@ -72,7 +75,12 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes)],
+  imports: [
+    RouterModule.forRoot(routes, {
+      anchorScrolling: 'enabled',
+      scrollPositionRestoration: 'top',
+    }),
+  ],
   exports: [RouterModule]
 })
 export class AppRoutingModule { }

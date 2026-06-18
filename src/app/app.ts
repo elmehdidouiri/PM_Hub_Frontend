@@ -17,7 +17,7 @@ export class App implements OnInit {
   constructor(private authService: AuthService) {}
 
   ngOnInit() {
-    // Initialiser l'utilisateur depuis le service
+    // Initialize the user from the service
     this.user.set(this.authService.getCurrentUser());
 
     // Écouter les changements (login/logout)

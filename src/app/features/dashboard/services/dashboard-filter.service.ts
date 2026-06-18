@@ -6,6 +6,7 @@ import { DashboardFilterParams, ProjectSummaryDto } from '../../projects/models'
 export interface DashboardFilterState {
   selectedYear: number | null;
   selectedMonth: number | null;
+  selectedYtd: boolean;
   selectedStartDate: string | null;
   selectedEndDate: string | null;
   selectedRoleId: string;
@@ -101,9 +102,9 @@ export class DashboardFilterService {
   buildParams(state: DashboardFilterState): DashboardFilterParams {
     return {
       year:           state.selectedYear ?? undefined,
-      month:          state.selectedMonth ?? undefined,
-      startDate:      state.selectedStartDate ?? undefined,
-      endDate:        state.selectedEndDate ?? undefined,
+      month:          !state.selectedYtd ? state.selectedMonth ?? undefined : undefined,
+      startDate:      !state.selectedYtd ? state.selectedStartDate ?? undefined : undefined,
+      endDate:        !state.selectedYtd ? state.selectedEndDate ?? undefined : undefined,
       roleId:         state.selectedRoleId !== 'all' ? state.selectedRoleId : undefined,
       departmentId:   state.selectedDepartment !== 'all' ? state.selectedDepartment : undefined,
       businessUnitId: state.selectedBusinessUnit !== 'all' ? state.selectedBusinessUnit : undefined,
@@ -116,7 +117,7 @@ export class DashboardFilterService {
         ? DashboardFilterService.PROCESS_STATUS_MAP[state.selectedProcessStatus] : undefined,
       projectManagementType: state.selectedProjectManagementType !== 'all'
         ? state.selectedProjectManagementType : undefined,
-      ytd: state.selectedYear !== null && state.selectedMonth === null ? true : undefined,
+      ytd: state.selectedYtd ? true : undefined,
     };
   }
 
@@ -124,6 +125,7 @@ export class DashboardFilterService {
     return (
       state.selectedYear !== null ||
       state.selectedMonth !== null ||
+      state.selectedYtd ||
       state.selectedRoleId !== 'all' ||
       state.selectedBusinessUnit !== 'all' ||
       state.selectedPlant !== 'all' ||
@@ -144,6 +146,7 @@ export class DashboardFilterService {
       state.selectedProjectManagementType !== 'all',
       state.selectedYear !== null,
       state.selectedMonth !== null,
+      state.selectedYtd,
     ].filter(Boolean).length;
   }
 
@@ -376,15 +379,9 @@ export class DashboardFilterService {
   }
 
   defaultFilterState(): DashboardFilterState {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth() + 1;
-    const startDate = new Date(currentYear, currentMonth - 1, 1);
-    const endDate = new Date(currentYear, currentMonth, 0);
-
     return {
-      selectedYear: currentYear, selectedMonth: currentMonth,
-      selectedStartDate: this.toDateInputValue(startDate), selectedEndDate: this.toDateInputValue(endDate),
+      selectedYear: null, selectedMonth: null, selectedYtd: false,
+      selectedStartDate: null, selectedEndDate: null,
       selectedRoleId: 'all', selectedProjectStatus: 'all',
       selectedProjectPhase: 'all', selectedProcessStatus: 'all',
       selectedProjectManagementType: 'all',
@@ -392,11 +389,4 @@ export class DashboardFilterService {
     };
   }
 
-  private toDateInputValue(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-
-    return `${year}-${month}-${day}`;
-  }
 }

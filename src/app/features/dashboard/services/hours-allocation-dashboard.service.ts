@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
@@ -15,11 +15,13 @@ import {
   HoursAllocationDetailDto,
   HoursAllocationFiltersDto,
   HoursAllocationMonthlyDto,
+  ProjectBookingHoursPreviewDto,
 } from '../models/hours-allocation-dashboard.models';
 
 @Injectable({ providedIn: 'root' })
 export class HoursAllocationDashboardService {
   private readonly apiUrl = `${environment.apiUrl}/hours-allocation`;
+  private readonly projectsApiUrl = `${environment.apiUrl}/projects`;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -37,10 +39,45 @@ export class HoursAllocationDashboardService {
       .pipe(map((response) => this.normalizeDashboard(this.unwrap(response))));
   }
 
+  getProjectDashboard(
+    projectId: string,
+    params: Omit<HoursAllocationDashboardParams, 'projectId'> = {},
+  ): Observable<HoursAllocationDashboardDto> {
+    return this.http
+      .get<ApiResponse<HoursAllocationDashboardDto> | HoursAllocationDashboardDto>(
+        `${this.apiUrl}/projects/${encodeURIComponent(projectId)}/dashboard`,
+        {
+          params: this.buildParams(params),
+        },
+      )
+      .pipe(map((response) => this.normalizeDashboard(this.unwrap(response))));
+  }
+
   sendReminders(params: HoursAllocationDashboardParams): Observable<void> {
     return this.http
       .post<ApiResponse<void> | void>(`${this.apiUrl}/reminders`, params)
       .pipe(map((response) => this.unwrapVoid(response)));
+  }
+
+  getProjectBookingHoursPreview(
+    params: Record<string, string | number | null | undefined>,
+  ): Observable<ProjectBookingHoursPreviewDto[]> {
+    return this.http
+      .get<ApiResponse<ProjectBookingHoursPreviewDto[]> | ProjectBookingHoursPreviewDto[]>(
+        `${this.projectsApiUrl}/export/booking-hours/preview`,
+        {
+          params: this.buildProjectBookingHoursParams(params),
+        },
+      )
+      .pipe(map((response) => this.normalizeBookingHoursPreview(this.unwrap(response))));
+  }
+
+  exportProjectBookingHours(params: Record<string, string | number | null | undefined>): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.projectsApiUrl}/export/booking-hours`, {
+      observe: 'response',
+      params: this.buildProjectBookingHoursParams(params),
+      responseType: 'blob',
+    });
   }
 
   private buildParams(params: HoursAllocationDashboardParams): HttpParams {
@@ -48,7 +85,16 @@ export class HoursAllocationDashboardService {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         httpParams = httpParams.set(key, String(value));
-        httpParams = httpParams.set(`${key.charAt(0).toUpperCase()}${key.slice(1)}`, String(value));
+      }
+    });
+    return httpParams;
+  }
+
+  private buildProjectBookingHoursParams(params: Record<string, string | number | null | undefined>): HttpParams {
+    let httpParams = new HttpParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        httpParams = httpParams.set(key, String(value));
       }
     });
     return httpParams;
@@ -244,6 +290,23 @@ export class HoursAllocationDashboardService {
       workedDays: this.num(r, ['workedDays', 'WorkedDays']),
       allocationCount: this.num(r, ['allocationCount', 'AllocationCount', 'allocations', 'Allocations']),
       isProjectManager: Boolean(this.pick(r, ['isProjectManager', 'IsProjectManager'])),
+    };
+  }
+
+  private normalizeBookingHoursPreview(raw: unknown): ProjectBookingHoursPreviewDto[] {
+    return this.array(raw).map((item) => this.toBookingHoursPreview(item));
+  }
+
+  private toBookingHoursPreview(item: unknown): ProjectBookingHoursPreviewDto {
+    const r = this.asRecord(item);
+    return {
+      project: this.str(r, ['project', 'Project', 'projects', 'Projects', 'projectName', 'ProjectName', 'name', 'Name']),
+      phase: this.str(r, ['phase', 'Phase', 'projectPhase', 'ProjectPhase']),
+      estimatedHours: this.num(r, ['estimatedHours', 'EstimatedHours']),
+      department: this.str(r, ['department', 'Department', 'departement', 'Departement', 'departmentName', 'DepartmentName']),
+      sponsor: this.str(r, ['sponsor', 'Sponsor']),
+      costCenter: this.str(r, ['costCenter', 'CostCenter']),
+      totalBookingHours: this.num(r, ['totalBookingHours', 'TotalBookingHours']),
     };
   }
 

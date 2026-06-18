@@ -9,8 +9,43 @@
             <mat-icon>insights</mat-icon>
             <span>PMHUB Analytics</span>
           </div>
-          <h1>Dashboard Projects</h1>
-          <p>Portfolio-wide OTD, effectiveness and resource utilization analytics.</p>
+          <h1>{{ user?.isAdmin ? 'Project dashboard' : (isNormalUserPersonalView ? 'My personal stats' : (isAllProjectStatsView ? 'All project stats' : 'My project stats')) }}</h1>
+          <p>
+            {{ user?.isAdmin
+              ? 'Track overall OTD, effectiveness, and resource utilization.'
+              : (isNormalUserPersonalView
+                ? 'Track your logged hours, progress, and personal assignments.'
+                : (isAllProjectStatsView
+                  ? 'View the same project indicators as the admin across all projects.'
+                  : 'View the same project indicators as the admin, limited to your own projects.')) }}
+          </p>
+
+          <div class="dashboard-view-switch" *ngIf="!user?.isAdmin" aria-label="User dashboard view">
+            <button
+              type="button"
+              [class.dashboard-view-switch__btn--active]="normalUserView === 'projects' && projectStatsScope === 'mine'"
+              (click)="setProjectStatsScope('mine')"
+              [disabled]="isRefreshing">
+              <mat-icon>workspaces</mat-icon>
+              My project stats
+            </button>
+            <button
+              type="button"
+              [class.dashboard-view-switch__btn--active]="normalUserView === 'projects' && projectStatsScope === 'all'"
+              (click)="setProjectStatsScope('all')"
+              [disabled]="isRefreshing">
+              <mat-icon>query_stats</mat-icon>
+              All project stats
+            </button>
+            <button
+              type="button"
+              [class.dashboard-view-switch__btn--active]="normalUserView === 'personal'"
+              (click)="setNormalUserView('personal')"
+              [disabled]="isRefreshing">
+              <mat-icon>person</mat-icon>
+              My personal stats
+            </button>
+          </div>
 
           <div class="dashboard-page-header__actions">
             <button
@@ -19,7 +54,7 @@
               [disabled]="isRefreshing"
               (click)="navigateToProjectsWithFilters()">
               <mat-icon>folder_open</mat-icon>
-              View Projects
+              {{ isAllProjectStatsView ? 'View filtered projects' : 'View my projects' }}
             </button>
             <button
               type="button"
@@ -27,7 +62,7 @@
               [disabled]="isRefreshing || !canRestoreFilters"
               (click)="clearAllFilters()">
               <mat-icon>restart_alt</mat-icon>
-              Reset Environment
+              Reset
             </button>
           </div>
         </div>
@@ -36,7 +71,7 @@
           <mat-icon>calendar_month</mat-icon>
           <div>
             <strong>{{ periodLabel }}</strong>
-            <span>{{ hasActiveFilters ? 'Filtered portfolio view' : 'All portfolio segments' }}</span>
+            <span>{{ isNormalUserPersonalView ? 'Personal view' : (isAllProjectStatsView ? 'All project stats' : (hasActiveFilters ? 'Filtered project view' : 'My project stats')) }}</span>
           </div>
         </div>
       </header>
@@ -50,27 +85,81 @@
       </section>
 
       <section class="period-bar pm-glass">
-        <div class="period-bar__dates">
+        <div class="period-bar__selectors" aria-label="Dashboard period filters">
           <mat-icon>analytics</mat-icon>
-          <input type="date" class="pm-input" [value]="filterState.selectedStartDate || ''" (change)="updateDateFilter('start', $event)" [disabled]="isRefreshing" />
-          <span>to</span>
-          <input type="date" class="pm-input" [value]="filterState.selectedEndDate || ''" (change)="updateDateFilter('end', $event)" [disabled]="isRefreshing" />
+          <label>
+            <span>Month</span>
+            <select
+              class="pm-input period-bar__select"
+              [value]="filterState.selectedMonth || ''"
+              (change)="updatePeriodFilter('month', $event)"
+              [disabled]="isRefreshing">
+              <option value="">All months</option>
+              <option *ngFor="let month of monthOptions" [value]="month.value">{{ month.label }}</option>
+            </select>
+          </label>
+          <label>
+            <span>Year</span>
+            <select
+              class="pm-input period-bar__select"
+              [value]="filterState.selectedYear || ''"
+              (change)="updatePeriodFilter('year', $event)"
+              [disabled]="isRefreshing">
+              <option value="">All years</option>
+              <option *ngFor="let year of yearOptions" [value]="year">{{ year }}</option>
+            </select>
+          </label>
+          <label>
+            <span>From</span>
+            <input
+              type="date"
+              class="pm-input period-bar__select period-bar__date"
+              [value]="filterState.selectedStartDate || ''"
+              (change)="updateDateFilter('start', $event)"
+              [disabled]="isRefreshing">
+          </label>
+          <label>
+            <span>To</span>
+            <input
+              type="date"
+              class="pm-input period-bar__select period-bar__date"
+              [value]="filterState.selectedEndDate || ''"
+              (change)="updateDateFilter('end', $event)"
+              [disabled]="isRefreshing">
+          </label>
+          <label>
+            <span>Process status</span>
+            <select
+              class="pm-input period-bar__select period-bar__select--wide"
+              [value]="filterState.selectedProcessStatus"
+              (change)="updateProcessStatusFilter($event)"
+              [disabled]="isRefreshing">
+              <option *ngFor="let status of processStatusOptions" [value]="status.id">{{ status.label }}</option>
+            </select>
+          </label>
         </div>
 
         <div class="period-bar__modes">
           <button
             type="button"
-            [class.period-bar__mode--active]="filterState.selectedYear === currentYear && filterState.selectedMonth === currentMonth"
+            [class.period-bar__mode--active]="!filterState.selectedYtd && filterState.selectedYear === currentYear && filterState.selectedMonth === currentMonth"
             (click)="selectCurrentMonth()"
             [disabled]="isRefreshing">
-            Month-to-Date
+            Current month
           </button>
           <button
             type="button"
-            [class.period-bar__mode--active]="filterState.selectedYear === null && filterState.selectedMonth === null"
+            [class.period-bar__mode--active]="filterState.selectedYtd"
+            (click)="selectYtd()"
+            [disabled]="isRefreshing">
+            YTD
+          </button>
+          <button
+            type="button"
+            [class.period-bar__mode--active]="!filterState.selectedYtd && filterState.selectedYear === null && filterState.selectedMonth === null"
             (click)="selectAllDates()"
             [disabled]="isRefreshing">
-            Global History
+            Full history
           </button>
         </div>
       </section>
@@ -91,26 +180,26 @@
             </span>
             <span class="dashboard-metric__label">
               {{ metric.label }}
-              <small>Real-time metric</small>
+              <small>{{ isNormalUserPersonalView ? 'Personal indicator' : 'Project indicator' }}</small>
             </span>
           </div>
           <strong>{{ metric.value }}</strong>
           <p>{{ metric.note }}</p>
           <span class="dashboard-metric__action">
-            {{ metric.actionLabel || 'Open details' }}
+            {{ metric.actionLabel || 'View details' }}
             <mat-icon>arrow_forward</mat-icon>
           </span>
           <mat-icon class="dashboard-metric__watermark">{{ metric.icon }}</mat-icon>
         </button>
       </section>
 
-      <section class="target-grid" aria-label="Target thresholds">
+      <section class="target-grid" aria-label="Target thresholds" *ngIf="!isNormalUserPersonalView">
         <article class="target-card target-card--success">
           <span><mat-icon>verified</mat-icon></span>
           <div>
             <strong>{{ aboveTargetCount }}</strong>
             <small>Segments</small>
-            <p>Superior Efficiency Index</p>
+            <p>Above target index</p>
           </div>
         </article>
         <article class="target-card target-card--danger">
@@ -118,12 +207,12 @@
           <div>
             <strong>{{ belowTargetCount }}</strong>
             <small>Segments</small>
-            <p>Attention Required Threshold</p>
+            <p>Threshold requiring attention</p>
           </div>
         </article>
       </section>
 
-      <section class="filter-sections" aria-label="Dashboard filters">
+      <section class="filter-sections" aria-label="Dashboard filters" *ngIf="!isNormalUserPersonalView">
         <article *ngFor="let section of filterSections" class="filter-section">
           <header class="pm-section-title">
             <div>
@@ -138,7 +227,7 @@
                 (click)="resetSectionFilter(section.kind)"
                 [disabled]="isRefreshing || !sectionHasActiveFilter(section)"
                 [attr.aria-label]="'Reset ' + section.title + ' filter'"
-                title="Reset section filter">
+                title="Reset this filter">
                 <mat-icon>restart_alt</mat-icon>
               </button>
             </div>
@@ -177,7 +266,7 @@
               style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 999px; background: #fff; border: 1px solid #e4e7ec; color: #df6800; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);"
               (click)="toggleSection(section.kind)">
               <mat-icon style="font-size: 1.2rem; width: 1.2rem; height: 1.2rem;">{{ isSectionExpanded(section.kind) ? 'expand_less' : 'expand_more' }}</mat-icon>
-              {{ isSectionExpanded(section.kind) ? 'Voir moins' : 'Voir les autres (' + section.hiddenCount + ')' }}
+              {{ isSectionExpanded(section.kind) ? 'Show less' : 'Show more (' + section.hiddenCount + ')' }}
             </button>
           </div>
         </article>

@@ -76,8 +76,8 @@ export class MainLayout implements OnInit {
       route: '/dashboard',
       children: [
         { label: 'Overview', route: '/dashboard', exact: true },
-        { label: 'Analytics', route: '/dashboard/analytics' },
-        { label: 'Hours Allocation', route: '/dashboard/hours-allocation' },
+        { label: 'Analytics', route: '/dashboard/analytics', adminOnly: true },
+        { label: 'Hours allocation', route: '/dashboard/hours-allocation', adminOnly: true },
       ],
     },
     {
@@ -86,8 +86,8 @@ export class MainLayout implements OnInit {
       icon: 'workspaces',
       route: '/projects',
       children: [
-        { label: 'My Projects', route: '/projects', exact: true },
-        { label: 'Create Project', route: '/projects/new', adminOnly: true },
+        { label: 'My projects', route: '/projects', exact: true },
+        { label: 'Create project', route: '/projects/new', adminOnly: true },
       ],
     },
     {
@@ -117,18 +117,18 @@ export class MainLayout implements OnInit {
       icon: 'school',
       route: '/interns',
       children: [
-        { label: 'All Interns', route: '/interns', exact: true },
-        { label: 'Add Intern', route: '/interns/new' },
+        { label: 'All interns', route: '/interns', exact: true },
+        { label: 'Add intern', route: '/interns/new', adminOnly: true },
       ],
     },
     {
       id: 'reports',
-      label: 'Analytics',
+      label: 'Reports',
       icon: 'analytics',
       userOnly: true,
       children: [
-        { label: 'Hours Summary', route: '/reports/hours-summary' },
-        { label: 'Project Overview', route: '/reports/project-overview' }
+        { label: 'Hours summary', route: '/reports/hours-summary' },
+        { label: 'Project overview', route: '/reports/project-overview' }
       ]
     },
     {
@@ -258,12 +258,12 @@ export class MainLayout implements OnInit {
   }
 
   get displayName(): string {
-    if (!this.user) return 'PMHUB User';
+    if (!this.user) return 'PMHUB user';
     return `${this.user.firstName} ${this.user.lastName}`;
   }
 
   get roleLabel(): string {
-    return this.isAdmin ? 'Administrator' : (this.user?.roleName || 'Standard User');
+    return this.isAdmin ? 'Administrator' : (this.user?.roleName || 'Standard user');
   }
 
   get currentYear(): number {
@@ -291,13 +291,13 @@ export class MainLayout implements OnInit {
     if (lastSegment === 'new') {
       const entity = segments[segments.length - 2];
       if (entity === 'interns') {
-        return 'Create Intern';
+        return 'Create intern';
       }
       if (entity === 'users') {
-        return 'Create User';
+        return 'Create user';
       }
       if (entity === 'projects') {
-        return 'Create Project';
+        return 'Create project';
       }
       return 'Create';
     }
@@ -305,23 +305,23 @@ export class MainLayout implements OnInit {
     if (lastSegment === 'edit') {
       const entity = segments[segments.length - 3];
       if (entity === 'interns') {
-        return 'Edit Intern';
+        return 'Edit intern';
       }
       if (entity === 'users') {
-        return 'Edit User';
+        return 'Edit user';
       }
       if (entity === 'projects') {
-        return 'Edit Project';
+        return 'Edit project';
       }
       return 'Edit';
     }
 
     if (segments.includes('projects') && this.looksLikeId(lastSegment)) {
-      return 'Project Details';
+      return 'Project details';
     }
 
     if (segments.includes('users') && this.looksLikeId(lastSegment)) {
-      return this.breadcrumbService.getLabel(lastSegment) || 'User Profile';
+      return this.breadcrumbService.getLabel(lastSegment) || 'User profile';
     }
 
     return this.labelizeSegment(lastSegment);

@@ -118,7 +118,7 @@ export class HourSummary implements OnInit {
         this.topProjects = this.buildTopProjects(topProjects);
 
         if (!this.monthlySummary.length && !this.breakdownCards.length && !this.projectOverviewCards.length && !this.topProjects.length) {
-          this.summaryError = 'No summary data is available yet for the selected period.';
+          this.summaryError = 'No summary data is available for the selected period yet.';
         }
 
         this.cdr.markForCheck();
@@ -132,10 +132,10 @@ export class HourSummary implements OnInit {
     }
 
     const entries = [
-      { title: 'Target Hours', value: this.pickNumber(record, ['targetHours', 'TargetHours']) },
-      { title: 'Logged Hours', value: this.pickNumber(record, ['loggedHours', 'LoggedHours', 'totalHours', 'TotalHours']) },
+      { title: 'Target hours', value: this.pickNumber(record, ['targetHours', 'TargetHours']) },
+      { title: 'Logged hours', value: this.pickNumber(record, ['loggedHours', 'LoggedHours', 'totalHours', 'TotalHours']) },
       { title: 'Variance', value: this.pickNumber(record, ['variance', 'Variance']) },
-      { title: 'Intern Management', value: this.pickNumber(record, ['totalInternManagementHours', 'TotalInternManagementHours']) },
+      { title: 'Intern management', value: this.pickNumber(record, ['totalInternManagementHours', 'TotalInternManagementHours']) },
     ];
 
     return entries
@@ -143,7 +143,7 @@ export class HourSummary implements OnInit {
       .map((entry) => ({
         title: entry.title,
         value: entry.value ?? 0,
-        suffix: 'hrs',
+        suffix: 'h',
       }));
   }
 
@@ -154,9 +154,9 @@ export class HourSummary implements OnInit {
     }
 
     return {
-      title: 'Total Hours This Month',
+      title: 'Total hours this month',
       value: total,
-      suffix: 'hrs',
+      suffix: 'h',
       accent: 'primary',
     };
   }
@@ -193,7 +193,7 @@ export class HourSummary implements OnInit {
       .map(([key, value]) => ({
         title: this.labelizeKey(key),
         value: value as number,
-        suffix: 'hrs',
+        suffix: 'h',
         accent: 'neutral',
       }));
   }

@@ -7,10 +7,10 @@
   <header class="summary-hero pm-surface">
     <div class="summary-hero__copy">
       <span class="eyebrow">Time analytics</span>
-      <h1>Performance Workspace</h1>
+      <h1>Performance summary</h1>
       <p>
-        Track your monthly effort, understand how your time is distributed, and follow the projects
-        where you create the most value.
+        Track your monthly hours, understand their breakdown, and identify the projects
+        taking most of your time.
       </p>
     </div>
 
@@ -49,13 +49,13 @@
 
       <div class="summary-toolbar__hint" *ngIf="!hasProjectFilter">
         <mat-icon>info_outline</mat-icon>
-        <span>Project filtering is not available right now. Your personal totals are still displayed.</span>
+        <span>The project filter is not available right now. Your personal totals are still displayed.</span>
       </div>
     </div>
 
     <button mat-flat-button type="button" class="summary-refresh-btn" (click)="refresh()" [disabled]="isRefreshing || isLoading">
       <mat-icon>{{ isRefreshing ? 'hourglass_top' : 'refresh' }}</mat-icon>
-      <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh data' }}</span>
+      <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
     </button>
   </section>
 
@@ -63,7 +63,7 @@
   <section class="summary-state summary-state--error pm-surface" *ngIf="!isLoading && summaryError">
     <mat-icon>error_outline</mat-icon>
     <div>
-      <strong>Summary not available yet</strong>
+      <strong>Summary unavailable</strong>
       <p>{{ summaryError }}</p>
     </div>
   </section>
@@ -81,8 +81,8 @@
       <article class="summary-panel summary-panel--breakdown pm-surface">
         <div class="panel-heading">
           <div>
-            <span class="panel-kicker">Distribution</span>
-            <h2>Hours breakdown</h2>
+            <span class="panel-kicker">Breakdown</span>
+            <h2>Hour details</h2>
           </div>
           <mat-icon>donut_large</mat-icon>
         </div>
@@ -91,7 +91,7 @@
           <div class="breakdown-item" *ngFor="let item of breakdownCards">
             <div class="breakdown-item__top">
               <strong>{{ item.label }}</strong>
-              <span>{{ item.hours | number:'1.2-2' }} hrs</span>
+            <span>{{ item.hours | number:'1.2-2' }} h</span>
             </div>
             <div class="breakdown-track">
               <div class="breakdown-fill" [style.width.%]="item.percent"></div>
@@ -104,7 +104,7 @@
       <article class="summary-panel summary-panel--overview pm-surface">
         <div class="panel-heading">
           <div>
-            <span class="panel-kicker">Project Lens</span>
+            <span class="panel-kicker">Project view</span>
             <h2>Project overview</h2>
           </div>
           <mat-icon>workspaces</mat-icon>
@@ -122,8 +122,8 @@
     <section class="summary-panel summary-panel--projects pm-surface">
       <div class="panel-heading">
         <div>
-          <span class="panel-kicker">Top Projects</span>
-          <h2>Where your time goes the most</h2>
+          <span class="panel-kicker">Top projects</span>
+          <h2>Your most time-consuming projects</h2>
         </div>
         <mat-icon>insights</mat-icon>
       </div>
@@ -134,12 +134,12 @@
           <div class="top-project-row__content">
             <strong>{{ project.name }}</strong>
             <span *ngIf="project.currentMonthHours !== null">
-              {{ project.currentMonthHours | number:'1.2-2' }} hrs this month
+              {{ project.currentMonthHours | number:'1.2-2' }} h this month
             </span>
-            <span *ngIf="project.currentMonthHours === null">Monthly detail not provided by API</span>
+            <span *ngIf="project.currentMonthHours === null">Monthly detail not provided by the API</span>
           </div>
           <div class="top-project-row__metric">
-            {{ project.totalHours | number:'1.2-2' }} hrs
+            {{ project.totalHours | number:'1.2-2' }} h
           </div>
         </div>
       </div>
@@ -156,14 +156,14 @@
   <ng-template #noOverview>
     <div class="empty-panel">
       <mat-icon>info_outline</mat-icon>
-      <span>No project overview metrics are available yet.</span>
+      <span>No project metric is available yet.</span>
     </div>
   </ng-template>
 
   <ng-template #noProjects>
     <div class="empty-panel">
       <mat-icon>info_outline</mat-icon>
-      <span>No top projects are available yet for this year.</span>
+      <span>No top project is available for this year yet.</span>
     </div>
   </ng-template>
 </section>

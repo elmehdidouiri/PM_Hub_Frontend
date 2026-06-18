@@ -1,6 +1,6 @@
 import { NgModule, APP_INITIALIZER, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser, CommonModule } from '@angular/common';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { of, timeout } from 'rxjs';
@@ -67,7 +67,10 @@ function appInitializer(authService: AuthService, platformId: any) {
     LayoutModule,
   ],
   providers: [
-    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor, angularZoneInterceptor])),
+    provideHttpClient(
+      withFetch(),
+      withInterceptors([authInterceptor, errorInterceptor, angularZoneInterceptor])
+    ),
     {
       provide: APP_INITIALIZER,
       useFactory: appInitializer,

@@ -72,6 +72,14 @@ export class ProjectService {
       );
   }
 
+  getMyProjectStats(): Observable<unknown | null> {
+    return this.http
+      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/stats/me`, {
+        headers: this.buildHeaders(),
+      })
+      .pipe(map((response) => (this.isApiResponse(response) ? (response.data ?? null) : response ?? null)));
+  }
+
   getUserDashboardStats(): Observable<DashboardStatsDto> {
     return this.getUserDashboardStatsFiltered({});
   }
@@ -92,6 +100,48 @@ export class ProjectService {
         params: this.buildDashboardParams(filters),
       })
       .pipe(map((response) => this.normalizeDashboardOverview(response)));
+  }
+
+  getUserDashboardExtended(filters: DashboardFilterParams): Observable<DashboardExtendedDto> {
+    return this.http
+      .get<ApiResponse<DashboardExtendedDto> | DashboardExtendedDto>(`${environment.apiUrl}/dashboard/me/extended`, {
+        headers: this.buildHeaders(),
+        params: this.buildDashboardParams(filters),
+      })
+      .pipe(map((response) => (this.isApiResponse(response) ? response.data! : response)));
+  }
+
+  getUserDashboardBi(filters: DashboardFilterParams): Observable<DashboardAdminBiDto> {
+    return this.http
+      .get<ApiResponse<DashboardAdminBiDto> | DashboardAdminBiDto>(`${environment.apiUrl}/dashboard/me/bi`, {
+        headers: this.buildHeaders(),
+        params: this.buildDashboardParams(filters),
+      })
+      .pipe(map((response) => this.normalizeDashboardBi(response)));
+  }
+
+  getAllProjectsDashboardExtended(filters: DashboardFilterParams): Observable<DashboardExtendedDto> {
+    return this.http
+      .get<ApiResponse<DashboardExtendedDto> | DashboardExtendedDto>(
+        `${environment.apiUrl}/dashboard/all-projects/extended`,
+        {
+          headers: this.buildHeaders(),
+          params: this.buildDashboardParams(filters),
+        }
+      )
+      .pipe(map((response) => (this.isApiResponse(response) ? response.data! : response)));
+  }
+
+  getAllProjectsDashboardBi(filters: DashboardFilterParams): Observable<DashboardAdminBiDto> {
+    return this.http
+      .get<ApiResponse<DashboardAdminBiDto> | DashboardAdminBiDto>(
+        `${environment.apiUrl}/dashboard/all-projects/bi`,
+        {
+          headers: this.buildHeaders(),
+          params: this.buildDashboardParams(filters),
+        }
+      )
+      .pipe(map((response) => this.normalizeDashboardBi(response)));
   }
 
   getUserDashboardPerformance(filters: DashboardFilterParams): Observable<DashboardPerformanceDto> {
@@ -210,7 +260,7 @@ export class ProjectService {
   }
 
   updateProject(id: string, payload: any): Observable<ProjectDto> {
-    const mappedPayload = this.mapToBackendDto(payload);
+    const mappedPayload = this.omitTeamMembers(this.mapToBackendDto(payload));
     return this.http
       .patch<ApiResponse<ProjectDto>>(`${this.apiUrl}/${id}`, mappedPayload, {
         headers: this.buildHeaders(),
@@ -380,11 +430,13 @@ export class ProjectService {
     options?: { noCache?: boolean }
   ): Observable<PaginatedResponse<ProjectSummaryDto>> {
     let httpParams = new HttpParams();
+    const requestedPageNumber = Number(params.PageNumber ?? params.pageNumber ?? 1) || 1;
+    const requestedPageSize = Number(params.PageSize ?? params.pageSize ?? 10) || 10;
     
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         const apiKey = this.toProjectSearchParamName(key);
-        const apiValue = apiKey === 'pageSize' ? Math.min(Number(value) || 10, 100) : value;
+        const apiValue = apiKey === 'pageSize' ? Number(value) || 10 : value;
         httpParams = httpParams.set(apiKey, String(apiValue));
       }
     });
@@ -404,14 +456,16 @@ export class ProjectService {
       .pipe(
         map((response) => {
           const data = this.isApiResponse(response) ? response.data : response;
-          return (data ?? { data: [], pageNumber: 1, pageSize: 10, totalCount: 0, totalPages: 0, hasPreviousPage: false, hasNextPage: false }) as PaginatedResponse<ProjectSummaryDto>;
+          return this.normalizePaginatedProjects(data, requestedPageNumber, requestedPageSize);
         })
       );
   }
 
   patchProject(id: string, payload: Record<string, unknown>): Observable<ProjectDto> {
+    const safePayload = this.omitTeamMembers(payload);
+
     return this.http
-      .patch<ApiResponse<ProjectDto>>(`${this.apiUrl}/${id}`, payload, {
+      .patch<ApiResponse<ProjectDto>>(`${this.apiUrl}/${id}`, safePayload, {
         headers: this.buildHeaders(),
       })
       .pipe(map((response) => this.unwrapResponse(response, 'Unable to update project')));
@@ -481,20 +535,35 @@ export class ProjectService {
   }
 
   addMember(projectId: string, payload: Record<string, unknown>): Observable<unknown> {
+    const memberPayload = {
+      ...payload,
+      UserId: payload['UserId'] ?? payload['userId'],
+      RoleId: payload['RoleId'] ?? payload['roleId'],
+    };
+
     return this.http
-      .post<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${projectId}/members`, payload, {
+      .post<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${projectId}/members`, memberPayload, {
         headers: this.buildHeaders(),
       })
       .pipe(map((response) => (this.isApiResponse(response) ? response.data : response)));
   }
 
+  getProjectMembers(projectId: string): Observable<ProjectDto['members']> {
+    return this.http
+      .get<ApiResponse<ProjectDto['members']> | ProjectDto['members']>(`${this.apiUrl}/${projectId}/members`, {
+        headers: this.buildHeaders(),
+      })
+      .pipe(map((response) => this.normalizeProjectMembersResponse(response)));
+  }
+
   removeMember(projectId: string, userId: string): Observable<void> {
     return this.http
-      .delete<ApiResponse<void>>(`${this.apiUrl}/${projectId}/members/${userId}`, {
+      .delete<ApiResponse<void> | null>(`${this.apiUrl}/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}`, {
         headers: this.buildHeaders(),
       })
       .pipe(
         map((response) => {
+          if (response === null || response === undefined) return;
           if (response.success) return;
           throw new Error(response.message || 'Unable to remove member');
         })
@@ -822,6 +891,91 @@ export class ProjectService {
     return [];
   }
 
+  private omitTeamMembers<T extends Record<string, unknown>>(payload: T): T {
+    const sanitized = { ...payload };
+    delete sanitized['members'];
+    delete sanitized['Members'];
+    delete sanitized['teamMembers'];
+    delete sanitized['TeamMembers'];
+    return sanitized;
+  }
+
+  private normalizeProjectMembersResponse(
+    response: ApiResponse<ProjectDto['members']> | ProjectDto['members']
+  ): ProjectDto['members'] {
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    if (this.isApiResponse(response)) {
+      return Array.isArray(response.data) ? response.data : [];
+    }
+
+    const raw = this.toPlainRecord(response);
+    const candidates = [raw['data'], raw['Data'], raw['members'], raw['Members'], raw['items'], raw['Items']];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate as ProjectDto['members'];
+      }
+    }
+
+    return [];
+  }
+
+  private normalizePaginatedProjects(
+    source: unknown,
+    fallbackPageNumber: number,
+    fallbackPageSize: number
+  ): PaginatedResponse<ProjectSummaryDto> {
+    const raw = this.toPlainRecord(source);
+    const projects = this.readProjectArray(raw) ?? [];
+    const pageNumber = this.toFiniteNumber(raw['pageNumber'] ?? raw['PageNumber'] ?? fallbackPageNumber) || fallbackPageNumber;
+    const pageSize = this.toFiniteNumber(raw['pageSize'] ?? raw['PageSize'] ?? fallbackPageSize) || fallbackPageSize;
+    const totalCount = this.toFiniteNumber(
+      raw['totalCount'] ??
+      raw['TotalCount'] ??
+      raw['count'] ??
+      raw['Count'] ??
+      projects.length
+    );
+    const totalPages = this.toFiniteNumber(
+      raw['totalPages'] ??
+      raw['TotalPages'] ??
+      Math.ceil(totalCount / Math.max(pageSize, 1))
+    );
+
+    return {
+      data: projects,
+      pageNumber,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasPreviousPage: Boolean(raw['hasPreviousPage'] ?? raw['HasPreviousPage'] ?? pageNumber > 1),
+      hasNextPage: Boolean(raw['hasNextPage'] ?? raw['HasNextPage'] ?? pageNumber < totalPages),
+    };
+  }
+
+  private readProjectArray(raw: Record<string, unknown>): ProjectSummaryDto[] | null {
+    const candidates = [
+      raw['data'],
+      raw['Data'],
+      raw['items'],
+      raw['Items'],
+      raw['projects'],
+      raw['Projects'],
+      raw['result'],
+      raw['Result'],
+    ];
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate as ProjectSummaryDto[];
+      }
+    }
+
+    return null;
+  }
+
   private buildDashboardParams(filters: DashboardFilterParams): HttpParams {
     let params = new HttpParams();
     Object.entries(filters).forEach(([key, value]) => {
@@ -844,6 +998,8 @@ export class ProjectService {
       Phase: 'phase',
       ProjectType: 'projectType',
       ProjectManagementType: 'projectManagementType',
+      ProcessStatus: 'processStatus',
+      processStatus: 'processStatus',
       DepartmentId: 'departmentId',
       BusinessUnitId: 'businessUnitId',
       PlantId: 'plantId',
@@ -851,6 +1007,8 @@ export class ProjectService {
       incompleteOnly: 'incompleteOnly',
       DelayedOnly: 'delayedOnly',
       delayedOnly: 'delayedOnly',
+      ytd: 'ytd',
+      Ytd: 'ytd',
       all: 'all',
       All: 'all',
     };

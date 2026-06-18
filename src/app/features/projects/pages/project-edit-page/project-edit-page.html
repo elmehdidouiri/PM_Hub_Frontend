@@ -1,4 +1,5 @@
-<section class="project-edit-page pm-page-enter">
+<section class="project-edit-page pm-page-enter" [class.project-edit-page--details]="mode === 'details'"
+  [class.project-edit-page--edit]="mode === 'edit'">
 
   <div class="bg-decoration" aria-hidden="true">
 
@@ -16,29 +17,240 @@
 
       <span class="eyebrow">Governance Hub</span>
 
-      <h1>  {{ project.name }}</h1>
+      <h1>{{ project.name }}</h1>
 
     </div>
 
     <div class="header-actions">
 
+      <button type="button" class="btn btn--back" (click)="backToList()">
+        <mat-icon>arrow_back</mat-icon>
+        Back
+      </button>
+
       <button type="button" class="btn btn--allocation" [routerLink]="['/projects', project.id, 'allocations']">
         <mat-icon>query_stats</mat-icon>
-        Voir allocations
+        View allocations
       </button>
 
     </div>
 
   </header>
 
+  <section class="edit-overview" aria-label="Project overview">
+    <article class="overview-tile overview-tile--status">
+      <span>Status</span>
+      <strong>{{ getStatusLabel(project) }}</strong>
+      <small>{{ project.processStatusLabel || 'No process status' }}</small>
+    </article>
+
+    <article class="overview-tile">
+      <span>Phase</span>
+      <strong>{{ getPhaseLabel(project) }}</strong>
+      <small>{{ project.projectTypeLabel || 'No project type' }}</small>
+    </article>
+
+    <article class="overview-tile overview-tile--progress">
+      <span>Progress</span>
+      <strong>{{ project.progressPercentage || 0 }}%</strong>
+      <i>
+        <b [style.width.%]="project.progressPercentage || 0"></b>
+      </i>
+    </article>
+
+    <article class="overview-tile">
+      <span>Documents</span>
+      <strong>{{ getDocumentCompletionCount() }} / {{ requiredProjectFileTypes.length }}</strong>
+      <small>{{ getMissingProjectFileTypes().length ? 'Missing files to complete' : 'Complete package' }}</small>
+    </article>
+  </section>
+
 
 
   <div class="edit-grid">
-
-    
-
-    <!-- Section 1: STATUS & PHASE (PRIORITY) -->
-
+    <!-- Section: CORE IDENTITY -->
+    <section class="edit-section" [class.editing]="editingSection === 'identity'">
+      <div class="section-header">
+        <h2>
+          <mat-icon>fingerprint</mat-icon>
+          Core Identity
+        </h2>
+        <button type="button" class="btn btn--text" *ngIf="isAdmin && editingSection !== 'identity'"
+          (click)="toggleEdit('identity')">
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+      <div class="info-display" *ngIf="editingSection !== 'identity'">
+        <div class="info-item">
+          <label>Project Name</label>
+          <span>{{ project.name }}</span>
+        </div>
+        <div class="info-item">
+          <label>Description</label>
+          <span style="font-size: 0.85rem;">{{ project.description || '-' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Management Type</label>
+          <span>{{ project.projectManagementTypeLabel }}</span>
+        </div>
+        <div class="info-item">
+          <label>Project Type</label>
+          <span>{{ project.projectTypeLabel || '-' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Project Manager</label>
+          <span>{{ project.projectManagerName || '-' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Sponsor</label>
+          <span>{{ project.sponsor || '-' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Department Name</label>
+          <span>{{ project.departmentName }}</span>
+        </div>
+        <div class="info-item">
+          <label>Plant Name</label>
+          <span>{{ project.plantName || '-' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Parent Project</label>
+          <span>{{ project.parentProjectName || '-' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Cost Center</label>
+          <span>{{ project.costCenter || '-' }}</span>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+          <label>Business Units</label>
+          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
+            <span class="badge" *ngFor="let bu of project.businessUnits">{{ bu }}</span>
+            <span *ngIf="!project.businessUnits.length">-</span>
+          </div>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+          <label>Technologies</label>
+          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
+            <span class="badge" *ngFor="let t of project.technologies">{{ t }}</span>
+            <span *ngIf="!project.technologies.length">-</span>
+          </div>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+          <label>Solution Domains</label>
+          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
+            <span class="badge" *ngFor="let s of project.solutionDomains">{{ s }}</span>
+            <span *ngIf="!project.solutionDomains.length">-</span>
+          </div>
+        </div>
+      </div>
+      <form [formGroup]="identityForm" class="edit-form" *ngIf="editingSection === 'identity'">
+        <div class="form-grid">
+          <div class="field">
+            <label>Name *</label>
+            <input type="text" formControlName="name">
+          </div>
+          <div class="field" style="grid-column: span 2;">
+            <label>Description</label>
+            <textarea formControlName="description"></textarea>
+          </div>
+          <div class="field">
+            <label>Management Type *</label>
+            <select formControlName="projectManagementType">
+              <option *ngFor="let opt of projectManagementTypeOptions" [ngValue]="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Project Type *</label>
+            <select formControlName="projectType">
+              <option *ngFor="let opt of projectTypeOptions" [ngValue]="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Project Manager</label>
+            <select formControlName="projectManagerId">
+              <option [ngValue]="null">Select manager</option>
+              <option *ngFor="let opt of references.users" [value]="opt.id">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Sponsor</label>
+            <input type="text" formControlName="sponsor">
+          </div>
+          <div class="field">
+            <label>Department Name *</label>
+            <select formControlName="departmentId">
+              <option value="">Select department</option>
+              <option *ngFor="let opt of references.departments" [value]="opt.id">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Plant Name</label>
+            <select formControlName="plantName">
+              <option value="">Select plant</option>
+              <option *ngFor="let opt of references.plants" [value]="opt.label">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="field" *ngIf="showParentProjectField">
+            <label>Parent Project</label>
+            <select formControlName="parentProjectId">
+              <option [ngValue]="null">Select parent project</option>
+              <option *ngFor="let opt of availableParentProjects" [value]="opt.id">{{ opt.label }}</option>
+            </select>
+            <small *ngIf="parentProjectError()">{{ parentProjectError() }}</small>
+          </div>
+          <div class="field">
+            <label>Cost Center</label>
+            <input type="text" formControlName="costCenter">
+          </div>
+          <div class="field">
+            <label>Server/Host</label>
+            <input type="text" formControlName="serverHostName">
+          </div>
+          <div class="field tag-selector-field">
+            <label>Business Units</label>
+            <div class="tag-selector-grid">
+              <button type="button" class="tag-select-btn" *ngFor="let opt of references.businessUnits"
+                [class.tag-select-btn--active]="isOptionSelected('businessUnitIds', opt.id)"
+                (click)="toggleOption('businessUnitIds', opt.id)">
+                <mat-icon *ngIf="isOptionSelected('businessUnitIds', opt.id)">check</mat-icon>
+                {{ opt.label }}
+              </button>
+              <span *ngIf="!references.businessUnits.length" class="empty-copy">No business units available</span>
+            </div>
+          </div>
+          <div class="field tag-selector-field">
+            <label>Technologies</label>
+            <div class="tag-selector-grid">
+              <button type="button" class="tag-select-btn" *ngFor="let opt of references.technologies"
+                [class.tag-select-btn--active]="isOptionSelected('technologyIds', opt.id)"
+                (click)="toggleOption('technologyIds', opt.id)">
+                <mat-icon *ngIf="isOptionSelected('technologyIds', opt.id)">check</mat-icon>
+                {{ opt.label }}
+              </button>
+              <span *ngIf="!references.technologies.length" class="empty-copy">No technologies available</span>
+            </div>
+          </div>
+          <div class="field tag-selector-field">
+            <label>Solution Domains</label>
+            <div class="tag-selector-grid">
+              <button type="button" class="tag-select-btn" *ngFor="let opt of references.solutionDomains"
+                [class.tag-select-btn--active]="isOptionSelected('solutionDomainIds', opt.id)"
+                (click)="toggleOption('solutionDomainIds', opt.id)">
+                <mat-icon *ngIf="isOptionSelected('solutionDomainIds', opt.id)">check</mat-icon>
+                {{ opt.label }}
+              </button>
+              <span *ngIf="!references.solutionDomains.length" class="empty-copy">No solution domains available</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving || identityForm.invalid"
+            (click)="saveSection('identity')">Save Identity</button>
+        </div>
+      </form>
+    </section>
+    <!-- Section: EXECUTION STATE -->
     <section class="edit-section edit-section--primary" [class.editing]="editingSection === 'status'">
 
       <div class="section-header">
@@ -51,7 +263,7 @@
 
         </h2>
 
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'status'" (click)="toggleEdit('status')">
+        <button type="button" class="btn btn--text" *ngIf="isAdmin && editingSection !== 'status'" (click)="toggleEdit('status')">
 
           <mat-icon>edit</mat-icon>
 
@@ -141,7 +353,8 @@
 
             <select formControlName="processStatus">
 
-              <option *ngFor="let opt of processStatusOptions" [ngValue]="opt">{{ getEnumLabel(opt, ProcessStatus) }}</option>
+              <option *ngFor="let opt of processStatusOptions" [ngValue]="opt">{{ getEnumLabel(opt, ProcessStatus) }}
+              </option>
 
             </select>
 
@@ -161,7 +374,8 @@
 
           <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
 
-          <button type="button" class="btn btn--primary" [disabled]="isSaving || statusForm.invalid" (click)="saveSection('status')">
+          <button type="button" class="btn btn--primary" [disabled]="isSaving || statusForm.invalid"
+            (click)="saveSection('status')">
 
             {{ isSaving ? 'Saving...' : 'Save Changes' }}
 
@@ -172,487 +386,39 @@
       </form>
 
     </section>
-
-        <section class="edit-section">
-      <div class="section-header">
-        <h2>
-          <mat-icon style="color: #64748b;">info</mat-icon>
-          System Info & Alignment
-        </h2>
-      </div>
-      <div class="info-display">
-        <div class="info-item">
-          <div class="info-icon-wrapper"><mat-icon>star</mat-icon></div>
-          <div class="info-content">
-            <label>Strategic Score</label>
-            <span style="font-weight: 700; color: #0f172a;">{{ project.strategicScore }}</span>
-          </div>
-        </div>
-        <div class="info-item">
-          <div class="info-icon-wrapper"><mat-icon>category</mat-icon></div>
-          <div class="info-content">
-            <label>Strategic Category</label>
-            <span style="color: #0f172a; font-weight: 500;">{{ project.strategicCategory || '-' }}</span>
-          </div>
-        </div>
-        <div class="info-item">
-          <div class="info-icon-wrapper"><mat-icon>today</mat-icon></div>
-          <div class="info-content">
-            <label>Created At</label>
-            <span>{{ project.createdAt | date:'medium' }}</span>
-          </div>
-        </div>
-        <div class="info-item">
-          <div class="info-icon-wrapper"><mat-icon>update</mat-icon></div>
-          <div class="info-content">
-            <label>Updated At</label>
-            <span>{{ project.updatedAt ? (project.updatedAt | date:'medium') : '-' }}</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-
-
-    <!-- Section 2: IDENTITY -->
-
-    <section class="edit-section" [class.editing]="editingSection === 'identity'">
-
-      <div class="section-header">
-
-        <h2>
-
-          <mat-icon>fingerprint</mat-icon>
-
-          Core Identity
-
-        </h2>
-
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'identity'" (click)="toggleEdit('identity')">
-
-          <mat-icon>edit</mat-icon>
-
-        </button>
-
-      </div>
-
-
-
-      <div class="info-display" *ngIf="editingSection !== 'identity'">
-
-        <div class="info-item">
-
-          <label>Project Name</label>
-
-          <span>{{ project.name }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Description</label>
-
-          <span style="font-size: 0.85rem;">{{ project.description || '-' }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Management Type</label>
-
-          <span>{{ project.projectManagementTypeLabel }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Project Type</label>
-
-          <span>{{ project.projectTypeLabel || '-' }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Project Manager</label>
-
-          <span>{{ project.projectManagerName || '-' }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Sponsor</label>
-
-          <span>{{ project.sponsor || '-' }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Department Name</label>
-
-          <span>{{ project.departmentName }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Plant Name</label>
-
-          <span>{{ project.plantName || '-' }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Parent Project</label>
-
-          <span>{{ project.parentProjectName || '-' }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Cost Center</label>
-
-          <span>{{ project.costCenter || '-' }}</span>
-
-        </div>
-
-        <div class="info-item" style="grid-column: span 2;">
-
-          <label>Business Units</label>
-
-          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
-
-            <span class="badge" *ngFor="let bu of project.businessUnits">{{ bu }}</span>
-
-            <span *ngIf="!project.businessUnits.length">-</span>
-
-          </div>
-
-        </div>
-
-        <div class="info-item" style="grid-column: span 2;">
-
-          <label>Technologies</label>
-
-          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
-
-            <span class="badge" *ngFor="let t of project.technologies">{{ t }}</span>
-
-            <span *ngIf="!project.technologies.length">-</span>
-
-          </div>
-
-        </div>
-
-        <div class="info-item" style="grid-column: span 2;">
-
-          <label>Solution Domains</label>
-
-          <div class="chip-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem;">
-
-            <span class="badge" *ngFor="let s of project.solutionDomains">{{ s }}</span>
-
-            <span *ngIf="!project.solutionDomains.length">-</span>
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-
-      <form [formGroup]="identityForm" class="edit-form" *ngIf="editingSection === 'identity'">
-
-        <div class="form-grid">
-
-          <div class="field">
-
-            <label>Name *</label>
-
-            <input type="text" formControlName="name">
-
-          </div>
-
-          <div class="field" style="grid-column: span 2;">
-
-            <label>Description</label>
-
-            <textarea formControlName="description"></textarea>
-
-          </div>
-
-          <div class="field">
-
-            <label>Management Type *</label>
-
-            <select formControlName="projectManagementType">
-
-              <option *ngFor="let opt of projectManagementTypeOptions" [ngValue]="opt.value">{{ opt.label }}</option>
-
-            </select>
-
-          </div>
-
-          <div class="field">
-
-            <label>Project Type *</label>
-
-            <select formControlName="projectType">
-
-              <option *ngFor="let opt of projectTypeOptions" [ngValue]="opt.value">{{ opt.label }}</option>
-
-            </select>
-
-          </div>
-
-          <div class="field">
-
-            <label>Project Manager</label>
-
-            <select formControlName="projectManagerId">
-
-              <option [ngValue]="null">Select manager</option>
-
-              <option *ngFor="let opt of references.users" [value]="opt.id">{{ opt.label }}</option>
-
-            </select>
-
-          </div>
-
-          <div class="field">
-
-            <label>Sponsor</label>
-
-            <input type="text" formControlName="sponsor">
-
-          </div>
-
-          <div class="field">
-
-            <label>Department Name *</label>
-
-            <select formControlName="departmentId">
-
-              <option value="">Select department</option>
-
-              <option *ngFor="let opt of references.departments" [value]="opt.id">{{ opt.label }}</option>
-
-            </select>
-
-          </div>
-
-          <div class="field">
-
-            <label>Plant Name</label>
-
-            <select formControlName="plantName">
-
-              <option value="">Select plant</option>
-
-              <option *ngFor="let opt of references.plants" [value]="opt.label">{{ opt.label }}</option>
-
-            </select>
-
-          </div>
-
-          <div class="field" *ngIf="showParentProjectField">
-
-            <label>Parent Project</label>
-
-            <select formControlName="parentProjectId">
-
-              <option [ngValue]="null">Select parent project</option>
-
-              <option *ngFor="let opt of availableParentProjects" [value]="opt.id">{{ opt.label }}</option>
-
-            </select>
-
-            <small *ngIf="parentProjectError()">{{ parentProjectError() }}</small>
-
-          </div>
-
-          <div class="field">
-
-            <label>Cost Center</label>
-
-            <input type="text" formControlName="costCenter">
-
-          </div>
-
-          <div class="field">
-
-            <label>Server/Host</label>
-
-            <input type="text" formControlName="serverHostName">
-
-          </div>
-
-          <div class="field tag-selector-field">
-            <label>Business Units</label>
-            <div class="tag-selector-grid">
-              <button type="button" 
-                class="tag-select-btn" 
-                *ngFor="let opt of references.businessUnits"
-                [class.tag-select-btn--active]="isOptionSelected('businessUnitIds', opt.id)"
-                (click)="toggleOption('businessUnitIds', opt.id)">
-                <mat-icon *ngIf="isOptionSelected('businessUnitIds', opt.id)">check</mat-icon>
-                {{ opt.label }}
-              </button>
-              <span *ngIf="!references.businessUnits.length" class="empty-copy">No business units available</span>
-            </div>
-          </div>
-
-          <div class="field tag-selector-field">
-            <label>Technologies</label>
-            <div class="tag-selector-grid">
-              <button type="button" 
-                class="tag-select-btn" 
-                *ngFor="let opt of references.technologies"
-                [class.tag-select-btn--active]="isOptionSelected('technologyIds', opt.id)"
-                (click)="toggleOption('technologyIds', opt.id)">
-                <mat-icon *ngIf="isOptionSelected('technologyIds', opt.id)">check</mat-icon>
-                {{ opt.label }}
-              </button>
-              <span *ngIf="!references.technologies.length" class="empty-copy">No technologies available</span>
-            </div>
-          </div>
-
-          <div class="field tag-selector-field">
-            <label>Solution Domains</label>
-            <div class="tag-selector-grid">
-              <button type="button" 
-                class="tag-select-btn" 
-                *ngFor="let opt of references.solutionDomains"
-                [class.tag-select-btn--active]="isOptionSelected('solutionDomainIds', opt.id)"
-                (click)="toggleOption('solutionDomainIds', opt.id)">
-                <mat-icon *ngIf="isOptionSelected('solutionDomainIds', opt.id)">check</mat-icon>
-                {{ opt.label }}
-              </button>
-              <span *ngIf="!references.solutionDomains.length" class="empty-copy">No solution domains available</span>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="form-actions">
-
-          <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-
-          <button type="button" class="btn btn--primary" [disabled]="isSaving || identityForm.invalid" (click)="saveSection('identity')">Save Identity</button>
-
-        </div>
-
-      </form>
-
-    </section>
-
-
-
-    <!-- Section 3: TIMELINE -->
-
+    <!-- Section: TIMELINE & EFFORT -->
     <section class="edit-section" [class.editing]="editingSection === 'timeline'">
-
       <div class="section-header">
-
-        <h2>
-
-          <mat-icon>calendar_today</mat-icon>
-
-          Timeline & Effort
-
-        </h2>
-
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'timeline'" (click)="toggleEdit('timeline')">
-
-          <mat-icon>edit</mat-icon>
-
-        </button>
-
+        <h2><mat-icon>calendar_today</mat-icon> Timeline &amp; Effort</h2>
+        <button type="button" class="btn btn--text" *ngIf="isAdmin && editingSection !== 'timeline'"
+          (click)="toggleEdit('timeline')"><mat-icon>edit</mat-icon></button>
       </div>
-
-
-
       <div class="info-display" *ngIf="editingSection !== 'timeline'">
-
-        <div class="info-item">
-
-          <label>Start Date</label>
-
-          <span>{{ (project.startDate | date) || '-' }}</span>
-
+        <div class="info-item"><label>Start Date</label><span>{{ (project.startDate | date) || '-' }}</span></div>
+        <div class="info-item"><label>End Date</label><span>{{ (project.endDate | date) || '-' }}</span></div>
+        <div class="info-item"><label>Est. Due Date</label><span>{{ (project.estimatedDueDate | date) || '-' }}</span>
         </div>
-
-        <div class="info-item">
-
-          <label>End Date</label>
-
-          <span>{{ (project.endDate | date) || '-' }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Est. Due Date</label>
-
-          <span>{{ (project.estimatedDueDate | date) || '-' }}</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Est. Hours</label>
-
-          <span>{{ project.estimatedHours || 0 }}h</span>
-
-        </div>
-
-        <div class="info-item">
-
-          <label>Actual Hours</label>
-
-          <span>{{ project.actualHours || 0 }}h</span>
-
-        </div>
-
+        <div class="info-item"><label>Est. Hours</label><span>{{ project.estimatedHours || 0 }}h</span></div>
+        <div class="info-item"><label>Actual Hours</label><span>{{ project.actualHours || 0 }}h</span></div>
       </div>
-
-
-
       <form [formGroup]="timelineForm" class="edit-form" *ngIf="editingSection === 'timeline'">
-
         <div class="form-grid">
-
           <div class="field"><label>Start Date *</label><input type="date" formControlName="startDate"></div>
-
           <div class="field"><label>End Date</label><input type="date" formControlName="endDate"></div>
-
           <div class="field"><label>Est. Due Date</label><input type="date" formControlName="estimatedDueDate"></div>
-
-          <small *ngIf="timelineForm.errors?.['endDateInvalid']">Project end date must be strictly after the start date.</small>
-
-          <small *ngIf="timelineForm.errors?.['estimatedDateInvalid']">Estimated due date must be strictly after the start date.</small>
-
+          <small *ngIf="timelineForm.errors?.['endDateInvalid']">Project end date must be strictly after the start
+            date.</small>
+          <small *ngIf="timelineForm.errors?.['estimatedDateInvalid']">Estimated due date must be strictly after the
+            start date.</small>
           <div class="field"><label>Est. Hours</label><input type="number" formControlName="estimatedHours"></div>
-
           <div class="field"><label>Actual Hours</label><input type="number" formControlName="actualHours"></div>
-
         </div>
-
         <div class="form-actions">
-
           <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
-
-          <button type="button" class="btn btn--primary" [disabled]="isSaving || timelineForm.invalid" (click)="saveSection('timeline')">Save</button>
-
+          <button type="button" class="btn btn--primary" [disabled]="isSaving || timelineForm.invalid"
+            (click)="saveSection('timeline')">Save</button>
         </div>
-
       </form>
-
     </section>
 
 
@@ -665,17 +431,21 @@
 
         <h2><mat-icon>account_balance</mat-icon> Financial</h2>
 
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'financial'" (click)="toggleEdit('financial')"><mat-icon>edit</mat-icon></button>
+        <button type="button" class="btn btn--text" *ngIf="isAdmin && editingSection !== 'financial'"
+          (click)="toggleEdit('financial')"><mat-icon>edit</mat-icon></button>
 
       </div>
 
       <div class="info-display" *ngIf="editingSection !== 'financial'">
 
-        <div class="info-item"><label>Budget</label><span>{{ project.budget !== null && project.budget !== undefined ? (project.budget | number) : '-' }}</span></div>
+        <div class="info-item"><label>Budget</label><span>{{ project.budget !== null && project.budget !== undefined ?
+            (project.budget | number) : '-' }}</span></div>
 
-        <div class="info-item"><label>Cost Saving</label><span>{{ project.costSaving !== null && project.costSaving !== undefined ? (project.costSaving | number) : '-' }}</span></div>
+        <div class="info-item"><label>Cost Saving</label><span>{{ project.costSaving !== null && project.costSaving !==
+            undefined ? (project.costSaving | number) : '-' }}</span></div>
 
-        <div class="info-item"><label>Digital Contribution</label><span>{{ project.digitalContribution !== null && project.digitalContribution !== undefined ? (project.digitalContribution | number) : '-' }}</span></div>
+        <div class="info-item"><label>Digital Contribution</label><span>{{ project.digitalContribution !== null &&
+            project.digitalContribution !== undefined ? (project.digitalContribution | number) : '-' }}</span></div>
 
       </div>
 
@@ -687,7 +457,8 @@
 
           <div class="field"><label>Cost Saving</label><input type="number" formControlName="costSaving"></div>
 
-          <div class="field"><label>Digital Contribution</label><input type="number" formControlName="digitalContribution"></div>
+          <div class="field"><label>Digital Contribution</label><input type="number"
+              formControlName="digitalContribution"></div>
 
         </div>
 
@@ -695,7 +466,8 @@
 
           <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
 
-          <button type="button" class="btn btn--primary" [disabled]="isSaving || financialForm.invalid" (click)="saveSection('financial')">Save</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving || financialForm.invalid"
+            (click)="saveSection('financial')">Save</button>
 
         </div>
 
@@ -719,7 +491,8 @@
 
         </h2>
 
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'context'" (click)="toggleEdit('context')">
+        <button type="button" class="btn btn--text" *ngIf="isAdmin && editingSection !== 'context'"
+          (click)="toggleEdit('context')">
 
           <mat-icon>edit</mat-icon>
 
@@ -839,7 +612,7 @@
 
         </div>
 
-        
+
 
         <div class="field">
 
@@ -877,7 +650,8 @@
 
           <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
 
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('context')">Save Context</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('context')">Save
+            Context</button>
 
         </div>
 
@@ -891,7 +665,7 @@
 
     <section class="edit-section" [class.editing]="editingSection === 'team'">
 
-       <div class="section-header">
+      <div class="section-header">
 
         <h2>
 
@@ -901,7 +675,7 @@
 
         </h2>
 
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'team'" (click)="toggleEdit('team')">
+        <button type="button" class="btn btn--text" *ngIf="isAdmin && editingSection !== 'team'" (click)="toggleEdit('team')">
 
           <mat-icon>edit</mat-icon>
 
@@ -909,7 +683,7 @@
 
       </div>
 
-      
+
 
       <div class="info-display" *ngIf="editingSection !== 'team'">
 
@@ -942,7 +716,8 @@
         <!-- Section A: Regular Team Members -->
         <div class="draft-card" [formGroup]="memberDraft">
 
-          <h3 style="font-size: 0.9rem; font-weight: 750; color: #475569; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+          <h3
+            style="font-size: 0.9rem; font-weight: 750; color: #475569; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
             <mat-icon style="font-size: 1.15rem; width:1.15rem; height:1.15rem;">person</mat-icon>
             Add Regular Team Member
           </h3>
@@ -985,9 +760,14 @@
 
             <span>{{ getUserLabel(m.get('userId')?.value) }} - {{ m.get('role')?.value }}</span>
 
-            <button type="button" class="btn btn--text" (click)="removeTeamMember(i)" style="color: #ef4444;">
+            <button
+              type="button"
+              class="btn btn--text"
+              (click)="removeTeamMember(i)"
+              [disabled]="deletingTeamMemberIds.has(m.get('userId')?.value)"
+              style="color: #ef4444;">
 
-              <mat-icon>delete</mat-icon>
+              <mat-icon>{{ deletingTeamMemberIds.has(m.get('userId')?.value) ? 'hourglass_top' : 'delete' }}</mat-icon>
 
             </button>
 
@@ -999,7 +779,8 @@
         <!-- Section B: Intern Members -->
         <div class="draft-card" style="margin-top: 1.5rem;">
 
-          <h3 style="font-size: 0.9rem; font-weight: 750; color: #475569; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+          <h3
+            style="font-size: 0.9rem; font-weight: 750; color: #475569; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
             <mat-icon style="font-size: 1.15rem; width:1.15rem; height:1.15rem;">school</mat-icon>
             Add Intern Member
           </h3>
@@ -1008,15 +789,22 @@
 
             <div class="field">
 
-              <label>Intern Full Name</label>
+              <label>Intern</label>
 
-               <input type="text" [formControl]="internMemberDraft" placeholder="Type intern name...">
+              <select [formControl]="internMemberDraft" [disabled]="isLoadingInterns">
+                <option value="">{{ isLoadingInterns ? 'Loading interns...' : 'Select intern' }}</option>
+                <option *ngFor="let intern of getAvailableInterns()" [value]="intern.id">
+                  {{ intern.name }}{{ intern.roleName ? ' - ' + intern.roleName : '' }}
+                </option>
+              </select>
+
+              <small *ngIf="!isLoadingInterns && !getAvailableInterns().length">No intern available to add.</small>
 
             </div>
 
           </div>
 
-          <button type="button" class="btn btn--primary" (click)="addInternMember()">Add Intern</button>
+          <button type="button" class="btn btn--primary" (click)="addInternMember()" [disabled]="isLoadingInterns || !internMemberDraft.value">Add Intern</button>
 
         </div>
 
@@ -1043,7 +831,8 @@
 
           <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
 
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('team')">Update Team</button>
+          <button type="button" class="btn btn--primary" [class.is-loading]="isSaving" (click)="saveSection('team')">Update
+            Team</button>
 
         </div>
 
@@ -1055,7 +844,7 @@
 
     <section class="edit-section" [class.editing]="editingSection === 'budget'">
 
-       <div class="section-header">
+      <div class="section-header">
 
         <h2>
 
@@ -1065,7 +854,7 @@
 
         </h2>
 
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'budget'" (click)="toggleEdit('budget')">
+        <button type="button" class="btn btn--text" *ngIf="isAdmin && editingSection !== 'budget'" (click)="toggleEdit('budget')">
 
           <mat-icon>edit</mat-icon>
 
@@ -1139,7 +928,8 @@
 
           <div class="list-item" *ngFor="let b of budgetItems.controls; index as i" [formGroupName]="i">
 
-            <span>{{ b.get('itemName')?.value }} ({{ b.get('pricePerUnit')?.value }} x {{ b.get('quantity')?.value }})</span>
+            <span>{{ b.get('itemName')?.value }} ({{ b.get('pricePerUnit')?.value }} x {{ b.get('quantity')?.value
+              }})</span>
 
             <button type="button" class="btn btn--text" (click)="removeBudgetItem(i)" style="color: #ef4444;">
 
@@ -1157,7 +947,8 @@
 
           <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
 
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('budget')">Update Budget</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('budget')">Update
+            Budget</button>
 
         </div>
 
@@ -1169,7 +960,7 @@
 
     <section class="edit-section" [class.editing]="editingSection === 'strategic'">
 
-       <div class="section-header">
+      <div class="section-header">
 
         <h2>
 
@@ -1179,7 +970,8 @@
 
         </h2>
 
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'strategic'" (click)="toggleEdit('strategic')">
+        <button type="button" class="btn btn--text" *ngIf="isAdmin && editingSection !== 'strategic'"
+          (click)="toggleEdit('strategic')">
 
           <mat-icon>edit</mat-icon>
 
@@ -1191,21 +983,29 @@
 
       <div class="info-display" *ngIf="editingSection !== 'strategic'">
 
-        <div class="info-item"><label>Financial Impact</label><span>{{ getStrategicScore(project.strategicCriteria, 1) }}</span></div>
+        <div class="info-item"><label>Financial Impact</label><span>{{ getStrategicScore(project.strategicCriteria, 1)
+            }}</span></div>
 
-        <div class="info-item"><label>Customer Impact</label><span>{{ getStrategicScore(project.strategicCriteria, 2) }}</span></div>
+        <div class="info-item"><label>Customer Impact</label><span>{{ getStrategicScore(project.strategicCriteria, 2)
+            }}</span></div>
 
-        <div class="info-item"><label>Operational Efficiency</label><span>{{ getStrategicScore(project.strategicCriteria, 3) }}</span></div>
+        <div class="info-item"><label>Operational Efficiency</label><span>{{
+            getStrategicScore(project.strategicCriteria, 3) }}</span></div>
 
-        <div class="info-item"><label>Strategic Alignment</label><span>{{ getStrategicScore(project.strategicCriteria, 4) }}</span></div>
+        <div class="info-item"><label>Strategic Alignment</label><span>{{ getStrategicScore(project.strategicCriteria,
+            4) }}</span></div>
 
-        <div class="info-item"><label>Cross Functional</label><span>{{ getStrategicScore(project.strategicCriteria, 5) }}</span></div>
+        <div class="info-item"><label>Cross Functional</label><span>{{ getStrategicScore(project.strategicCriteria, 5)
+            }}</span></div>
 
-        <div class="info-item"><label>Innovation</label><span>{{ getStrategicScore(project.strategicCriteria, 6) }}</span></div>
+        <div class="info-item"><label>Innovation</label><span>{{ getStrategicScore(project.strategicCriteria, 6)
+            }}</span></div>
 
-        <div class="info-item"><label>Risk Mitigation</label><span>{{ getStrategicScore(project.strategicCriteria, 7) }}</span></div>
+        <div class="info-item"><label>Risk Mitigation</label><span>{{ getStrategicScore(project.strategicCriteria, 7)
+            }}</span></div>
 
-        <div class="info-item"><label>Sustainability ESG</label><span>{{ getStrategicScore(project.strategicCriteria, 8) }}</span></div>
+        <div class="info-item"><label>Sustainability ESG</label><span>{{ getStrategicScore(project.strategicCriteria, 8)
+            }}</span></div>
 
       </div>
 
@@ -1215,21 +1015,29 @@
 
         <div class="form-grid">
 
-          <div class="field"><label>Financial Impact (0-10)</label><input type="number" formControlName="financialImpact" min="0" max="10"></div>
+          <div class="field"><label>Financial Impact (0-10)</label><input type="number"
+              formControlName="financialImpact" min="0" max="10"></div>
 
-          <div class="field"><label>Customer Impact (0-10)</label><input type="number" formControlName="customerImpact" min="0" max="10"></div>
+          <div class="field"><label>Customer Impact (0-10)</label><input type="number" formControlName="customerImpact"
+              min="0" max="10"></div>
 
-          <div class="field"><label>Operational Efficiency (0-10)</label><input type="number" formControlName="operationalEfficiency" min="0" max="10"></div>
+          <div class="field"><label>Operational Efficiency (0-10)</label><input type="number"
+              formControlName="operationalEfficiency" min="0" max="10"></div>
 
-          <div class="field"><label>Strategic Alignment (0-10)</label><input type="number" formControlName="strategicAlignment" min="0" max="10"></div>
+          <div class="field"><label>Strategic Alignment (0-10)</label><input type="number"
+              formControlName="strategicAlignment" min="0" max="10"></div>
 
-          <div class="field"><label>Cross Functional Impact (0-10)</label><input type="number" formControlName="crossFunctionalImpact" min="0" max="10"></div>
+          <div class="field"><label>Cross Functional Impact (0-10)</label><input type="number"
+              formControlName="crossFunctionalImpact" min="0" max="10"></div>
 
-          <div class="field"><label>Innovation Digitalisation (0-10)</label><input type="number" formControlName="innovationDigitalisation" min="0" max="10"></div>
+          <div class="field"><label>Innovation Digitalisation (0-10)</label><input type="number"
+              formControlName="innovationDigitalisation" min="0" max="10"></div>
 
-          <div class="field"><label>Risk Mitigation Urgency (0-10)</label><input type="number" formControlName="riskMitigationUrgency" min="0" max="10"></div>
+          <div class="field"><label>Risk Mitigation Urgency (0-10)</label><input type="number"
+              formControlName="riskMitigationUrgency" min="0" max="10"></div>
 
-          <div class="field"><label>Sustainability ESG (0-10)</label><input type="number" formControlName="sustainabilityESG" min="0" max="10"></div>
+          <div class="field"><label>Sustainability ESG (0-10)</label><input type="number"
+              formControlName="sustainabilityESG" min="0" max="10"></div>
 
         </div>
 
@@ -1237,7 +1045,8 @@
 
           <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
 
-          <button type="button" class="btn btn--primary" [disabled]="isSaving || strategicForm.invalid" (click)="saveSection('strategic')">Save Strategy</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving || strategicForm.invalid"
+            (click)="saveSection('strategic')">Save Strategy</button>
 
         </div>
 
@@ -1247,47 +1056,9 @@
 
 
 
-    <!-- Section: DELIVERABLES (read-only list from API) -->
-
-    <section class="edit-section" style="column-span: all; display: block;">
-
-      <div class="section-header">
-
-        <h2><mat-icon>checklist</mat-icon> Deliverables</h2>
-
-      </div>
-
-      <div class="info-display" style="grid-template-columns: 1fr;">
-
-        <div class="list-grid">
-
-          <div class="list-item" *ngFor="let d of deliverables">
-
-            <div style="flex: 1;">
-
-              <div style="font-weight: 600;">{{ d.name || d.title || 'Deliverable' }}</div>
-
-              <div style="font-size: 0.8rem; color: #64748b;">{{ d.description || '' }}</div>
-
-            </div>
-
-            <span class="badge">{{ d.status || d.priority || '' }}</span>
-
-          </div>
-
-          <span *ngIf="!deliverables.length">-</span>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-
     <section class="edit-section" [class.editing]="editingSection === 'kpis'">
 
-       <div class="section-header">
+      <div class="section-header">
 
         <h2>
 
@@ -1297,7 +1068,7 @@
 
         </h2>
 
-        <button type="button" class="btn btn--text" *ngIf="editingSection !== 'kpis'" (click)="toggleEdit('kpis')">
+        <button type="button" class="btn btn--text" *ngIf="isAdmin && editingSection !== 'kpis'" (click)="toggleEdit('kpis')">
 
           <mat-icon>edit</mat-icon>
 
@@ -1317,7 +1088,8 @@
 
               <div style="font-weight: 600;">{{ k.name }}</div>
 
-              <div style="font-size: 0.8rem; color: #64748b;">Target: {{ k.targetValue }} | Current: {{ k.currentValue }}</div>
+              <div style="font-size: 0.8rem; color: #64748b;">Target: {{ k.targetValue }} | Current: {{ k.currentValue
+                }}</div>
 
             </div>
 
@@ -1345,7 +1117,8 @@
 
             <div class="field"><label>Est. Hours</label><input type="number" formControlName="estimatedHours"></div>
 
-            <div class="field" style="grid-column: span 2;"><label>Description</label><input type="text" formControlName="description"></div>
+            <div class="field" style="grid-column: span 2;"><label>Description</label><input type="text"
+                formControlName="description"></div>
 
           </div>
 
@@ -1363,11 +1136,13 @@
 
               <div style="font-weight: 600;">{{ k.get('name')?.value }}</div>
 
-              <div style="font-size: 0.8rem; color: #64748b;">Target: {{ k.get('targetValue')?.value }} | Hours: {{ k.get('estimatedHours')?.value || 0 }}h</div>
+              <div style="font-size: 0.8rem; color: #64748b;">Target: {{ k.get('targetValue')?.value }} | Hours: {{
+                k.get('estimatedHours')?.value || 0 }}h</div>
 
             </div>
 
-            <button type="button" class="btn btn--text" (click)="removeKpi(i)" style="color: #ef4444;"><mat-icon>delete</mat-icon></button>
+            <button type="button" class="btn btn--text" (click)="removeKpi(i)"
+              style="color: #ef4444;"><mat-icon>delete</mat-icon></button>
 
           </div>
 
@@ -1379,7 +1154,8 @@
 
           <button type="button" class="btn btn--secondary" (click)="cancelEdit()">Cancel</button>
 
-          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('kpis')">Save KPIs</button>
+          <button type="button" class="btn btn--primary" [disabled]="isSaving" (click)="saveSection('kpis')">Save
+            KPIs</button>
 
         </div>
 
@@ -1387,11 +1163,331 @@
 
     </section>
 
+    <!-- ══════════════════════ PROJECT FILES ══════════════════════ -->
+    <section class="edit-section" style="grid-column: span 2;">
 
+      <div class="section-header"
+        style="display:flex;justify-content:space-between;align-items:center;padding-bottom:.75rem;margin-bottom:1rem;border-bottom:1px solid #e2e8f0;">
+        <h2 style="margin:0;display:flex;align-items:center;gap:.5rem;">
+          <mat-icon>folder</mat-icon> Project Files
+        </h2>
+        <strong style="color:#475569;">{{ getDocumentCompletionCount() }} / {{ requiredProjectFileTypes.length
+          }}</strong>
+      </div>
 
+      <app-loading-spinner *ngIf="isLoadingFiles"></app-loading-spinner>
+      <p class="empty-copy" *ngIf="fileLoadError">{{ fileLoadError }}</p>
 
+      <ng-container *ngIf="!isLoadingFiles && !fileLoadError">
+        <div style="background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden;margin-bottom:.5rem;">
+          <i [style.width.%]="(getDocumentCompletionCount()/requiredProjectFileTypes.length)*100"
+            style="display:block;height:100%;background:#df6800;border-radius:3px;transition:width .3s;"></i>
+        </div>
+        <p *ngIf="getMissingProjectFileTypes().length" style="font-size:.85rem;color:#64748b;margin:0 0 1rem;">
+          Missing: {{ getMissingProjectFileTypes().join(', ') }}
+        </p>
+        <p *ngIf="!getMissingProjectFileTypes().length"
+          style="font-size:.85rem;color:#10b981;margin:0 0 1rem;font-weight:600;">
+          All required document types are available.
+        </p>
 
+        <div class="file-message-panel" *ngIf="isAdmin && (pendingProjectFileUpload || pendingProjectVersionUpload)">
+          <div class="file-message-panel__icon">
+            <mat-icon>{{ pendingProjectVersionUpload ? 'publish' : 'upload_file' }}</mat-icon>
+          </div>
 
+          <div class="file-message-panel__content">
+            <div class="file-message-panel__title">
+              <strong>
+                {{ pendingProjectVersionUpload ? 'New version ready to upload' : 'Document ready to upload' }}
+              </strong>
+              <span>{{ getPendingProjectFileName() }}</span>
+            </div>
+
+            <p>
+              {{ pendingProjectVersionUpload
+              ? 'Add a clear note for this version of ' + getPendingProjectFileTarget() + '.'
+              : 'Add a custom message for the file ' + getPendingProjectFileTarget() + '.' }}
+            </p>
+
+            <label for="projectFileMessage">Message / note</label>
+            <textarea id="projectFileMessage" [(ngModel)]="projectFileMessageDraft" rows="3"
+              placeholder="Example: version approved by the sponsor, final document, requested correction..."></textarea>
+
+            <div class="file-message-panel__actions">
+              <button type="button" class="btn btn--secondary" (click)="clearProjectFileMessage()">
+                Cancel
+              </button>
+              <button type="button" class="btn btn--primary" (click)="confirmProjectFileMessage()"
+                [disabled]="isConfirmingProjectFileMessage()">
+                <mat-icon>{{ isConfirmingProjectFileMessage() ? 'sync' : 'check' }}</mat-icon>
+                {{ pendingProjectVersionUpload ? 'Upload version' : 'Upload document' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;">
+          <tbody>
+            <ng-container *ngFor="let type of requiredProjectFileTypes">
+
+              <tr [class.file-row--missing]="!getFileByType(type.value)" style="border-bottom:1px solid #f1f5f9;">
+
+                <!-- Type -->
+                <td style="padding:.75rem;vertical-align:middle;width:160px;">
+                  <div style="display:flex;align-items:center;gap:.5rem;">
+                    <mat-icon [style.color]="getFileByType(type.value)?'#10b981':'#94a3b8'">
+                      {{ getFileByType(type.value) ? 'check_circle' : 'radio_button_unchecked' }}
+                    </mat-icon>
+                    <strong>{{ type.label }}</strong>
+                  </div>
+                </td>
+
+                <!-- Info -->
+                <td style="padding:.75rem;vertical-align:middle;">
+                  <ng-container *ngIf="getFileByType(type.value) as file; else missingTpl">
+                    <span style="font-weight:600;display:block;color:#1e293b;">{{ file.originalFileName }}</span>
+
+                    <div *ngIf="editingDescriptionFileId===file.id; else showDesc"
+                      style="display:flex;gap:.5rem;margin-top:.25rem;">
+                      <input type="text" [(ngModel)]="descriptionEditValue" (keyup.enter)="saveDescription(file)"
+                        (keyup.escape)="cancelEditingDescription()" placeholder="Description…"
+                        style="flex:1;padding:.25rem .5rem;font-size:.85rem;border:1px solid #cbd5e1;border-radius:4px;" />
+                      <button type="button" class="btn btn--primary" (click)="saveDescription(file)"
+                        [disabled]="isSavingDescription[file.id]" style="font-size:.75rem;padding:.25rem .5rem;">
+                        {{ isSavingDescription[file.id] ? '...' : 'Save' }}
+                      </button>
+                      <button type="button" class="btn btn--secondary" (click)="cancelEditingDescription()"
+                        style="font-size:.75rem;padding:.25rem .5rem;">Cancel</button>
+                    </div>
+
+                    <ng-template #showDesc>
+                      <span *ngIf="file.description?.trim()"
+                        style="display:block;font-size:.85rem;color:#64748b;margin-top:.15rem;">{{ file.description
+                        }}</span>
+                    </ng-template>
+
+                    <span style="display:block;font-size:.75rem;color:#94a3b8;margin-top:.25rem;">
+                      {{ file.fileSizeLabel || ((file.fileSize / 1024 | number:'1.0-1') + ' KB') }}
+                      &nbsp;|&nbsp;{{ (file.updatedAt || file.createdAt) | date:'dd MMM yyyy HH:mm' }}
+                    </span>
+                  </ng-container>
+                  <ng-template #missingTpl>
+                    <span style="color:#94a3b8;font-style:italic;font-size:.85rem;">Not provided</span>
+                  </ng-template>
+                </td>
+
+                <!-- Actions -->
+                <td style="padding:.75rem;vertical-align:middle;text-align:right;">
+                  <ng-container *ngIf="getFileByType(type.value) as file; else uploadTpl">
+                    <div style="display:flex;gap:.35rem;justify-content:flex-end;">
+                      <button type="button" class="btn btn--text" (click)="downloadFile(file)" title="Download"
+                        style="padding:.25rem;">
+                        <mat-icon>download</mat-icon>
+                      </button>
+
+                      <input type="file" #verInput style="display:none" (change)="onUploadNewVersion($event, file)"
+                        accept=".pdf,.xlsx,.docx,.pptx" />
+                      <button *ngIf="isAdmin" type="button" class="btn btn--text" (click)="verInput.click()"
+                        [disabled]="isUploadingVersion[file.id]" title="New version" style="padding:.25rem;">
+                        <mat-icon>{{ isUploadingVersion[file.id] ? 'sync' : 'publish' }}</mat-icon>
+                      </button>
+
+                      <button type="button" class="btn btn--text" *ngIf="isAdmin && editingDescriptionFileId!==file.id"
+                        (click)="startEditingDescription(file)" title="Edit description" style="padding:.25rem;">
+                        <mat-icon>edit</mat-icon>
+                      </button>
+
+                      <button type="button" class="btn btn--text" (click)="toggleVersionsHistory(file)" title="History"
+                        style="padding:.25rem;">
+                        <mat-icon>history</mat-icon>
+                      </button>
+
+                      <button *ngIf="isAdmin" type="button" class="btn btn--text" (click)="deleteFile(file)"
+                        [disabled]="isDeleting[file.id]" title="Delete" style="color:#ef4444;padding:.25rem;">
+                        <mat-icon>{{ isDeleting[file.id] ? 'sync' : 'delete' }}</mat-icon>
+                      </button>
+                    </div>
+                  </ng-container>
+
+                  <ng-template #uploadTpl>
+                    <ng-container *ngIf="isAdmin; else readonlyMissingFileTpl">
+                    <input type="file" #upInput style="display:none" (change)="onUploadFile($event, type.value)"
+                      accept=".pdf,.xlsx,.docx,.pptx" />
+                    <button type="button" class="btn btn--secondary" (click)="upInput.click()"
+                      [disabled]="isUploading[type.value]"
+                      style="font-size:.8rem;display:inline-flex;align-items:center;gap:.25rem;padding:.35rem .75rem;">
+                      <mat-icon style="font-size:1.1rem;width:1.1rem;height:1.1rem;">
+                        {{ isUploading[type.value] ? 'sync' : 'upload' }}
+                      </mat-icon>
+                      Upload
+                    </button>
+                    </ng-container>
+                    <ng-template #readonlyMissingFileTpl>
+                      <span style="color:#94a3b8;font-style:italic;font-size:.85rem;">Not provided</span>
+                    </ng-template>
+                  </ng-template>
+                </td>
+              </tr>
+
+              <!-- Version history expandable row -->
+              <tr *ngIf="getFileByType(type.value) as file">
+                <td colspan="3" *ngIf="expandedHistoryFileId===file.id" style="padding:.75rem;background:#f8fafc;">
+                  <h4 style="font-size:.85rem;font-weight:700;color:#475569;margin:0 0 .5rem;">
+                    Version archive history
+                  </h4>
+                  <app-loading-spinner *ngIf="isLoadingVersions[file.id]"></app-loading-spinner>
+                  <div *ngIf="!isLoadingVersions[file.id]" style="display:flex;flex-direction:column;gap:.5rem;">
+                    <div *ngFor="let ver of fileVersions[file.id]"
+                      style="display:flex;justify-content:space-between;align-items:center;padding:.5rem;background:#fff;border:1px solid #e2e8f0;border-radius:4px;">
+                      <div>
+                        <strong style="font-size:.8rem;">Version {{ ver.versionNumber }} : {{ ver.originalFileName
+                          }}</strong>
+                        <span *ngIf="ver.description?.trim()" style="display:block;font-size:.75rem;color:#64748b;">{{
+                          ver.description }}</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:.75rem;">
+                        <span style="font-size:.75rem;color:#94a3b8;">{{ ver.createdAt | date:'dd MMM yyyy HH:mm'
+                          }}</span>
+                        <button type="button" class="btn btn--text" (click)="downloadFile(ver)" style="padding:.25rem;">
+                          <mat-icon>download</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                    <p *ngIf="!fileVersions[file.id]?.length" style="font-size:.8rem;color:#94a3b8;font-style:italic;">
+                      No archived version yet.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+
+            </ng-container>
+          </tbody>
+        </table>
+      </ng-container>
+    </section>
+
+    <!-- ══════════════════════ PROJECT ALLOCATIONS ══════════════════════ -->
+    <section class="edit-section allocation-panel" style="grid-column: span 2;">
+
+      <div class="section-header"
+        style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;padding-bottom:.75rem;margin-bottom:1rem;border-bottom:1px solid #e2e8f0;">
+        <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;">
+          <h2 style="margin:0;display:flex;align-items:center;gap:.5rem;">
+            <mat-icon>query_stats</mat-icon> Project Allocations
+          </h2>
+          <span class="active-analysis-badge">
+            <span class="pulse-dot"></span>Active
+          </span>
+          <span
+            style="background:#fff7f0;color:#df6800;border:1px solid #ffd8bd;font-weight:700;font-size:11px;padding:2px 8px;border-radius:6px;">
+            {{ projectAllocations.length }} total rows
+          </span>
+        </div>
+        <div
+          style="display:flex;align-items:center;gap:.5rem;background:#f1f5f9;padding:.25rem .5rem;border-radius:6px;border:1px solid #cbd5e1;">
+          <mat-icon style="color:#64748b;">search</mat-icon>
+          <input type="search" [(ngModel)]="allocationSearch" (keyup.enter)="searchAllocations()"
+            placeholder="Search user"
+            style="border:none;background:transparent;outline:none;font-size:.85rem;width:150px;" />
+          <button type="button" class="btn btn--text" (click)="clearAllocationSearch()"
+            style="padding:.15rem;color:#64748b;">
+            <mat-icon style="font-size:1.15rem;width:1.15rem;height:1.15rem;">close</mat-icon>
+          </button>
+          <button type="button" class="btn btn--primary" (click)="searchAllocations()"
+            style="font-size:.75rem;padding:.25rem .5rem;">Search</button>
+        </div>
+      </div>
+
+      <app-loading-spinner *ngIf="isLoadingAllocations"></app-loading-spinner>
+      <p class="empty-copy" *ngIf="allocationLoadError">{{ allocationLoadError }}</p>
+
+      <ng-container *ngIf="!isLoadingAllocations && !allocationLoadError">
+        <!-- KPI mini-cards -->
+        <div
+          style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin-bottom:1.5rem;">
+          <div *ngFor="let kpi of [
+            {label:'Total hours',   value: getAllocationTotalHours()   | number:'1.0-2', suffix:'h'},
+            {label:'Contributors',  value: projectAllocations.length,                   suffix:''},
+            {label:'Average/user',  value: getAverageHoursPerContributor() | number:'1.0-2', suffix:'h'},
+            {label:'Worked days',   value: getAllocationWorkedDays()   | number:'1.0-2', suffix:''},
+            {label:'PM count',      value: getProjectManagerAllocationCount(),           suffix:''}
+          ]"
+            style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:.75rem;display:flex;flex-direction:column;">
+            <span style="font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">{{ kpi.label
+              }}</span>
+            <strong style="font-size:1.25rem;color:#1e293b;margin-top:.25rem;">{{ kpi.value }}{{ kpi.suffix }}</strong>
+          </div>
+        </div>
+
+        <ng-container *ngIf="projectAllocations.length; else noAllocTpl">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem;">
+
+            <!-- Team load ranking -->
+            <section style="display:flex;flex-direction:column;gap:.75rem;">
+              <div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:600;color:#475569;">
+                <span>Team load</span>
+                <strong>{{ getSortedAllocations().length }} people</strong>
+              </div>
+              <div *ngFor="let item of getSortedAllocations()"
+                style="display:flex;flex-direction:column;gap:.35rem;padding:.5rem;background:#fff;border:1px solid #f1f5f9;border-radius:6px;">
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                  <i
+                    style="width:28px;height:28px;border-radius:50%;background:#e2e8f0;display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;color:#475569;font-style:normal;">
+                    {{ getInitials(item.userName) }}
+                  </i>
+                  <div style="flex:1;">
+                    <strong style="font-size:.85rem;display:block;color:#1e293b;">{{ displayValue(item.userName)
+                      }}</strong>
+                    <span style="font-size:.75rem;color:#64748b;">{{ displayValue(item.role) }}</span>
+                  </div>
+                  <small *ngIf="item.isProjectManager"
+                    style="background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:10px;padding:1px 4px;border-radius:4px;">PM</small>
+                </div>
+                <div style="height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;">
+                  <i [style.width.%]="getAllocationShare(item)"
+                    style="display:block;height:100%;background:#df6800;border-radius:3px;"></i>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:.75rem;color:#64748b;">
+                  <strong>{{ item.totalHours | number:'1.0-2' }}h</strong>
+                  <span>{{ item.workedDays | number:'1.0-2' }} days</span>
+                  <span>{{ getDominantAllocationType(item) }}</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Activity mix -->
+            <section style="display:flex;flex-direction:column;gap:.75rem;">
+              <div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:600;color:#475569;">
+                <span>Activity mix</span>
+                <strong>{{ getAllocationCount() }} allocations</strong>
+              </div>
+              <div *ngFor="let item of getAllocationActivityBreakdown()"
+                style="display:flex;align-items:center;gap:.75rem;padding:.5rem;background:#fff;border:1px solid #f1f5f9;border-radius:6px;">
+                <mat-icon style="color:#df6800;">{{ item.icon }}</mat-icon>
+                <div style="flex:1;">
+                  <div
+                    style="display:flex;justify-content:space-between;font-size:.8rem;color:#1e293b;margin-bottom:.25rem;">
+                    <span>{{ item.label }}</span>
+                    <strong>{{ item.value | number:'1.0-2' }}h</strong>
+                  </div>
+                  <div style="height:4px;background:#f1f5f9;border-radius:2px;overflow:hidden;">
+                    <b [style.width.%]="getAllocationActivityShare(item.value)"
+                      style="display:block;height:100%;background:#df6800;border-radius:2px;"></b>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </ng-container>
+
+        <ng-template #noAllocTpl>
+          <p class="empty-copy">No allocations found for this project.</p>
+        </ng-template>
+      </ng-container>
+
+    </section>
 
   </div>
 

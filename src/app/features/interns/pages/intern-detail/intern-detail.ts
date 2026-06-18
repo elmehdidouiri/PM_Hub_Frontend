@@ -1,7 +1,8 @@
 import { ChangeDetectorRef, Component, NgZone, OnDestroy, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { Subscription } from 'rxjs';
+import { forkJoin, of, Subscription } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 import { InternDto } from '../../models/intern.models';
 import { InternService } from '../../services/intern';
@@ -28,6 +29,7 @@ export class InternDetail implements OnInit {
   private routeSubscription?: Subscription;
 
   intern: InternDto | null = null;
+  statisticCards: Array<{ label: string; value: string; note?: string }> = [];
   isLoading = false;
   errorMessage = '';
 
@@ -169,10 +171,16 @@ export class InternDetail implements OnInit {
     this.isLoading = true;
     this.errorMessage = '';
 
-    this.internService.getIntern(this.internId).subscribe({
-      next: (intern) => {
+    forkJoin({
+      intern: this.internService.getIntern(this.internId),
+      statistics: this.internService.getStatistics(this.internId).pipe(catchError(() => of(null))),
+      visualization: this.internService.getWorkVisualization(this.internId).pipe(catchError(() => of(null))),
+      periodStatistics: this.internService.getPeriodStatistics(this.internId).pipe(catchError(() => of(null))),
+    }).subscribe({
+      next: ({ intern, statistics, visualization, periodStatistics }) => {
         this.runUiUpdate(() => {
           this.intern = intern;
+          this.statisticCards = this.buildStatisticCards(statistics, visualization, periodStatistics);
           this.isLoading = false;
           if (!intern) {
             this.errorMessage = 'This intern could not be found from the current dataset.';
@@ -182,6 +190,7 @@ export class InternDetail implements OnInit {
       error: (error) => {
         this.runUiUpdate(() => {
           this.intern = null;
+          this.statisticCards = [];
           this.isLoading = false;
           this.errorMessage = this.extractErrorMessage(error, 'Unable to load intern details.');
         });
@@ -215,5 +224,58 @@ export class InternDetail implements OnInit {
     }
 
     return fallback;
+  }
+
+  private buildStatisticCards(statistics: unknown, visualization: unknown, periodStatistics: unknown): Array<{ label: string; value: string; note?: string }> {
+    const stats = this.asRecord(statistics);
+    const visual = this.asRecord(visualization);
+    const period = this.asRecord(periodStatistics);
+
+    const cards = [
+      {
+        label: 'Worked hours',
+        value: this.formatMetric(this.firstNumber(stats, visual, period, ['totalHours', 'hoursWorked', 'workedHours', 'TotalHours', 'HoursWorked'])),
+        note: 'Declared total',
+      },
+      {
+        label: 'Allocated hours',
+        value: this.formatMetric(this.firstNumber(stats, visual, period, ['allocatedHours', 'totalAllocatedHours', 'AllocatedHours'])),
+        note: 'Current allocation',
+      },
+      {
+        label: 'Remaining hours',
+        value: this.formatMetric(this.firstNumber(stats, visual, period, ['remainingHours', 'RemainingHours'])),
+        note: 'Estimated balance',
+      },
+      {
+        label: 'Projects',
+        value: this.formatMetric(this.firstNumber(stats, visual, period, ['projectCount', 'projectsCount', 'totalProjects', 'ProjectCount']), ''),
+        note: 'Assignments',
+      },
+    ];
+
+    return cards.filter((card) => card.value !== '-');
+  }
+
+  private firstNumber(...args: [Record<string, unknown>, Record<string, unknown>, Record<string, unknown>, string[]]): number | null {
+    const [a, b, c, keys] = args;
+    for (const source of [a, b, c]) {
+      for (const key of keys) {
+        const value = source[key];
+        const parsed = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+    }
+    return null;
+  }
+
+  private formatMetric(value: number | null, suffix = ' h'): string {
+    return value === null ? '-' : `${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}${suffix}`;
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   }
 }

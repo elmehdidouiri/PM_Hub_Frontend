@@ -1,11 +1,11 @@
 <section class="project-allocations-page pm-page-enter">
   <header class="allocations-header">
-    <button type="button" class="icon-button" (click)="backToProject()" aria-label="Retour au projet">
+    <button type="button" class="icon-button" (click)="backToProject()" aria-label="Back to project">
       <mat-icon>west</mat-icon>
     </button>
 
     <div class="allocations-header__title">
-      <span>Allocations projet</span>
+      <span>Project allocations</span>
       <h1>{{ project?.name || 'Project' }}</h1>
     </div>
 
@@ -15,13 +15,13 @@
         type="search"
         [(ngModel)]="search"
         (keyup.enter)="reload()"
-        placeholder="Rechercher une personne"
-        aria-label="Rechercher une personne"
+        placeholder="Search a person"
+        aria-label="Search a person"
       />
-      <button type="button" class="icon-button icon-button--small" (click)="clearSearch()" aria-label="Effacer">
+      <button type="button" class="icon-button icon-button--small" (click)="clearSearch()" aria-label="Clear">
         <mat-icon>close</mat-icon>
       </button>
-      <button type="button" class="search-submit" (click)="reload()">Rechercher</button>
+      <button type="button" class="search-submit" (click)="reload()">Search</button>
     </div>
   </header>
 
@@ -31,19 +31,19 @@
   <ng-container *ngIf="!isLoading && !errorMessage">
     <section class="kpi-grid">
       <article>
-        <span>Total heures</span>
+        <span>Total hours</span>
         <strong>{{ totalHours | number:'1.0-2' }}h</strong>
       </article>
       <article>
-        <span>Contributeurs</span>
+        <span>Contributors</span>
         <strong>{{ allocations.length }}</strong>
       </article>
       <article>
-        <span>Moyenne / personne</span>
+        <span>Average / person</span>
         <strong>{{ averageHours | number:'1.0-2' }}h</strong>
       </article>
       <article>
-        <span>Jours travaillés</span>
+        <span>Worked days</span>
         <strong>{{ workedDays | number:'1.0-2' }}</strong>
       </article>
       <article>
@@ -55,8 +55,8 @@
     <section class="insight-grid" *ngIf="allocations.length; else noAllocations">
       <article class="panel panel--wide">
         <div class="panel-title">
-          <span>Qui a alloué quoi</span>
-          <strong>{{ sortedAllocations.length }} personnes</strong>
+          <span>Who allocated what</span>
+          <strong>{{ sortedAllocations.length }} people</strong>
         </div>
 
         <div class="person-list">
@@ -76,7 +76,7 @@
 
             <div class="person-row__facts">
               <span><b>{{ item.totalHours | number:'1.0-2' }}h</b> total</span>
-              <span>{{ item.workedDays | number:'1.0-2' }} jours</span>
+              <span>{{ item.workedDays | number:'1.0-2' }} days</span>
               <span>{{ item.allocationCount }} allocations</span>
               <span>{{ getDominantActivity(item) }}</span>
             </div>
@@ -96,7 +96,7 @@
 
       <article class="panel">
         <div class="panel-title">
-          <span>Comment les heures sont utilisées</span>
+          <span>How hours are used</span>
           <strong>{{ activityBreakdown.length }} types</strong>
         </div>
 
@@ -117,6 +117,6 @@
   </ng-container>
 
   <ng-template #noAllocations>
-    <p class="empty-state">Aucune allocation trouvée pour ce projet.</p>
+    <p class="empty-state">No allocation found for this project.</p>
   </ng-template>
 </section>

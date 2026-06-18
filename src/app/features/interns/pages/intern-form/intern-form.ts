@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
@@ -24,6 +24,7 @@ export class InternForm implements OnInit {
   private readonly rolesApi = inject(RolesApiService);
   private readonly usersApi = inject(UsersApiService);
   private readonly notifications = inject(NotificationService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly form = this.formBuilder.nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(120)]],
@@ -100,12 +101,14 @@ export class InternForm implements OnInit {
     request$.subscribe({
       next: () => {
         this.isSubmitting = false;
+        this.cdr.detectChanges();
         this.notifications.showSuccess(this.isEditMode ? 'Intern updated successfully.' : 'Intern created successfully.');
         void this.router.navigate(['/interns']);
       },
       error: (error) => {
         this.isSubmitting = false;
         this.notifications.showError(this.extractErrorMessage(error, 'Unable to save intern.'));
+        this.cdr.detectChanges();
       },
     });
   }
@@ -126,6 +129,7 @@ export class InternForm implements OnInit {
   private loadFormData(): void {
     this.isLoading = true;
     this.errorMessage = '';
+    this.cdr.detectChanges();
 
     forkJoin({
       roles: this.rolesApi.getRoles(),
@@ -152,10 +156,12 @@ export class InternForm implements OnInit {
         }
 
         this.isLoading = false;
+        this.cdr.detectChanges();
       },
       error: (error) => {
         this.isLoading = false;
         this.errorMessage = this.extractErrorMessage(error, 'Unable to load intern references.');
+        this.cdr.detectChanges();
       },
     });
   }

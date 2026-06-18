@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
-import { catchError, finalize, of } from 'rxjs';
+import { catchError, finalize, forkJoin, of } from 'rxjs';
 
 import {
   AllocationFrequency,
@@ -11,6 +11,8 @@ import {
   CategoryWork,
   CreateHourEntryDto,
   DateSelectionMode,
+  HourEntryDto,
+  HourEntryUpdateDto,
   InternSupervisionDto,
   ProjectInternAllocationDto,
   resolveMyProjectOption,
@@ -45,14 +47,14 @@ export class HourEntry implements OnInit {
   readonly dateSelectionModeOptions = [
     { value: DateSelectionMode.SingleDay, label: 'Single day' },
     { value: DateSelectionMode.MultipleDays, label: 'Multiple days' },
-    { value: DateSelectionMode.WeekRange, label: 'Week range' },
+    { value: DateSelectionMode.WeekRange, label: 'Weekly range' },
   ];
 
   readonly categoryOptions = [
     { value: CategoryWork.Project,      label: 'Project' },
     { value: CategoryWork.Holiday,       label: 'Holiday' },
     { value: CategoryWork.Other,        label: 'Other' },
-    { value: CategoryWork.MonthlyMeeting, label: 'Monthly Meeting' },
+    { value: CategoryWork.MonthlyMeeting, label: 'Monthly meeting' },
     { value: CategoryWork.Workshop,     label: 'Workshop' },
 
   ];
@@ -70,8 +72,14 @@ export class HourEntry implements OnInit {
   isLoadingProjects = true;
   isLoadingInterns = true;
   isSubmitting = false;
+  isLoadingRecentEntries = true;
+  isLoadingMonthlyDashboard = true;
   projectsError = '';
   internsError = '';
+  recentEntriesError = '';
+  recentEntries: HourEntryDto[] = [];
+  monthlyDashboard: HourEntryMonthlyFocus | null = null;
+  editingEntryId: string | null = null;
 
   totalHours = 0;
   overtimeWarning = false;
@@ -111,6 +119,7 @@ export class HourEntry implements OnInit {
 
     this.loadProjects();
     this.loadSupervisedInterns();
+    this.loadRecentEntries();
   }
 
   /** Returns true when full project-work form should be shown */
@@ -150,6 +159,105 @@ export class HourEntry implements OnInit {
 
   get canSaveInternDraft(): boolean {
     return !!this.selectedInternAllocationId && this.internDraftHours > 0;
+  }
+
+  get monthLoggedHours(): number {
+    const dashboardHours = this.monthlyDashboard?.loggedHours;
+    if (typeof dashboardHours === 'number' && Number.isFinite(dashboardHours)) {
+      return dashboardHours;
+    }
+
+    return this.recentEntries.reduce((total, entry) => total + (entry.totalHours ?? this.sumEntryHours(entry)), 0);
+  }
+
+  get monthTargetHours(): number {
+    return this.monthlyDashboard?.targetHours ?? 160;
+  }
+
+  get monthRemainingHours(): number {
+    return Math.max(0, this.monthTargetHours - this.monthLoggedHours);
+  }
+
+  get monthProgressPercent(): number {
+    if (this.monthTargetHours <= 0) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(100, (this.monthLoggedHours / this.monthTargetHours) * 100));
+  }
+
+  get monthDailyNeeded(): number {
+    const dashboardDailyNeeded = this.monthlyDashboard?.dailyNeeded;
+    if (typeof dashboardDailyNeeded === 'number' && Number.isFinite(dashboardDailyNeeded)) {
+      return Math.max(0, dashboardDailyNeeded);
+    }
+
+    return this.monthRemainingHours / Math.max(1, this.workingDaysLeftInMonth());
+  }
+
+  get monthStatusLabel(): string {
+    if (this.monthlyDashboard?.status) {
+      return this.monthlyDashboard.status;
+    }
+
+    if (this.monthProgressPercent >= 100) {
+      return 'Target reached';
+    }
+
+    if (this.monthProgressPercent >= 75) {
+      return 'Strong pace';
+    }
+
+    if (this.monthProgressPercent >= 45) {
+      return 'Keep pushing';
+    }
+
+    return 'Needs focus';
+  }
+
+  get monthStatusIcon(): string {
+    if (this.monthProgressPercent >= 100) {
+      return 'verified';
+    }
+
+    if (this.monthProgressPercent >= 75) {
+      return 'trending_up';
+    }
+
+    if (this.monthProgressPercent >= 45) {
+      return 'speed';
+    }
+
+    return 'flag';
+  }
+
+  get selectedEntryPreview(): HourEntryDto | null {
+    if (!this.editingEntryId) {
+      return null;
+    }
+
+    return this.recentEntries.find((entry) => entry.id === this.editingEntryId) ?? null;
+  }
+
+  get recentProjectCount(): number {
+    return new Set(this.recentEntries.map((entry) => entry.projectName || 'Non-project activity')).size;
+  }
+
+  get productiveDayCount(): number {
+    return new Set(this.recentEntries.map((entry) => entry.date).filter(Boolean)).size;
+  }
+
+  get topProjectEntries(): ProjectHourFocus[] {
+    const totals = this.recentEntries.reduce<Map<string, ProjectHourFocus>>((accumulator, entry) => {
+      const label = entry.projectName || 'Non-project activity';
+      const current = accumulator.get(label) ?? { label, hours: 0, entries: 0 };
+      current.hours += entry.totalHours ?? this.sumEntryHours(entry);
+      current.entries += 1;
+      accumulator.set(label, current);
+      return accumulator;
+    }, new Map<string, ProjectHourFocus>());
+
+    return [...totals.values()].sort((a, b) => b.hours - a.hours).slice(0, 4);
   }
 
   // Filter out weekends
@@ -240,8 +348,11 @@ export class HourEntry implements OnInit {
     };
 
     this.isSubmitting = true;
-    this.hours
-      .createEntry(payload)
+    const request$ = this.editingEntryId
+      ? this.hours.updateEntry(this.editingEntryId, this.toUpdatePayload(payload))
+      : this.hours.createEntry(payload);
+
+    request$
       .pipe(
         finalize(() => {
           this.zone.run(() => {
@@ -260,8 +371,9 @@ export class HourEntry implements OnInit {
             return;
           }
           this.zone.run(() => {
-            this.notifications.showSuccess('Hours saved successfully.');
+            this.notifications.showSuccess(this.editingEntryId ? 'Hours updated successfully.' : 'Hours saved successfully.');
             this.resetForm();
+            this.loadRecentEntries();
             this.cdr.markForCheck();
           });
         },
@@ -352,8 +464,8 @@ export class HourEntry implements OnInit {
     if (!intern) return;
 
     const data: ConfirmationDialogData = {
-      title: 'Remove Intern Supervision',
-      message: `Are you sure you want to remove the supervision hours for ${intern.internName}?`,
+      title: 'Remove intern supervision',
+      message: `Do you really want to remove supervision hours for ${intern.internName}?`,
       icon: 'person_remove',
       saveLabel: 'Remove',
       saveColor: 'warn',
@@ -370,6 +482,125 @@ export class HourEntry implements OnInit {
         this.executeRemoveIntern(internAllocationId);
       }
     });
+  }
+
+  editEntry(entry: HourEntryDto): void {
+    if (!entry.id) {
+      return;
+    }
+
+    this.editingEntryId = entry.id;
+    this.selectedDatesList = [];
+    this.selectedInterns = [];
+    this.selectedInternAllocationId = '';
+    this.internDraftHours = 0;
+    this.editingInternAllocationId = null;
+
+    const entryDate = this.parseDate(entry.date);
+    this.form.patchValue({
+      projectId: entry.projectId ?? '',
+      allocationFrequency: AllocationFrequency.Daily,
+      dateSelectionMode: DateSelectionMode.SingleDay,
+      date: entryDate,
+      selectedDatesText: '',
+      rangeStartDate: '',
+      rangeEndDate: '',
+      category: entry.projectId ? CategoryWork.Project : CategoryWork.Other,
+      activityNote: '',
+      bookingType: entry.bookingType ?? BookingType.Normal,
+      executionHours: entry.executionHours ?? 0,
+      technicalSupervisionHours: entry.supervisionHours ?? 0,
+      processRelatedHours: entry.processHours ?? 0,
+      projectManagementHours: entry.managementHours ?? 0,
+      researchAndDevHours: entry.rAndDHours ?? 0,
+      workshopHours: entry.workshopHours ?? 0,
+      otherActivitiesHours: entry.otherHours ?? 0,
+      internManagementHours: entry.internManagementHours ?? 0,
+      simpleTotalHours: entry.totalHours ?? 0,
+      notes: entry.notes ?? '',
+    });
+
+    this.computeTotals();
+    this.cdr.markForCheck();
+
+    queueMicrotask(() => {
+      document.querySelector('.editor-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  cancelEdit(): void {
+    this.resetForm();
+    this.cdr.markForCheck();
+  }
+
+  deleteEntry(entry: HourEntryDto): void {
+    if (!entry.id) {
+      return;
+    }
+
+    const data: ConfirmationDialogData = {
+      title: 'Delete entry',
+      message: `Do you really want to delete this ${this.formatEntryHours(entry)} entry?`,
+      icon: 'delete',
+      saveLabel: 'Delete',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result !== 'save') {
+        return;
+      }
+
+      this.hours.deleteEntry(entry.id).subscribe({
+        next: () => {
+          this.notifications.showSuccess('Entry deleted successfully.');
+          if (this.editingEntryId === entry.id) {
+            this.resetForm();
+          }
+          this.loadRecentEntries();
+        },
+        error: (err) => this.notifications.showError(this.extractApiError(err)),
+      });
+    });
+  }
+
+  formatEntryDate(value?: string): string {
+    if (!value) {
+      return '-';
+    }
+
+    const date = new Date(value.includes('T') ? value : `${value}T00:00:00`);
+    return Number.isNaN(date.getTime())
+      ? value
+      : new Intl.DateTimeFormat('en-US', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+  }
+
+  formatEntryHours(entry: HourEntryDto): string {
+    const hours = entry.totalHours ?? this.sumEntryHours(entry);
+    return `${hours.toLocaleString('en-US', { maximumFractionDigits: 2 })} h`;
+  }
+
+  getEntryBreakdown(entry: HourEntryDto): string {
+    const parts = [
+      ['Execution', entry.executionHours],
+      ['Supervision', entry.supervisionHours],
+      ['Process', entry.processHours],
+      ['Management', entry.managementHours],
+      ['R&D', entry.rAndDHours],
+      ['Workshop', entry.workshopHours],
+      ['Other', entry.otherHours],
+      ['Interns', entry.internManagementHours],
+    ]
+      .filter(([, value]) => Number(value) > 0)
+      .map(([label, value]) => `${label}: ${Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 })}h`);
+
+    return parts.length ? parts.join(' | ') : 'No detailed split';
   }
 
   private executeRemoveIntern(internAllocationId: string): void {
@@ -439,6 +670,37 @@ export class HourEntry implements OnInit {
           this.selectedInterns = [];
           this.cdr.markForCheck();
         });
+      });
+  }
+
+  private loadRecentEntries(): void {
+    const today = new Date();
+    this.isLoadingRecentEntries = true;
+    this.isLoadingMonthlyDashboard = true;
+    this.recentEntriesError = '';
+
+    forkJoin({
+      entries: this.hours.myEntriesByMonth(today.getFullYear(), today.getMonth() + 1).pipe(
+        catchError(() => {
+          this.recentEntriesError = 'Unable to load your recent entries.';
+          return of([] as HourEntryDto[]);
+        })
+      ),
+      dashboard: this.hours.dashboardMonthly(today.getFullYear(), today.getMonth() + 1).pipe(catchError(() => of(null))),
+    })
+      .pipe(
+        finalize(() => {
+          this.isLoadingRecentEntries = false;
+          this.isLoadingMonthlyDashboard = false;
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe(({ entries, dashboard }) => {
+        this.recentEntries = [...entries].sort((a, b) =>
+          String(b.date ?? b.createdAt ?? '').localeCompare(String(a.date ?? a.createdAt ?? ''))
+        );
+        this.monthlyDashboard = this.mapMonthlyFocus(dashboard);
+        this.cdr.markForCheck();
       });
   }
 
@@ -562,7 +824,7 @@ export class HourEntry implements OnInit {
       if (typeof err.message === 'string' && err.message.trim()) {
         return err.message.trim();
       }
-      return `Request failed with status ${err.status}`;
+      return `The request failed with status ${err.status}`;
     }
 
     if (err instanceof Error && err.message.trim()) {
@@ -599,9 +861,99 @@ export class HourEntry implements OnInit {
     this.selectedInternAllocationId = '';
     this.internDraftHours = 0;
     this.editingInternAllocationId = null;
+    this.editingEntryId = null;
     this.totalHours = 0;
     this.overtimeWarning = false;
     this.totalOver24 = false;
+  }
+
+  private toUpdatePayload(payload: CreateHourEntryDto): HourEntryUpdateDto {
+    return {
+      bookingType: payload.bookingType,
+      executionHours: payload.executionHours,
+      supervisionHours: payload.technicalSupervisionHours,
+      processHours: payload.processRelatedHours,
+      managementHours: payload.projectManagementHours,
+      rAndDHours: payload.researchAndDevHours,
+      workshopHours: payload.workshopHours,
+      otherHours: this.isProjectWorkMode ? payload.otherActivitiesHours : (payload.totalHours ?? 0),
+      notes: payload.notes,
+    };
+  }
+
+  private parseDate(value?: string): Date {
+    if (!value) {
+      return new Date();
+    }
+
+    const date = new Date(value.includes('T') ? value : `${value}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? new Date() : date;
+  }
+
+  private sumEntryHours(entry: HourEntryDto): number {
+    return [
+      entry.executionHours,
+      entry.supervisionHours,
+      entry.processHours,
+      entry.managementHours,
+      entry.rAndDHours,
+      entry.workshopHours,
+      entry.otherHours,
+      entry.internManagementHours,
+    ].reduce<number>((sum, value) => sum + (Number(value) || 0), 0);
+  }
+
+  private mapMonthlyFocus(source: unknown): HourEntryMonthlyFocus | null {
+    if (!source || typeof source !== 'object') {
+      return null;
+    }
+
+    const record = source as Record<string, unknown>;
+    return {
+      loggedHours: this.pickNumber(record, ['loggedHours', 'LoggedHours', 'totalHours', 'TotalHours']),
+      targetHours: this.pickNumber(record, ['targetHours', 'TargetHours', 'monthlyTargetHours', 'MonthlyTargetHours']),
+      dailyNeeded: this.pickNumber(record, ['dailyNeeded', 'DailyNeeded']),
+      status: this.pickText(record, ['status', 'Status', 'performanceStatus', 'PerformanceStatus']),
+    };
+  }
+
+  private pickNumber(record: Record<string, unknown>, keys: string[]): number | null {
+    for (const key of keys) {
+      const parsed = this.toNullableNumber(record[key]);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+
+    return null;
+  }
+
+  private pickText(record: Record<string, unknown>, keys: string[]): string | null {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    return null;
+  }
+
+  private workingDaysLeftInMonth(): number {
+    const today = new Date();
+    const cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    let count = 0;
+
+    while (cursor <= end) {
+      const day = cursor.getDay();
+      if (day !== 0 && day !== 6) {
+        count += 1;
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return count;
   }
 
   private mapInternOption(row: unknown): SupervisedInternOption | null {
@@ -668,4 +1020,17 @@ interface SupervisedInternSelection extends InternSupervisionDto {
   allocatedHours: number | null;
   hoursWorked: number | null;
   remainingHours: number | null;
+}
+
+interface HourEntryMonthlyFocus {
+  loggedHours: number | null;
+  targetHours: number | null;
+  dailyNeeded: number | null;
+  status: string | null;
+}
+
+interface ProjectHourFocus {
+  label: string;
+  hours: number;
+  entries: number;
 }

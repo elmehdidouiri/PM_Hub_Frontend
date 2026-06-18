@@ -71,6 +71,22 @@
         </div>
 
         <div class="filter-actions">
+          <button
+            type="button"
+            class="booking-preview-btn"
+            [disabled]="isLoadingBookingHoursPreview"
+            (click)="loadBookingHoursPreview()">
+            <mat-icon>visibility</mat-icon>
+            {{ isLoadingBookingHoursPreview ? 'Loading...' : 'Preview' }}
+          </button>
+          <button
+            type="button"
+            class="booking-export-btn"
+            [disabled]="isExportingBookingHours"
+            (click)="exportProjectBookingHours()">
+            <mat-icon>download</mat-icon>
+            {{ isExportingBookingHours ? 'Exporting...' : 'Export Excel' }}
+          </button>
           <button type="button" class="advanced-filters-toggle" [class.active]="showAdvancedFilters" (click)="showAdvancedFilters = !showAdvancedFilters">
             <mat-icon>{{ showAdvancedFilters ? 'expand_less' : 'tune' }}</mat-icon>
             {{ showAdvancedFilters ? 'Less' : 'More' }}
@@ -115,6 +131,93 @@
       <mat-icon>check_circle</mat-icon>
       <span>{{ successMessage }}</span>
     </div>
+
+    <section class="panel booking-preview-panel">
+      <header class="panel__header">
+        <div>
+          <mat-icon>table_view</mat-icon>
+          <strong>Projects Booking Hours</strong>
+        </div>
+        <div class="panel__actions">
+          <button
+            type="button"
+            class="export-table-btn"
+            [disabled]="isExportingBookingHours"
+            (click)="exportProjectBookingHours()">
+            <mat-icon>download</mat-icon>
+            {{ isExportingBookingHours ? 'Exporting...' : 'Export Excel' }}
+          </button>
+          <div class="panel__chips">
+            <span><mat-icon>calendar_month</mat-icon> {{ headerPeriodLabel }}</span>
+            <span><mat-icon>folder</mat-icon> {{ bookingHoursTotalCount }} booked projects</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="booking-preview-loading" *ngIf="isLoadingBookingHoursPreview">
+        <mat-icon>hourglass_empty</mat-icon>
+        <span>Loading preview...</span>
+      </div>
+
+      <div class="table-wrap" *ngIf="!isLoadingBookingHoursPreview">
+        <table>
+          <thead>
+            <tr>
+              <th>Projects</th>
+              <th>Phase</th>
+              <th>Estimated Hours</th>
+              <th>Departement</th>
+              <th>Sponsor</th>
+              <th>Cost Center</th>
+              <th>{{ bookingHoursTotalHeader }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of pagedBookingHoursPreview; trackBy: trackByBookingHoursProject">
+              <td><mat-icon>folder_open</mat-icon>{{ row.project }}</td>
+              <td><span class="soft-pill">{{ row.phase || '-' }}</span></td>
+              <td>{{ formatNumber(row.estimatedHours) }}</td>
+              <td>{{ row.department || '-' }}</td>
+              <td>{{ row.sponsor || '-' }}</td>
+              <td>{{ row.costCenter || '-' }}</td>
+              <td><span class="total-badge">{{ formatHours(row.totalBookingHours) }}</span></td>
+            </tr>
+            <tr *ngIf="!bookingHoursTotalCount">
+              <td colspan="7" class="empty">No projects booking hours found for the selected filters.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-pagination" *ngIf="!isLoadingBookingHoursPreview && bookingHoursTotalCount > 0">
+        <div class="table-pagination__info">
+          <div class="page-size-selector">
+            <span>Rows per page:</span>
+            <select [ngModel]="bookingHoursPageSize" (ngModelChange)="onBookingHoursPageSizeChange($event)" class="page-size-select">
+              <option *ngFor="let size of availablePageSizes" [value]="size">{{ size }}</option>
+            </select>
+          </div>
+          <div class="table-pagination__summary">
+            Showing {{ bookingHoursPageStart }}-{{ bookingHoursPageEnd }} of {{ bookingHoursTotalCount }} booked projects
+          </div>
+        </div>
+
+        <div class="table-pagination__controls" *ngIf="bookingHoursTotalPages > 1">
+          <button type="button" class="pagination-btn" (click)="onBookingHoursPageChange(bookingHoursPage - 1)" [disabled]="bookingHoursPage === 1">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+
+          <button type="button" class="pagination-btn" *ngFor="let page of getVisibleBookingHoursPages()"
+            [class.pagination-btn--active]="page === bookingHoursPage" (click)="onBookingHoursPageChange(page)">
+            {{ page }}
+          </button>
+
+          <button type="button" class="pagination-btn" (click)="onBookingHoursPageChange(bookingHoursPage + 1)" [disabled]="bookingHoursPage === bookingHoursTotalPages">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+      </div>
+    </section>
 
     <ng-container *ngIf="dashboard as data">
       <!-- SUMMARY METRICS -->

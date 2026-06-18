@@ -52,6 +52,7 @@
 }
 
 /* Premium micro-interactions on header buttons */
+.dashboard-back-btn,
 .refresh-btn-header,
 .new-project-btn {
   display: inline-flex;
@@ -67,6 +68,26 @@
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
   text-decoration: none;
+}
+
+.dashboard-back-btn {
+  background: #ffffff;
+  color: #ea580c;
+  border: 1px solid #fed7aa;
+  box-shadow: 0 1px 2px rgba(234, 88, 12, 0.08);
+
+  &:hover {
+    background: #fff7ed;
+    border-color: #fdba74;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(234, 88, 12, 0.12);
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .refresh-btn-header {
@@ -228,6 +249,57 @@
     gap: 12px;
     flex-wrap: wrap;
   }
+}
+
+.scope-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.scope-filter__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+
+  mat-icon {
+    font-size: 17px;
+    width: 17px;
+    height: 17px;
+  }
+
+  &:hover:not(:disabled) {
+    color: #ea580c;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.scope-filter__btn--active {
+  background: #ffffff;
+  color: #ea580c;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 /* Custom dropdown filters */
@@ -502,6 +574,7 @@
   }
 }
 
+.selection-export-btn,
 .selection-clear-btn {
   margin-left: auto;
   display: inline-flex;
@@ -530,6 +603,23 @@
     width: 16px;
     height: 16px;
   }
+}
+
+.selection-export-btn {
+  margin-left: auto;
+  border-color: #fdba74;
+  background: #ea580c;
+  color: #ffffff;
+
+  &:hover {
+    background: #d94e06;
+    border-color: #d94e06;
+    transform: translateY(-1px);
+  }
+}
+
+.selection-export-btn + .selection-clear-btn {
+  margin-left: 0;
 }
 
 .selection-control {
@@ -1271,6 +1361,7 @@
     justify-content: flex-end;
   }
 
+  .selection-export-btn,
   .selection-clear-btn {
     width: 100%;
     margin-left: 0;

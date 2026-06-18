@@ -49,6 +49,7 @@ export class AuthService {
     '--projectDashboardPreferences',
   ];
   private apiUrl = `${environment.apiUrl}/auth`;
+  private usersApiUrl = `${environment.apiUrl}/Users`;
   private refreshHttpClient: HttpClient;
   private refreshRequest$: Observable<AuthResponse> | null = null;
 
@@ -205,7 +206,7 @@ export class AuthService {
   }
 
   changePassword(data: ChangePasswordRequest): Observable<string> {
-    return this.http.post<ApiResponse<unknown>>(`${this.apiUrl}/change-password`, data).pipe(
+    return this.http.put<ApiResponse<unknown>>(`${this.usersApiUrl}/me/password`, data).pipe(
       map((response) => {
         if (response.success) {
           return response.message || 'Your password has been changed successfully.';
@@ -331,7 +332,7 @@ export class AuthService {
     const returnUrl = currentUrl.includes('/auth/') ? '/dashboard' : currentUrl;
     
     this.clearAuthData();
-    this.notificationService.showInfo('Vous avez ete deconnecte');
+    this.notificationService.showInfo('You have been logged out');
     
     if (!currentUrl.includes('/auth/login')) {
       this.router.navigate(['/auth/login'], { queryParams: { returnUrl } });
@@ -343,7 +344,7 @@ export class AuthService {
     const returnUrl = currentUrl.includes('/auth/') ? '/dashboard' : currentUrl;
     
     this.clearAuthData();
-    this.notificationService.showInfo('Votre session a expire. Veuillez vous reconnecter.');
+    this.notificationService.showInfo('Your session has expired. Please sign in again.');
     
     if (!currentUrl.includes('/auth/login')) {
       this.router.navigate(['/auth/login'], { queryParams: { returnUrl } });

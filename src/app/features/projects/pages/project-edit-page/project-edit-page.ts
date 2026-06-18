@@ -1,10 +1,15 @@
 import { Component, OnDestroy, OnInit, ChangeDetectorRef } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Observable, Subscription, catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
 
 import { NotificationService } from '../../../../core/services/notification.service';
 import { AuthService } from '../../../../core/services/auth';
+import { HourEntriesApiService } from '../../../../core/services/hour-entries-api.service';
+import { HourEntryDto } from '../../../../core/models/hour-entry.model';
+import { InternDto } from '../../../interns/models/intern.models';
+import { InternService } from '../../../interns/services/intern';
 import {
   ProjectDto,
   ProcessStatus,
@@ -14,9 +19,21 @@ import {
   ProjectReferenceData,
   ProjectStatus,
   SelectOption,
+  ProjectFileDto,
+  ProjectFileVersionDto,
+  ProjectFileType,
 } from '../../models';
 import { ProjectReferenceService } from '../../services/project-reference.service';
 import { ProjectService } from '../../services/project';
+import { ProjectFilesApiService } from '../../../../core/services/project-files-api.service';
+import { FileService } from '../../../files/services/file';
+import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
+import {
+  HoursAllocationByProjectUserDto,
+  HoursAllocationDashboardDto,
+  HoursAllocationDashboardParams,
+} from '../../../dashboard/models/hours-allocation-dashboard.models';
+import { HoursAllocationDashboardService } from '../../../dashboard/services/hours-allocation-dashboard.service';
 
 @Component({
   selector: 'app-project-edit-page',
@@ -64,10 +81,48 @@ export class ProjectEditPage implements OnInit {
   businessUnitDraft: FormControl<string>;
   kpiDraft!: FormGroup;
   internMemberDraft = new FormControl('', { nonNullable: true });
+  interns: InternDto[] = [];
+  isLoadingInterns = false;
+  deletingTeamMemberIds = new Set<string>();
 
-  // Deliverables (loaded separately via API)
-  deliverables: any[] = [];
-  readonly collectionKeys = ['internMembers', 'subProjects', 'deliverables', 'timelineEntries', 'roadblockEntries'] as const;
+  // File and Allocation state
+  projectFiles: ProjectFileDto[] = [];
+  isLoadingFiles = false;
+  fileLoadError = '';
+  showAllocations = true;
+  isLoadingAllocations = false;
+  allocationLoadError = '';
+  allocationSearch = '';
+  projectAllocations: HoursAllocationByProjectUserDto[] = [];
+
+  readonly requiredProjectFileTypes: Array<{ value: ProjectFileType; label: string }> = [
+    { value: ProjectFileType.BRD, label: 'BRD' },
+    { value: ProjectFileType.FDD, label: 'FDD' },
+    { value: ProjectFileType.PROCESS, label: 'PROCESS' },
+    { value: ProjectFileType.UAT, label: 'UAT' },
+    { value: ProjectFileType.RiskAssessment, label: 'RiskAssessment' },
+    { value: ProjectFileType.Timeline, label: 'Timeline' },
+    { value: ProjectFileType.StrategicEvaluation, label: 'StrategicEvaluation' },
+    { value: ProjectFileType.OnePager, label: 'OnePager' },
+    { value: ProjectFileType.SharePoint, label: 'SharePoint' },
+    { value: ProjectFileType.SAPApproval, label: 'SAPApproval' },
+    { value: ProjectFileType.Compliance, label: 'Compliance' },
+  ];
+
+  isUploading: Record<number, boolean> = {};
+  isUploadingVersion: Record<string, boolean> = {};
+  isSavingDescription: Record<string, boolean> = {};
+  isDeleting: Record<string, boolean> = {};
+  editingDescriptionFileId: string | null = null;
+  descriptionEditValue = '';
+  pendingProjectFileUpload: { file: File; fileType: ProjectFileType; fileTypeLabel: string } | null = null;
+  pendingProjectVersionUpload: { file: File; currentFile: ProjectFileDto } | null = null;
+  projectFileMessageDraft = '';
+  expandedHistoryFileId: string | null = null;
+  fileVersions: Record<string, ProjectFileVersionDto[]> = {};
+  isLoadingVersions: Record<string, boolean> = {};
+
+  readonly collectionKeys = ['internMembers', 'subProjects', 'timelineEntries', 'roadblockEntries'] as const;
 
   readonly projectTypeOptions = [
     { value: ProjectType.NewProject, label: 'New Project' },
@@ -99,7 +154,13 @@ export class ProjectEditPage implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly cdr: ChangeDetectorRef,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
+    private readonly projectFilesApi: ProjectFilesApiService,
+    private readonly hoursAllocationDashboard: HoursAllocationDashboardService,
+    private readonly hourEntriesApi: HourEntriesApiService,
+    private readonly internService: InternService,
+    private readonly fileService: FileService,
+    private readonly dialog: MatDialog
   ) {
     this.memberDraft = this.fb.group({
       userId: this.fb.nonNullable.control('', Validators.required),
@@ -147,7 +208,16 @@ export class ProjectEditPage implements OnInit {
 
     this.editingSection = null;
     this.initForms();
-    this.loadDeliverables();
+    if (this.isAdmin) {
+      this.loadInterns();
+    }
+    if (this.project?.id) {
+      this.loadProjectMembers(this.project.id);
+      this.loadProjectFiles(this.project.id);
+      if (this.showAllocations) {
+        this.loadProjectAllocations();
+      }
+    }
     this.cdr.detectChanges();
   }
 
@@ -275,13 +345,6 @@ export class ProjectEditPage implements OnInit {
   }
 
   // ── Load deliverables (separate endpoint) ──
-  loadDeliverables(): void {
-    this.projectService.getDeliverables(this.project.id).subscribe({
-      next: (data) => { this.deliverables = data as any[]; },
-      error: () => { this.deliverables = []; }
-    });
-  }
-
   // ── Helpers ──
   public getStrategicScore(criteria: any[], type: number): number {
     const found = (criteria || []).find(c => c.type === type);
@@ -308,6 +371,10 @@ export class ProjectEditPage implements OnInit {
 
   // ── UI Actions ──
   toggleEdit(section: string): void {
+    if (!this.isAdmin) {
+      return;
+    }
+
     this.editingSection = (this.editingSection === section) ? null : section;
   }
 
@@ -317,6 +384,15 @@ export class ProjectEditPage implements OnInit {
   }
 
   saveSection(section: string): void {
+    if (this.isSaving) {
+      return;
+    }
+
+    if (!this.isAdmin) {
+      this.notificationService.showWarning('Only administrators can modify projects.');
+      return;
+    }
+
     const form = this.getFormBySection(section);
     if (form && form.invalid) {
       form.markAllAsTouched();
@@ -336,8 +412,13 @@ export class ProjectEditPage implements OnInit {
       return;
     }
 
-    this.isSaving = true;
     const payload = this.buildUpdatePayload(section);
+    if (section === 'team') {
+      this.saveTeamSection(payload);
+      return;
+    }
+
+    this.isSaving = true;
     this.projectService.patchProject(this.project.id, payload).subscribe({
       next: (updated) => this.handleSaveSuccess(updated),
       error: () => this.handleSaveError()
@@ -356,6 +437,36 @@ export class ProjectEditPage implements OnInit {
   private handleSaveError(): void {
     this.isSaving = false;
     this.notificationService.showError('Unable to update project.');
+  }
+
+  private saveTeamSection(payload: Record<string, unknown>): void {
+    this.isSaving = true;
+    this.projectService.getProjectMembers(this.project.id).pipe(
+      switchMap((freshMembers) => {
+        const changes = this.buildMemberSyncChanges(freshMembers, payload);
+        const removals$ = changes.removedUserIds.length
+          ? forkJoin(changes.removedUserIds.map((userId) => this.projectService.removeMember(this.project.id, userId)))
+          : of([]);
+
+        return removals$.pipe(
+          switchMap(() => changes.addedMembers.length
+            ? forkJoin(changes.addedMembers.map((member) => this.projectService.addMember(this.project.id, member)))
+            : of([])
+          ),
+          switchMap(() => forkJoin({
+            project: this.projectService.getProject(this.project.id),
+            members: this.projectService.getProjectMembers(this.project.id),
+          })),
+          map(({ project, members }) => ({
+            ...project,
+            members,
+          } as ProjectDto))
+        );
+      })
+    ).subscribe({
+      next: (updated) => this.handleSaveSuccess(updated),
+      error: () => this.handleSaveError()
+    });
   }
 
   private getFormBySection(section: string): FormGroup | null {
@@ -488,6 +599,60 @@ export class ProjectEditPage implements OnInit {
   }
 
   // ── FormArray getters ──
+  private buildMemberSyncChanges(
+    freshMembers: ProjectDto['members'],
+    payload: Record<string, unknown>
+  ): {
+    addedMembers: Array<Record<string, unknown>>;
+    removedUserIds: string[];
+  } {
+    const requestedMembers = Array.isArray(payload['teamMembers'])
+      ? payload['teamMembers'] as Array<{ userId?: string; roleId?: string }>
+      : [];
+    const normalizedFreshMembers = this.normalizedProjectMembers({ ...this.project, members: freshMembers });
+    const projectManagerId = this.project.projectManagerId;
+    const requestedByUserId = new Map(
+      requestedMembers
+      .filter((member) => member.userId && member.userId !== projectManagerId)
+      .map((member) => {
+        const userId = member.userId as string;
+        const freshMember = normalizedFreshMembers.find((item) => item.userId === userId);
+        return [userId, member.roleId || freshMember?.roleId || this.roleIdForUser(userId)];
+      })
+    );
+    const freshUserIds = new Set(
+      normalizedFreshMembers
+        .filter((member) => member.userId && member.userId !== projectManagerId)
+        .map((member) => member.userId)
+    );
+    const removedUserIds: string[] = [];
+    const addedMembers: Array<Record<string, unknown>> = [];
+
+    freshUserIds.forEach((userId) => {
+      if (!requestedByUserId.has(userId)) {
+        removedUserIds.push(userId);
+      }
+    });
+
+    requestedByUserId.forEach((requestedRoleId, userId) => {
+      if (!freshUserIds.has(userId)) {
+        const memberPayload: Record<string, unknown> = {
+          userId,
+          UserId: userId,
+        };
+
+        if (requestedRoleId) {
+          memberPayload['roleId'] = requestedRoleId;
+          memberPayload['RoleId'] = requestedRoleId;
+        }
+
+        addedMembers.push(memberPayload);
+      }
+    });
+
+    return { addedMembers, removedUserIds };
+  }
+
   get teamMembers(): FormArray { return this.teamForm.get('teamMembers') as FormArray; }
   get teamInternMembers(): FormArray { return this.teamForm.get('internMembers') as FormArray; }
   get budgetItems(): FormArray { return this.budgetForm.get('budgetItems') as FormArray; }
@@ -496,6 +661,7 @@ export class ProjectEditPage implements OnInit {
 
   // ── Array CRUD ──
   addTeamMember(): void {
+    if (!this.isAdmin) return;
     if (this.memberDraft.invalid) return;
     if (this.isProjectManager(this.memberDraft.get('userId')?.value)) {
       this.notificationService.showWarning('The project manager is managed separately from team members.');
@@ -504,17 +670,82 @@ export class ProjectEditPage implements OnInit {
     this.teamMembers.push(this.fb.group(this.memberDraft.getRawValue()));
     this.memberDraft.reset({ userId: '', role: '', roleId: '' });
   }
-  removeTeamMember(i: number): void { this.teamMembers.removeAt(i); }
+  removeTeamMember(i: number): void {
+    if (!this.isAdmin) return;
+
+    const userId = String(this.teamMembers.at(i)?.get('userId')?.value || '');
+    if (!userId) {
+      this.removeTeamMemberLocally(i);
+      return;
+    }
+
+    const isSavedMember = this.project.members?.some((member) => member.userId === userId);
+    if (!isSavedMember) {
+      this.removeTeamMemberLocally(i);
+      return;
+    }
+
+    this.deletingTeamMemberIds.add(userId);
+    this.projectService.removeMember(this.project.id, userId).pipe(
+      switchMap(() => this.projectService.getProjectMembers(this.project.id)),
+      finalize(() => {
+        this.deletingTeamMemberIds.delete(userId);
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
+      next: (members) => {
+        this.mergeMemberOptions(members);
+        this.project = this.normalizeProjectResponse({
+          ...this.project,
+          members,
+        });
+        this.syncTeamMembersForm();
+        this.notificationService.showSuccess('Team member removed successfully.');
+      },
+      error: () => {
+        this.notificationService.showError('Unable to remove team member.');
+      },
+    });
+  }
+
+  private removeTeamMemberLocally(index: number): void {
+    this.teamMembers.removeAt(index);
+    this.teamMembers.markAsDirty();
+    this.teamForm.markAsDirty();
+  }
 
   addInternMember(): void {
-    const val = this.internMemberDraft.value.trim();
-    if (val) {
-      const obj = { fullName: val };
-      this.teamInternMembers.push(this.fb.control(JSON.stringify(obj)));
-      this.internMemberDraft.reset();
+    if (!this.isAdmin) return;
+
+    const internId = this.internMemberDraft.value.trim();
+    if (!internId) {
+      this.internMemberDraft.markAsTouched();
+      return;
+    }
+
+    if (this.isInternSelected(internId)) {
+      this.notificationService.showWarning('This intern is already added to the project.');
+      return;
+    }
+
+    const intern = this.interns.find((item) => item.id === internId);
+    if (intern) {
+      const obj = {
+        internId: intern.id,
+        id: intern.id,
+        fullName: intern.name,
+        name: intern.name,
+        roleId: intern.roleId,
+        roleName: intern.roleName,
+        supervisorId: intern.supervisorId,
+        supervisorName: intern.supervisorName,
+      };
+      this.teamInternMembers.push(this.fb.nonNullable.control(JSON.stringify(obj)));
+      this.internMemberDraft.reset('');
     }
   }
   removeInternMember(i: number): void {
+    if (!this.isAdmin) return;
     this.teamInternMembers.removeAt(i);
   }
 
@@ -526,6 +757,21 @@ export class ProjectEditPage implements OnInit {
     } catch {
       return controlValue;
     }
+  }
+
+  getAvailableInterns(): InternDto[] {
+    return this.interns.filter((intern) => !this.isInternSelected(intern.id));
+  }
+
+  private isInternSelected(internId: string): boolean {
+    return this.teamInternMembers.controls.some((control) => {
+      try {
+        const parsed = JSON.parse(control.value || '{}') as Record<string, unknown>;
+        return parsed['internId'] === internId || parsed['id'] === internId;
+      } catch {
+        return false;
+      }
+    });
   }
 
   onProjectManagerChange(pmUserId: string | null): void {
@@ -904,5 +1150,627 @@ export class ProjectEditPage implements OnInit {
     }
 
     return Object.keys(errors).length ? errors : null;
+  }
+
+  // ── File and Allocation Methods ──
+  toggleAllocations(): void {
+    this.showAllocations = !this.showAllocations;
+
+    if (this.showAllocations && !this.projectAllocations.length && !this.isLoadingAllocations) {
+      this.loadProjectAllocations();
+    }
+  }
+
+  searchAllocations(): void {
+    this.loadProjectAllocations();
+  }
+
+  clearAllocationSearch(): void {
+    if (!this.allocationSearch.trim()) {
+      return;
+    }
+
+    this.allocationSearch = '';
+    this.loadProjectAllocations();
+  }
+
+  displayValue(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '(vide)';
+    }
+
+    if (typeof value === 'string') {
+      return value.trim() || '(vide)';
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? String(value) : '(vide)';
+    }
+
+    return String(value) || '(vide)';
+  }
+
+  splitTextItems(value: string | null | undefined): string[] {
+    if (!value) {
+      return [];
+    }
+
+    return value
+      .split(/\r?\n|[;]+/g)
+      .map((item) => item.trim())
+      .filter((item) => !!item);
+  }
+
+  private readString(record: Record<string, unknown>, keys: string[]): string {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return String(value);
+      }
+    }
+
+    return '';
+  }
+
+  getDocumentCompletionCount(): number {
+    const present = new Set(this.projectFiles.map((file) => this.normalizeFileTypeLabel(file)));
+    return this.requiredProjectFileTypes.filter((type) => present.has(type.label.toLowerCase())).length;
+  }
+
+  getMissingProjectFileTypes(): string[] {
+    const present = new Set(this.projectFiles.map((file) => this.normalizeFileTypeLabel(file)));
+    return this.requiredProjectFileTypes
+      .filter((type) => !present.has(type.label.toLowerCase()))
+      .map((type) => type.label);
+  }
+
+  hasProjectFileType(label: string): boolean {
+    const normalized = label.toLowerCase();
+    return this.projectFiles.some((file) => this.normalizeFileTypeLabel(file) === normalized);
+  }
+
+  private loadProjectFiles(projectId: string): void {
+    this.isLoadingFiles = true;
+    this.fileLoadError = '';
+    this.projectFilesApi
+      .list(projectId)
+      .pipe(
+        catchError(() => {
+          this.fileLoadError = 'Unable to load project files.';
+          return of([] as unknown[]);
+        })
+      )
+      .subscribe((files) => {
+        this.projectFiles = [...(files as ProjectFileDto[])];
+        this.isLoadingFiles = false;
+        this.cdr.detectChanges();
+      });
+  }
+
+  private loadProjectMembers(projectId: string): void {
+    this.projectService.getProjectMembers(projectId).pipe(
+      catchError(() => of([] as ProjectDto['members']))
+    ).subscribe((members) => {
+      this.mergeMemberOptions(members);
+      this.project = this.normalizeProjectResponse({
+        ...this.project,
+        members,
+      });
+      this.syncTeamMembersForm();
+      this.cdr.detectChanges();
+    });
+  }
+
+  private mergeMemberOptions(members: ProjectDto['members']): void {
+    const usersById = new Map(this.references.users.map((user) => [user.id, user]));
+    members.forEach((member) => {
+      if (!member.userId || usersById.has(member.userId)) {
+        return;
+      }
+
+      usersById.set(member.userId, {
+        id: member.userId,
+        label: member.fullName || member.email || member.userId,
+        email: member.email || '',
+        roleId: member.roleId || '',
+        roleName: member.roleName || '',
+      });
+    });
+
+    this.references = {
+      ...this.references,
+      users: Array.from(usersById.values()),
+    };
+  }
+
+  private syncTeamMembersForm(): void {
+    if (!this.teamForm) {
+      return;
+    }
+
+    this.teamForm.setControl(
+      'teamMembers',
+      this.fb.array(
+        this.normalizedProjectMembers(this.project)
+          .filter((member) => member.userId !== this.project.projectManagerId)
+          .map((member) => this.fb.group({
+            userId: [member.userId, Validators.required],
+            role: [member.roleName || this.roleNameForUser(member.userId, member.roleId), Validators.required],
+            roleId: [member.roleId || ''],
+          }))
+      )
+    );
+  }
+
+  private loadInterns(): void {
+    this.isLoadingInterns = true;
+    this.internService
+      .getInterns()
+      .pipe(
+        catchError(() => {
+          this.notificationService.showWarning('Unable to load interns.');
+          return of([] as InternDto[]);
+        }),
+        finalize(() => {
+          this.isLoadingInterns = false;
+          this.cdr.detectChanges();
+        })
+      )
+      .subscribe((interns) => {
+        this.interns = interns;
+      });
+  }
+
+  private loadProjectAllocations(): void {
+    const projectId = this.project?.id;
+    if (!projectId) {
+      return;
+    }
+
+    const params: Omit<HoursAllocationDashboardParams, 'projectId'> = {
+      analysis: 'projectUsers',
+      search: this.allocationSearch.trim() || null,
+      all: true,
+    };
+
+    this.isLoadingAllocations = true;
+    this.allocationLoadError = '';
+
+    const request$: Observable<HoursAllocationDashboardDto | HourEntryDto[] | null> = this.authService.isAdmin()
+      ? this.hoursAllocationDashboard
+          .getProjectDashboard(projectId, params)
+          .pipe(
+            catchError(() => {
+              this.allocationLoadError = 'Unable to load project allocations.';
+              return of(null);
+            })
+          )
+      : this.hourEntriesApi
+          .getMyByProject(projectId)
+          .pipe(
+            catchError(() => {
+              this.allocationLoadError = 'Unable to load your project allocations.';
+              return of(null);
+            })
+          );
+
+    request$
+      .pipe(
+        finalize(() => {
+          this.isLoadingAllocations = false;
+          this.cdr.detectChanges();
+        })
+      )
+      .subscribe((result) => {
+        this.projectAllocations = Array.isArray(result)
+          ? this.toMyProjectAllocationRows(result, projectId)
+          : result?.hoursByProjectUser ?? [];
+      });
+  }
+
+  private toMyProjectAllocationRows(entries: HourEntryDto[], projectId: string): HoursAllocationByProjectUserDto[] {
+    const query = this.allocationSearch.trim().toLowerCase();
+    const currentUser = this.authService.getCurrentUser();
+    const userName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ').trim()
+      || entries.find((entry) => entry.userFullName)?.userFullName
+      || currentUser?.email
+      || 'Me';
+    const projectName = this.project?.name || entries.find((entry) => entry.projectName)?.projectName || '';
+
+    if (query && !`${userName} ${projectName}`.toLowerCase().includes(query)) {
+      return [];
+    }
+
+    return [{
+      projectId,
+      projectName,
+      userId: currentUser?.userId || entries.find((entry) => entry.userId)?.userId || '',
+      userName,
+      role: currentUser?.roleName || '',
+      totalHours: this.sumHourEntries(entries, 'totalHours'),
+      executionHours: this.sumHourEntries(entries, 'executionHours'),
+      techLeadHours: this.sumHourEntries(entries, 'supervisionHours'),
+      processHours: this.sumHourEntries(entries, 'processHours'),
+      projectManagementHours: this.sumHourEntries(entries, 'managementHours'),
+      researchAndDevHours: this.sumHourEntries(entries, 'rAndDHours'),
+      workshopHours: this.sumHourEntries(entries, 'workshopHours'),
+      otherHours: this.sumHourEntries(entries, 'otherHours') + this.sumHourEntries(entries, 'internManagementHours'),
+      workedDays: new Set(entries.map((entry) => entry.date).filter(Boolean)).size,
+      allocationCount: entries.length,
+      isProjectManager: false,
+    }];
+  }
+
+  private sumHourEntries(entries: HourEntryDto[], key: keyof HourEntryDto): number {
+    return entries.reduce((total, entry) => total + (Number(entry[key]) || 0), 0);
+  }
+
+  private normalizeFileTypeLabel(file: ProjectFileDto): string {
+    const label = (file.fileTypeLabel || '').trim();
+    if (label) {
+      return label.toLowerCase();
+    }
+
+    const enumLabel = this.requiredProjectFileTypes.find((type) => type.value === file.fileType)?.label || '';
+    return enumLabel.toLowerCase();
+  }
+
+  getFileByType(typeVal: ProjectFileType): ProjectFileDto | undefined {
+    return this.projectFiles.find((f) => f.fileType === typeVal);
+  }
+
+  onUploadFile(event: Event, fileType: ProjectFileType): void {
+    if (!this.isAdmin) return;
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !this.project?.id) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      this.notificationService.showWarning('The file size cannot exceed 10 MB.');
+      input.value = '';
+      return;
+    }
+
+    const fileTypeLabel =
+      this.requiredProjectFileTypes.find((type) => type.value === fileType)?.label || 'document';
+    this.pendingProjectFileUpload = { file, fileType, fileTypeLabel };
+    this.pendingProjectVersionUpload = null;
+    this.projectFileMessageDraft = '';
+    input.value = '';
+  }
+
+  confirmProjectFileMessage(): void {
+    if (this.pendingProjectVersionUpload) {
+      this.confirmProjectVersionUpload();
+      return;
+    }
+
+    this.confirmProjectFileUpload();
+  }
+
+  confirmProjectFileUpload(): void {
+    if (!this.isAdmin) return;
+    const pending = this.pendingProjectFileUpload;
+    if (!pending || !this.project?.id) return;
+
+    this.isUploading[pending.fileType] = true;
+
+    this.fileService.upload(this.project.id, {
+      file: pending.file,
+      fileType: pending.fileType,
+      description: this.projectFileMessageDraft.trim() || null
+    }).subscribe({
+      next: () => {
+        this.isUploading[pending.fileType] = false;
+        this.clearProjectFileMessage();
+        this.notificationService.showSuccess('File uploaded successfully.');
+        if (this.project?.id) {
+          this.loadProjectFiles(this.project.id);
+        }
+      },
+      error: () => {
+        this.isUploading[pending.fileType] = false;
+        this.notificationService.showError("Unable to upload the file.");
+      }
+    });
+  }
+
+  onUploadNewVersion(event: Event, file: ProjectFileDto): void {
+    if (!this.isAdmin) return;
+    const input = event.target as HTMLInputElement;
+    const newFile = input.files?.[0];
+    if (!newFile || !this.project?.id) return;
+
+    if (newFile.size > 10 * 1024 * 1024) {
+      this.notificationService.showWarning('The file size cannot exceed 10 MB.');
+      input.value = '';
+      return;
+    }
+
+    this.pendingProjectVersionUpload = { file: newFile, currentFile: file };
+    this.pendingProjectFileUpload = null;
+    this.projectFileMessageDraft = '';
+    input.value = '';
+  }
+
+  confirmProjectVersionUpload(): void {
+    if (!this.isAdmin) return;
+    const pending = this.pendingProjectVersionUpload;
+    if (!pending || !this.project?.id) return;
+
+    this.isUploadingVersion[pending.currentFile.id] = true;
+
+    this.fileService.uploadVersion(this.project.id, pending.currentFile.id, {
+      file: pending.file,
+      description: this.projectFileMessageDraft.trim() || null
+    }).subscribe({
+      next: () => {
+        this.isUploadingVersion[pending.currentFile.id] = false;
+        this.clearProjectFileMessage();
+        this.notificationService.showSuccess('New version uploaded successfully.');
+        if (this.project?.id) {
+          this.loadProjectFiles(this.project.id);
+        }
+        if (this.expandedHistoryFileId === pending.currentFile.id) {
+          this.loadVersions(pending.currentFile.id);
+        }
+      },
+      error: () => {
+        this.isUploadingVersion[pending.currentFile.id] = false;
+        this.notificationService.showError("Unable to upload the new version.");
+      }
+    });
+  }
+
+  clearProjectFileMessage(): void {
+    this.pendingProjectFileUpload = null;
+    this.pendingProjectVersionUpload = null;
+    this.projectFileMessageDraft = '';
+  }
+
+  getPendingProjectFileName(): string {
+    return this.pendingProjectVersionUpload?.file.name
+      || this.pendingProjectFileUpload?.file.name
+      || '';
+  }
+
+  getPendingProjectFileTarget(): string {
+    if (this.pendingProjectVersionUpload) {
+      return this.pendingProjectVersionUpload.currentFile.originalFileName || 'existing document';
+    }
+
+    return this.pendingProjectFileUpload?.fileTypeLabel || 'document';
+  }
+
+  isConfirmingProjectFileMessage(): boolean {
+    if (this.pendingProjectVersionUpload) {
+      return !!this.isUploadingVersion[this.pendingProjectVersionUpload.currentFile.id];
+    }
+
+    if (this.pendingProjectFileUpload) {
+      return !!this.isUploading[this.pendingProjectFileUpload.fileType];
+    }
+
+    return false;
+  }
+
+  downloadFile(file: ProjectFileDto | ProjectFileVersionDto): void {
+    if (!this.project?.id) return;
+    this.fileService.download(this.project.id, file.id).subscribe({
+      next: (blob) => {
+        const blobUrl = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+        anchor.download = file.originalFileName || 'download';
+        anchor.click();
+        window.URL.revokeObjectURL(blobUrl);
+      },
+      error: () => {
+        this.notificationService.showError("Unable to download the file.");
+      }
+    });
+  }
+
+  deleteFile(file: ProjectFileDto): void {
+    if (!this.isAdmin) return;
+    if (!this.project?.id) return;
+
+    const data: ConfirmationDialogData = {
+      title: 'Delete project file',
+      message: `Are you sure you want to delete "${file.originalFileName}"? This will permanently delete the file and all archived versions.`,
+      icon: 'delete_sweep',
+      saveLabel: 'Delete',
+      saveColor: 'warn',
+      cancelLabel: 'Cancel'
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialog, {
+      data,
+      width: '400px'
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === 'save') {
+        this.isDeleting[file.id] = true;
+        this.fileService.delete(this.project!.id, file.id).subscribe({
+          next: () => {
+            this.isDeleting[file.id] = false;
+            this.notificationService.showSuccess('File deleted successfully.');
+            this.loadProjectFiles(this.project!.id);
+            if (this.expandedHistoryFileId === file.id) {
+              this.expandedHistoryFileId = null;
+            }
+          },
+          error: () => {
+            this.isDeleting[file.id] = false;
+            this.notificationService.showError('Unable to delete the file.');
+          }
+        });
+      }
+    });
+  }
+
+  startEditingDescription(file: ProjectFileDto): void {
+    if (!this.isAdmin) return;
+    this.editingDescriptionFileId = file.id;
+    this.descriptionEditValue = file.description || '';
+  }
+
+  cancelEditingDescription(): void {
+    this.editingDescriptionFileId = null;
+    this.descriptionEditValue = '';
+  }
+
+  saveDescription(file: ProjectFileDto): void {
+    if (!this.isAdmin) return;
+    if (!this.project?.id) return;
+    this.isSavingDescription[file.id] = true;
+    this.fileService.update(this.project.id, file.id, {
+      description: this.descriptionEditValue.trim() || null
+    }).subscribe({
+      next: () => {
+        this.isSavingDescription[file.id] = false;
+        this.editingDescriptionFileId = null;
+        this.notificationService.showSuccess('Description updated.');
+        this.loadProjectFiles(this.project!.id);
+      },
+      error: () => {
+        this.isSavingDescription[file.id] = false;
+        this.notificationService.showError('Unable to update the description.');
+      }
+    });
+  }
+
+  toggleVersionsHistory(file: ProjectFileDto): void {
+    if (this.expandedHistoryFileId === file.id) {
+      this.expandedHistoryFileId = null;
+      return;
+    }
+    this.expandedHistoryFileId = file.id;
+    this.loadVersions(file.id);
+  }
+
+  loadVersions(fileId: string): void {
+    if (!this.project?.id) return;
+    this.isLoadingVersions[fileId] = true;
+    this.fileService.listVersions(this.project.id, fileId).subscribe({
+      next: (versions) => {
+        this.fileVersions[fileId] = (versions as ProjectFileVersionDto[]).sort((a, b) => b.versionNumber - a.versionNumber);
+        this.isLoadingVersions[fileId] = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.isLoadingVersions[fileId] = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  getInitials(value: string | null | undefined): string {
+    const words = (value || 'Project')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    return words
+      .slice(0, 2)
+      .map((word) => word.charAt(0).toUpperCase())
+      .join('') || 'P';
+  }
+
+  getAllocationTotalHours(): number {
+    return this.projectAllocations.reduce((total, item) => total + item.totalHours, 0);
+  }
+
+  getAllocationWorkedDays(): number {
+    return this.projectAllocations.reduce((total, item) => total + item.workedDays, 0);
+  }
+
+  getAllocationCount(): number {
+    return this.projectAllocations.reduce((total, item) => total + item.allocationCount, 0);
+  }
+
+  getProjectManagerAllocationCount(): number {
+    return this.projectAllocations.filter((item) => item.isProjectManager).length;
+  }
+
+  getAverageHoursPerContributor(): number {
+    if (!this.projectAllocations.length) {
+      return 0;
+    }
+
+    return this.getAllocationTotalHours() / this.projectAllocations.length;
+  }
+
+  getMaxAllocationHours(): number {
+    return Math.max(1, ...this.projectAllocations.map((item) => item.totalHours));
+  }
+
+  getAllocationShare(item: HoursAllocationByProjectUserDto): number {
+    return Math.max(0, Math.min(100, (item.totalHours / this.getMaxAllocationHours()) * 100));
+  }
+
+  getDominantAllocationType(item: HoursAllocationByProjectUserDto): string {
+    const categories = [
+      { label: 'Execution', value: item.executionHours },
+      { label: 'Tech Lead', value: item.techLeadHours },
+      { label: 'Process', value: item.processHours },
+      { label: 'PM', value: item.projectManagementHours },
+      { label: 'R&D', value: item.researchAndDevHours },
+      { label: 'Workshop', value: item.workshopHours },
+      { label: 'Other', value: item.otherHours },
+    ];
+    const best = categories.sort((a, b) => b.value - a.value)[0];
+    return best?.value > 0 ? best.label : 'No split';
+  }
+
+  getSortedAllocations(): HoursAllocationByProjectUserDto[] {
+    return [...this.projectAllocations].sort((a, b) => b.totalHours - a.totalHours);
+  }
+
+  getAllocationActivityBreakdown(): Array<{ label: string; value: number; icon: string }> {
+    const totals = this.projectAllocations.reduce(
+      (acc, item) => {
+        acc.execution += item.executionHours;
+        acc.techLead += item.techLeadHours;
+        acc.process += item.processHours;
+        acc.projectManagement += item.projectManagementHours;
+        acc.researchAndDev += item.researchAndDevHours;
+        acc.workshop += item.workshopHours;
+        acc.other += item.otherHours;
+        return acc;
+      },
+      {
+        execution: 0,
+        techLead: 0,
+        process: 0,
+        projectManagement: 0,
+        researchAndDev: 0,
+        workshop: 0,
+        other: 0,
+      }
+    );
+
+    return [
+      { label: 'Execution', value: totals.execution, icon: 'rocket_launch' },
+      { label: 'Tech lead', value: totals.techLead, icon: 'engineering' },
+      { label: 'Process', value: totals.process, icon: 'account_tree' },
+      { label: 'Project management', value: totals.projectManagement, icon: 'assignment_turned_in' },
+      { label: 'R&D', value: totals.researchAndDev, icon: 'science' },
+      { label: 'Workshop', value: totals.workshop, icon: 'groups' },
+      { label: 'Other', value: totals.other, icon: 'more_horiz' },
+    ].filter((item) => item.value > 0);
+  }
+
+  getAllocationActivityShare(value: number): number {
+    const total = this.getAllocationActivityBreakdown().reduce((sum, item) => sum + item.value, 0);
+    if (!total) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(100, (value / total) * 100));
   }
 }

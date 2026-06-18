@@ -17,6 +17,16 @@ export interface HoursAllocationFiltersDto {
   months: HoursAllocationMonthOptionDto[];
 }
 
+export interface ProjectBookingHoursPreviewDto {
+  project: string;
+  phase: string;
+  estimatedHours: number;
+  department: string;
+  sponsor: string;
+  costCenter: string;
+  totalBookingHours: number;
+}
+
 export interface HoursAllocationDashboardParams {
   userId?: string | null;
   memberId?: string | null;

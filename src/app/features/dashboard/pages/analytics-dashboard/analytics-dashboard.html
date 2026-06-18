@@ -109,7 +109,7 @@
         class="metric-card metric-card--clickable"
         *ngFor="let metric of metrics"
         [style.--metric-tone]="getToneColor(metric.tone)"
-        (click)="openMetricTarget(metric)"
+        (click)="openMetricTarget(metric)"  
         [attr.aria-label]="metric.actionLabel || ('Open ' + metric.label)">
         <span class="metric-card__line"></span>
         <div class="metric-card__head">

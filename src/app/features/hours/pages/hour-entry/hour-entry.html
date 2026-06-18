@@ -1,455 +1,533 @@
-<section class="hour-entry-page pm-page-enter">
-  <div class="bg-decoration">
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
-  </div>
-
-  <header class="hour-entry-header">
-    <div class="header-content">
-       <span class="eyebrow">Time tracking</span>
-       <h1>Activity Logger</h1>
-      <p class="hour-entry-lead">
-        Effortlessly manage your project allocations with our streamlined tracking system.
-      </p>
-    </div>
-
-    <div class="total-hours-widget" [class.warning]="overtimeWarning" [class.error]="totalOver24">
-      <div class="widget-label">Total Allocated</div>
-      <div class="widget-value">{{ totalHours | number: '1.2-2' }} <span class="unit">hrs</span></div>
-      <div class="widget-status" *ngIf="overtimeWarning && !totalOver24">Overtime detected</div>
-      <div class="widget-status" *ngIf="totalOver24">Limit exceeded!</div>
-    </div>
-  </header>
-
-  <div class="glass-container">
-    <app-loading-spinner *ngIf="isLoadingProjects || isLoadingInterns"></app-loading-spinner>
-
-    <div class="status-messages">
-      <p class="hour-entry-error" *ngIf="projectsError && !isLoadingProjects">
-        <mat-icon>error_outline</mat-icon> {{ projectsError }}
-      </p>
-      <p class="hour-entry-error" *ngIf="internsError && !isLoadingInterns">
-        <mat-icon>error_outline</mat-icon> {{ internsError }}
-      </p>
-      <p class="hour-entry-empty" *ngIf="!isLoadingProjects && !projectsError && !projectOptions.length">
-        <mat-icon>info_outline</mat-icon>
-        No active projects found. Please contact your admin to be assigned to a project team.
-      </p>
-    </div>
-
-    <form *ngIf="!isLoadingProjects && projectOptions.length" [formGroup]="form" (ngSubmit)="submit()" class="hour-entry-form">
-
-      <!-- â•â•â•â• Section 1: Classification â•â•â•â• -->
-      <div class="form-section">
-        <div class="section-header">
-          <mat-icon>category</mat-icon>
-          <h3>Classification</h3>
-        </div>
-
-        <!-- Project Work: Category + Booking Type side by side -->
-        <div class="grid-row two-cols" *ngIf="isProjectWorkMode">
-          <mat-form-field appearance="outline">
-            <mat-label>Work Category</mat-label>
-            <mat-select formControlName="category">
-              <mat-option *ngFor="let option of categoryOptions" [value]="option.value">
-                {{ option.label }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>label</mat-icon>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Booking Type</mat-label>
-            <mat-select formControlName="bookingType">
-              <mat-option *ngFor="let option of bookingTypeOptions" [value]="option.value">
-                {{ option.label }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>bolt</mat-icon>
-          </mat-form-field>
-        </div>
-
-        <!-- Non-Project Work: Category + Activity Note below -->
-        <ng-container *ngIf="!isProjectWorkMode">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Work Category</mat-label>
-            <mat-select formControlName="category">
-              <mat-option *ngFor="let option of categoryOptions" [value]="option.value">
-                {{ option.label }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>label</mat-icon>
-          </mat-form-field>
-
-          <div class="activity-note-block">
-            <div class="activity-note-label">
-              <mat-icon>sticky_note_2</mat-icon>
-              <span>Activity Description <em>(optional)</em></span>
-            </div>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Briefly describe your activity</mat-label>
-              <textarea matInput rows="2" formControlName="activityNote"
-                placeholder="e.g. Team building day, National holiday, External training..."></textarea>
-            </mat-form-field>
-          </div>
-        </ng-container>
-      </div>
-
-      <!-- â•â•â•â• Section 2A: Project Details (project-work only) â•â•â•â• -->
-      <div class="form-section" *ngIf="isProjectWorkMode">
-        <div class="section-header">
-          <mat-icon>assignment</mat-icon>
-          <h3>Project Details</h3>
-        </div>
-        <div class="grid-row three-cols">
-          <mat-form-field appearance="outline">
-            <mat-label>Project</mat-label>
-            <mat-select formControlName="projectId" required (selectionChange)="onProjectChanged()">
-              <mat-option *ngFor="let p of projectOptions" [value]="p.projectId">{{ p.label }}</mat-option>
-            </mat-select>
-            <mat-icon matPrefix>work</mat-icon>
-            <mat-error *ngIf="form.controls.projectId.touched && form.controls.projectId.invalid">
-              Selection required
-            </mat-error>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Allocation Frequency</mat-label>
-            <mat-select formControlName="allocationFrequency">
-              <mat-option *ngFor="let option of allocationFrequencyOptions" [value]="option.value">
-                {{ option.label }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>update</mat-icon>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Date Mode</mat-label>
-            <mat-select formControlName="dateSelectionMode"
-              [disabled]="form.controls.allocationFrequency.value === allocationFrequency.Weekly">
-              <mat-option [value]="null" disabled>Select a date mode...</mat-option>
-              <mat-option *ngFor="let option of filteredDateModeOptions" [value]="option.value">
-                {{ option.label }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>calendar_view_day</mat-icon>
-          </mat-form-field>
-        </div>
-      </div>
-
-      <!-- â•â•â•â• Section 2B: Schedule Options (non-project-work) â•â•â•â• -->
-      <div class="form-section" *ngIf="!isProjectWorkMode">
-        <div class="section-header">
-          <mat-icon>tune</mat-icon>
-          <h3>Schedule Options</h3>
-        </div>
-        <div class="grid-row two-cols">
-          <mat-form-field appearance="outline">
-            <mat-label>Allocation Frequency</mat-label>
-            <mat-select formControlName="allocationFrequency">
-              <mat-option *ngFor="let option of allocationFrequencyOptions" [value]="option.value">
-                {{ option.label }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>update</mat-icon>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Date Mode</mat-label>
-            <mat-select formControlName="dateSelectionMode"
-              [disabled]="form.controls.allocationFrequency.value === allocationFrequency.Weekly">
-              <mat-option [value]="null" disabled>Select a date mode...</mat-option>
-              <mat-option *ngFor="let option of filteredDateModeOptions" [value]="option.value">
-                {{ option.label }}
-              </mat-option>
-            </mat-select>
-            <mat-icon matPrefix>calendar_view_day</mat-icon>
-          </mat-form-field>
-        </div>
-      </div>
-
-      <!-- â•â•â•â• Section 3: Schedule Selection (shown only after date mode is chosen) â•â•â•â• -->
-      <div class="form-section" *ngIf="form.controls.dateSelectionMode.value !== null">
-        <div class="section-header">
-          <mat-icon>event</mat-icon>
-          <h3>Schedule Selection</h3>
-        </div>
-
-        <!-- Single Day -->
-        <div class="calendar-container"
-          *ngIf="form.controls.dateSelectionMode.value === dateSelectionMode.SingleDay">
-          <mat-calendar
-            [selected]="form.controls.date.value"
-            [dateFilter]="weekendFilter"
-            (selectedChange)="onDateSelected($event)">
-          </mat-calendar>
-          <div class="selected-date-chip" *ngIf="form.controls.date.value">
-            <mat-icon>event_available</mat-icon>
-            <span>{{ form.controls.date.value | date:'EEEE, MMMM d, y' }}</span>
-          </div>
-        </div>
-
-        <!-- Multiple Days -->
-        <div class="calendar-container"
-          *ngIf="form.controls.dateSelectionMode.value === dateSelectionMode.MultipleDays">
-          <mat-calendar
-            [dateClass]="dateClass"
-            [dateFilter]="weekendFilter"
-            (selectedChange)="onDateSelected($event)">
-          </mat-calendar>
-          <div class="multi-dates-chips" *ngIf="selectedDatesList.length > 0">
-            <div class="chips-label">
-              <mat-icon>calendar_month</mat-icon>
-              <span>{{ selectedDatesList.length }} day(s) selected</span>
-            </div>
-            <div class="chips-list">
-              <span class="date-chip" *ngFor="let d of selectedDatesList">
-                {{ d | date:'EEE, MMM d' }}
-                <button type="button" class="chip-remove" (click)="removeDate(d)">
-                  <mat-icon>close</mat-icon>
-                </button>
-              </span>
-            </div>
-          </div>
-          <div class="no-dates-hint" *ngIf="selectedDatesList.length === 0">
-            <mat-icon>touch_app</mat-icon>
-            <span>Click on the calendar to select multiple days (weekdays only)</span>
-          </div>
-        </div>
-
-        <!-- Week Range -->
-        <div class="date-range-container"
-          *ngIf="form.controls.dateSelectionMode.value === dateSelectionMode.WeekRange">
-          <div class="range-fields grid-row two-cols">
-            <mat-form-field appearance="outline">
-              <mat-label>From</mat-label>
-              <input matInput [matDatepicker]="startPicker" formControlName="rangeStartDate"
-                [matDatepickerFilter]="weekendFilter" />
-              <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
-              <mat-datepicker #startPicker></mat-datepicker>
-              <mat-icon matPrefix>start</mat-icon>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>To</mat-label>
-              <input matInput [matDatepicker]="endPicker" formControlName="rangeEndDate"
-                [matDatepickerFilter]="weekendFilter" />
-              <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
-              <mat-datepicker #endPicker></mat-datepicker>
-              <mat-icon matPrefix>event_busy</mat-icon>
-            </mat-form-field>
-          </div>
-        </div>
-      </div>
-
-      <!-- â•â•â•â• Section 4A: Time Allocation â€” Full (project-work) â•â•â•â• -->
-      <div class="form-section" *ngIf="isProjectWorkMode">
-        <div class="section-header">
-          <mat-icon>timer</mat-icon>
-          <h3>Time Allocation</h3>
-        </div>
-        <div class="hours-grid">
-          <div class="hour-input-card">
-            <label>Execution</label>
-            <div class="input-wrapper">
-              <mat-icon>code</mat-icon>
-              <input type="number" min="0" step="0.25" formControlName="executionHours" />
-            </div>
-          </div>
-          <div class="hour-input-card">
-            <label>Technical Supervision</label>
-            <div class="input-wrapper">
-              <mat-icon>visibility</mat-icon>
-              <input type="number" min="0" step="0.25" formControlName="technicalSupervisionHours" />
-            </div>
-          </div>
-          <div class="hour-input-card">
-            <label>Process</label>
-            <div class="input-wrapper">
-              <mat-icon>settings_suggest</mat-icon>
-              <input type="number" min="0" step="0.25" formControlName="processRelatedHours" />
-            </div>
-          </div>
-          <div class="hour-input-card">
-            <label>Management</label>
-            <div class="input-wrapper">
-              <mat-icon>leaderboard</mat-icon>
-              <input type="number" min="0" step="0.25" formControlName="projectManagementHours" />
-            </div>
-          </div>
-          <div class="hour-input-card">
-            <label>R & D</label>
-            <div class="input-wrapper">
-              <mat-icon>science</mat-icon>
-              <input type="number" min="0" step="0.25" formControlName="researchAndDevHours" />
-            </div>
-          </div>
-          <div class="hour-input-card">
-            <label>Workshop</label>
-            <div class="input-wrapper">
-              <mat-icon>groups</mat-icon>
-              <input type="number" min="0" step="0.25" formControlName="workshopHours" />
-            </div>
-          </div>
-          <div class="hour-input-card">
-            <label>Other</label>
-            <div class="input-wrapper">
-              <mat-icon>more_horiz</mat-icon>
-              <input type="number" min="0" step="0.25" formControlName="otherActivitiesHours" />
-            </div>
-          </div>
-          <div class="hour-input-card">
-            <label>Intern Mgmt</label>
-            <div class="input-wrapper">
-              <mat-icon>school</mat-icon>
-              <input type="number" min="0" step="0.25" formControlName="internManagementHours" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- â•â•â•â• Section 4B: Time Allocation â€” Simplified (non-project-work) â•â•â•â• -->
-      <div class="form-section" *ngIf="!isProjectWorkMode">
-        <div class="section-header">
-          <mat-icon>timer</mat-icon>
-          <h3>Time Allocation</h3>
-        </div>
-        <div class="simple-hours-card">
-          <div class="simple-hours-icon">
-            <mat-icon>hourglass_top</mat-icon>
-          </div>
-          <div class="simple-hours-content">
-            <label class="simple-hours-label">Total Hours</label>
-            <p class="simple-hours-hint">Enter the total number of hours for this activity</p>
-            <div class="simple-hours-input-row">
-              <input
-                type="number"
-                min="0"
-                step="0.25"
-                formControlName="simpleTotalHours"
-                class="simple-hours-input"
-                placeholder="0"
-              />
-              <span class="simple-hours-unit">hrs</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- â•â•â•â• Section 5: Supervised Interns (project-work only, conditional) â•â•â•â• -->
-      <div class="form-section interns-section" *ngIf="isProjectWorkMode">
-        <div class="section-header">
-          <mat-icon>people</mat-icon>
-          <h3>Intern Management</h3>
-        </div>
-        <div class="intern-management-shell" *ngIf="activeInternOptions.length; else noInternsForProject">
-          <div class="grid-row two-cols intern-management-grid">
-            <mat-form-field appearance="outline">
-              <mat-label>Select intern</mat-label>
-              <mat-select [value]="selectedInternAllocationId" (selectionChange)="onInternSelectionChanged($event.value)">
-                <mat-option value="">Choose an intern</mat-option>
-                <mat-option *ngFor="let intern of activeInternOptions" [value]="intern.internAllocationId">
-                  {{ intern.internName }}
-                </mat-option>
-              </mat-select>
-              <mat-icon matPrefix>school</mat-icon>
-            </mat-form-field>
-
-            <div class="intern-supervision-card">
-              <label>Supervision Hours</label>
-              <div class="input-wrapper">
-                <mat-icon>schedule</mat-icon>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  [value]="internDraftHours"
-                  (input)="onInternDraftHoursChanged($event)"
-                  placeholder="0"
-                />
-                <span class="unit">hrs</span>
-              </div>
-              <button type="button" class="intern-save-btn" [disabled]="!canSaveInternDraft" (click)="saveInternDraft()">
-                <mat-icon>{{ editingInternAllocationId ? 'edit' : 'add' }}</mat-icon>
-                <span>{{ editingInternAllocationId ? 'Update intern' : 'Add intern' }}</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="intern-insights" *ngIf="currentInternOption as currentIntern">
-            <div class="intern-insight-card">
-              <span class="insight-label">Worked On Project</span>
-              <strong>{{ currentIntern.hoursWorked !== null ? (currentIntern.hoursWorked | number:'1.2-2') + ' hrs' : 'Not available' }}</strong>
-            </div>
-            <div class="intern-insight-card">
-              <span class="insight-label">Allocated Hours</span>
-              <strong>{{ currentIntern.allocatedHours !== null ? (currentIntern.allocatedHours | number:'1.2-2') + ' hrs' : 'Not available' }}</strong>
-            </div>
-            <div class="intern-insight-card">
-              <span class="insight-label">Remaining Hours</span>
-              <strong>{{ currentIntern.remainingHours !== null ? (currentIntern.remainingHours | number:'1.2-2') + ' hrs' : 'Not available' }}</strong>
-            </div>
-          </div>
-
-          <div class="saved-interns" *ngIf="selectedInterns.length">
-            <div class="saved-intern-card" *ngFor="let intern of selectedInterns">
-              <div class="saved-intern-main">
-                <div class="saved-intern-title-row">
-                  <strong>{{ intern.internName }}</strong>
-                  <span class="saved-hours">{{ intern.hours | number:'1.2-2' }} hrs</span>
-                </div>
-                <p>{{ intern.projectLabel }}</p>
-                <div class="saved-intern-meta">
-                  <span>Worked: {{ intern.hoursWorked !== null ? (intern.hoursWorked | number:'1.2-2') + ' hrs' : 'N/A' }}</span>
-                  <span>Remaining: {{ intern.remainingHours !== null ? (intern.remainingHours | number:'1.2-2') + ' hrs' : 'N/A' }}</span>
-                </div>
-              </div>
-              <div class="saved-intern-actions">
-                <button type="button" class="icon-btn" (click)="editInternSelection(intern)" aria-label="Edit intern supervision">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button type="button" class="icon-btn danger" (click)="removeInternSelection(intern.internAllocationId)" aria-label="Remove intern supervision">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <ng-template #noInternsForProject>
-          <div class="intern-empty-state">
-            <mat-icon>info_outline</mat-icon>
-            <span>No supervised interns are linked to the selected project yet.</span>
-          </div>
-        </ng-template>
-      </div>
-
-      <!-- â•â•â•â• Section 6: Notes (always) â•â•â•â• -->
-      <div class="form-section">
-        <div class="section-header">
-          <mat-icon>note_alt</mat-icon>
-          <h3>Contextual Notes</h3>
-        </div>
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Special observations or notes</mat-label>
-          <textarea matInput rows="3" formControlName="notes"
-            placeholder="e.g. Completed phase 1 documentation..."></textarea>
-        </mat-form-field>
-      </div>
-
-      <div class="form-actions">
-        <button mat-flat-button class="submit-btn" type="submit"
-          [disabled]="isSubmitting || form.invalid || totalOver24">
-          <div class="btn-content" *ngIf="!isSubmitting">
-            <mat-icon>save_alt</mat-icon>
-            <span>Confirm and Save Allocation</span>
-          </div>
-          <div class="btn-content" *ngIf="isSubmitting">
-            <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
-            <span>Saving Allocation...</span>
-          </div>
-        </button>
-      </div>
-    </form>
-  </div>
-</section>
+<section class="hour-entry-page pm-page-enter">
+  <header class="hour-entry-header">
+    <div class="header-copy">
+      <span class="eyebrow">Time tracking</span>
+      <h1>Hours cockpit</h1>
+      <p>
+        Update entries faster, keep the monthly target visible, and help the team stay on pace.
+      </p>
+    </div>
+
+    <div class="month-score" [class.done]="monthProgressPercent >= 100">
+      <div class="score-icon">
+        <mat-icon>{{ monthStatusIcon }}</mat-icon>
+      </div>
+      <div>
+        <span>{{ monthStatusLabel }}</span>
+        <strong>{{ monthProgressPercent | number:'1.0-0' }}%</strong>
+      </div>
+    </div>
+  </header>
+
+  <app-loading-spinner *ngIf="isLoadingProjects || isLoadingInterns"></app-loading-spinner>
+
+  <div class="status-messages">
+    <p class="hour-entry-error" *ngIf="projectsError && !isLoadingProjects">
+      <mat-icon>error_outline</mat-icon> {{ projectsError }}
+    </p>
+    <p class="hour-entry-error" *ngIf="internsError && !isLoadingInterns">
+      <mat-icon>error_outline</mat-icon> {{ internsError }}
+    </p>
+    <p class="hour-entry-empty" *ngIf="!isLoadingProjects && !projectsError && !projectOptions.length">
+      <mat-icon>info_outline</mat-icon>
+      No active project found. Contact your administrator to be assigned to a project team.
+    </p>
+  </div>
+
+  <div class="hours-workspace" *ngIf="!isLoadingProjects && projectOptions.length">
+    <aside class="insights-panel">
+      <section class="target-card">
+        <div class="target-card__top">
+          <div>
+            <span class="panel-label">Monthly goal</span>
+            <strong>{{ monthLoggedHours | number:'1.0-2' }}h</strong>
+          </div>
+          <span>{{ monthTargetHours | number:'1.0-0' }}h target</span>
+        </div>
+
+        <div class="progress-track">
+          <span [style.width.%]="monthProgressPercent"></span>
+        </div>
+
+        <div class="target-grid">
+          <div>
+            <span>Remaining</span>
+            <strong>{{ monthRemainingHours | number:'1.0-2' }}h</strong>
+          </div>
+          <div>
+            <span>Needed / day</span>
+            <strong>{{ monthDailyNeeded | number:'1.0-2' }}h</strong>
+          </div>
+          <div>
+            <span>Logged days</span>
+            <strong>{{ productiveDayCount }}</strong>
+          </div>
+          <div>
+            <span>Projects</span>
+            <strong>{{ recentProjectCount }}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="compact-card" *ngIf="selectedEntryPreview as preview">
+        <div class="compact-card__header">
+          <span class="panel-label">Editing now</span>
+          <button type="button" class="icon-btn subtle" (click)="cancelEdit()" aria-label="Cancel edit">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <strong>{{ preview.projectName || 'Non-project activity' }}</strong>
+        <p>{{ formatEntryDate(preview.date || preview.createdAt) }} - {{ formatEntryHours(preview) }}</p>
+      </section>
+
+      <section class="compact-card">
+        <div class="compact-card__header">
+          <span class="panel-label">Top allocations</span>
+          <mat-icon>stacked_bar_chart</mat-icon>
+        </div>
+        <div class="allocation-mini-list" *ngIf="topProjectEntries.length; else noAllocationStats">
+          <div class="allocation-mini-row" *ngFor="let project of topProjectEntries">
+            <div>
+              <strong>{{ project.label }}</strong>
+              <span>{{ project.entries }} entr{{ project.entries > 1 ? 'ies' : 'y' }}</span>
+            </div>
+            <b>{{ project.hours | number:'1.0-2' }}h</b>
+          </div>
+        </div>
+        <ng-template #noAllocationStats>
+          <p class="muted-line">No allocation trend yet for this month.</p>
+        </ng-template>
+      </section>
+
+      <section class="history-panel">
+        <div class="history-header">
+          <div>
+            <span class="panel-label">Month history</span>
+            <h2>Entries</h2>
+          </div>
+          <span>{{ recentEntries.length }}</span>
+        </div>
+
+        <p class="hour-entry-error" *ngIf="recentEntriesError">
+          <mat-icon>error_outline</mat-icon> {{ recentEntriesError }}
+        </p>
+
+        <div class="empty-history" *ngIf="!isLoadingRecentEntries && !recentEntriesError && !recentEntries.length">
+          <mat-icon>event_busy</mat-icon>
+          <span>No entry found for the current month.</span>
+        </div>
+
+        <div class="history-list" *ngIf="recentEntries.length">
+          <article class="history-item" *ngFor="let entry of recentEntries" [class.active]="entry.id === editingEntryId">
+            <button type="button" class="history-main" (click)="editEntry(entry)">
+              <span>{{ formatEntryDate(entry.date || entry.createdAt) }}</span>
+              <strong>{{ entry.projectName || 'Non-project activity' }}</strong>
+              <small>{{ getEntryBreakdown(entry) }}</small>
+            </button>
+
+            <div class="history-side">
+              <b>{{ formatEntryHours(entry) }}</b>
+              <div>
+                <button type="button" class="icon-btn" (click)="editEntry(entry)" aria-label="Edit entry">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button type="button" class="icon-btn danger" (click)="deleteEntry(entry)" aria-label="Delete entry">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </aside>
+
+    <main class="editor-panel">
+      <form [formGroup]="form" (ngSubmit)="submit()" class="hour-entry-form">
+        <div class="editor-toolbar">
+          <div>
+            <span class="panel-label">{{ editingEntryId ? 'Update mode' : 'New entry' }}</span>
+            <h2>{{ editingEntryId ? 'Modify selected entry' : 'Book hours' }}</h2>
+          </div>
+
+          <div class="total-pill" [class.warning]="overtimeWarning" [class.error]="totalOver24">
+            <span>Current total</span>
+            <strong>{{ totalHours | number:'1.2-2' }}h</strong>
+          </div>
+        </div>
+
+        <section class="form-section">
+          <div class="section-header">
+            <mat-icon>category</mat-icon>
+            <h3>Classification</h3>
+          </div>
+
+          <div class="grid-row two-cols" *ngIf="isProjectWorkMode">
+            <mat-form-field appearance="outline">
+              <mat-label>Work category</mat-label>
+              <mat-select formControlName="category">
+                <mat-option *ngFor="let option of categoryOptions" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matPrefix>label</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Booking type</mat-label>
+              <mat-select formControlName="bookingType">
+                <mat-option *ngFor="let option of bookingTypeOptions" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matPrefix>bolt</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <ng-container *ngIf="!isProjectWorkMode">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Work category</mat-label>
+              <mat-select formControlName="category">
+                <mat-option *ngFor="let option of categoryOptions" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matPrefix>label</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Briefly describe your activity</mat-label>
+              <textarea matInput rows="2" formControlName="activityNote"></textarea>
+            </mat-form-field>
+          </ng-container>
+        </section>
+
+        <section class="form-section">
+          <div class="section-header">
+            <mat-icon>assignment</mat-icon>
+            <h3>{{ isProjectWorkMode ? 'Project and schedule' : 'Schedule' }}</h3>
+          </div>
+
+          <div class="grid-row three-cols" *ngIf="isProjectWorkMode">
+            <mat-form-field appearance="outline">
+              <mat-label>Project</mat-label>
+              <mat-select formControlName="projectId" required (selectionChange)="onProjectChanged()">
+                <mat-option *ngFor="let p of projectOptions" [value]="p.projectId">{{ p.label }}</mat-option>
+              </mat-select>
+              <mat-icon matPrefix>work</mat-icon>
+              <mat-error *ngIf="form.controls.projectId.touched && form.controls.projectId.invalid">
+                Selection is required
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Allocation frequency</mat-label>
+              <mat-select formControlName="allocationFrequency">
+                <mat-option *ngFor="let option of allocationFrequencyOptions" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matPrefix>update</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Date mode</mat-label>
+              <mat-select
+                formControlName="dateSelectionMode"
+                [disabled]="form.controls.allocationFrequency.value === allocationFrequency.Weekly"
+              >
+                <mat-option [value]="null" disabled>Select a date mode...</mat-option>
+                <mat-option *ngFor="let option of filteredDateModeOptions" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matPrefix>calendar_view_day</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <div class="grid-row two-cols" *ngIf="!isProjectWorkMode">
+            <mat-form-field appearance="outline">
+              <mat-label>Allocation frequency</mat-label>
+              <mat-select formControlName="allocationFrequency">
+                <mat-option *ngFor="let option of allocationFrequencyOptions" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matPrefix>update</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Date mode</mat-label>
+              <mat-select
+                formControlName="dateSelectionMode"
+                [disabled]="form.controls.allocationFrequency.value === allocationFrequency.Weekly"
+              >
+                <mat-option [value]="null" disabled>Select a date mode...</mat-option>
+                <mat-option *ngFor="let option of filteredDateModeOptions" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matPrefix>calendar_view_day</mat-icon>
+            </mat-form-field>
+          </div>
+
+          <div class="schedule-strip" *ngIf="form.controls.dateSelectionMode.value !== null">
+            <div class="calendar-card" *ngIf="form.controls.dateSelectionMode.value === dateSelectionMode.SingleDay">
+              <mat-calendar
+                [selected]="form.controls.date.value"
+                [dateFilter]="weekendFilter"
+                (selectedChange)="onDateSelected($event)"
+              ></mat-calendar>
+              <div class="selected-date-chip" *ngIf="form.controls.date.value">
+                <mat-icon>event_available</mat-icon>
+                <span>{{ form.controls.date.value | date:'EEEE, MMMM d, y' }}</span>
+              </div>
+            </div>
+
+            <div class="calendar-card" *ngIf="form.controls.dateSelectionMode.value === dateSelectionMode.MultipleDays">
+              <mat-calendar
+                [dateClass]="dateClass"
+                [dateFilter]="weekendFilter"
+                (selectedChange)="onDateSelected($event)"
+              ></mat-calendar>
+
+              <div class="multi-dates-chips" *ngIf="selectedDatesList.length > 0">
+                <span>{{ selectedDatesList.length }} selected day(s)</span>
+                <div class="chips-list">
+                  <span class="date-chip" *ngFor="let d of selectedDatesList">
+                    {{ d | date:'EEE, MMM d' }}
+                    <button type="button" class="chip-remove" (click)="removeDate(d)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </span>
+                </div>
+              </div>
+
+              <div class="empty-history" *ngIf="selectedDatesList.length === 0">
+                <mat-icon>touch_app</mat-icon>
+                <span>Click the calendar to select working days.</span>
+              </div>
+            </div>
+
+            <div class="date-range-container" *ngIf="form.controls.dateSelectionMode.value === dateSelectionMode.WeekRange">
+              <div class="grid-row two-cols">
+                <mat-form-field appearance="outline">
+                  <mat-label>From</mat-label>
+                  <input
+                    matInput
+                    [matDatepicker]="startPicker"
+                    formControlName="rangeStartDate"
+                    [matDatepickerFilter]="weekendFilter"
+                  />
+                  <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #startPicker></mat-datepicker>
+                  <mat-icon matPrefix>start</mat-icon>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>To</mat-label>
+                  <input
+                    matInput
+                    [matDatepicker]="endPicker"
+                    formControlName="rangeEndDate"
+                    [matDatepickerFilter]="weekendFilter"
+                  />
+                  <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #endPicker></mat-datepicker>
+                  <mat-icon matPrefix>event_busy</mat-icon>
+                </mat-form-field>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-section" *ngIf="isProjectWorkMode">
+          <div class="section-header">
+            <mat-icon>timer</mat-icon>
+            <h3>Time allocation</h3>
+          </div>
+          <div class="hours-grid">
+            <div class="hour-input-card">
+              <label>Execution</label>
+              <div class="input-wrapper">
+                <mat-icon>code</mat-icon>
+                <input type="number" min="0" step="0.25" formControlName="executionHours" />
+              </div>
+            </div>
+            <div class="hour-input-card">
+              <label>Technical supervision</label>
+              <div class="input-wrapper">
+                <mat-icon>visibility</mat-icon>
+                <input type="number" min="0" step="0.25" formControlName="technicalSupervisionHours" />
+              </div>
+            </div>
+            <div class="hour-input-card">
+              <label>Process</label>
+              <div class="input-wrapper">
+                <mat-icon>settings_suggest</mat-icon>
+                <input type="number" min="0" step="0.25" formControlName="processRelatedHours" />
+              </div>
+            </div>
+            <div class="hour-input-card">
+              <label>Management</label>
+              <div class="input-wrapper">
+                <mat-icon>leaderboard</mat-icon>
+                <input type="number" min="0" step="0.25" formControlName="projectManagementHours" />
+              </div>
+            </div>
+            <div class="hour-input-card">
+              <label>R & D</label>
+              <div class="input-wrapper">
+                <mat-icon>science</mat-icon>
+                <input type="number" min="0" step="0.25" formControlName="researchAndDevHours" />
+              </div>
+            </div>
+            <div class="hour-input-card">
+              <label>Workshop</label>
+              <div class="input-wrapper">
+                <mat-icon>groups</mat-icon>
+                <input type="number" min="0" step="0.25" formControlName="workshopHours" />
+              </div>
+            </div>
+            <div class="hour-input-card">
+              <label>Other</label>
+              <div class="input-wrapper">
+                <mat-icon>more_horiz</mat-icon>
+                <input type="number" min="0" step="0.25" formControlName="otherActivitiesHours" />
+              </div>
+            </div>
+            <div class="hour-input-card">
+              <label>Intern management</label>
+              <div class="input-wrapper">
+                <mat-icon>school</mat-icon>
+                <input type="number" min="0" step="0.25" formControlName="internManagementHours" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-section" *ngIf="!isProjectWorkMode">
+          <div class="section-header">
+            <mat-icon>timer</mat-icon>
+            <h3>Time allocation</h3>
+          </div>
+          <div class="simple-hours-card">
+            <mat-icon>hourglass_top</mat-icon>
+            <div>
+              <label>Total hours</label>
+              <input type="number" min="0" step="0.25" formControlName="simpleTotalHours" placeholder="0" />
+              <span>h</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-section interns-section" *ngIf="isProjectWorkMode">
+          <div class="section-header">
+            <mat-icon>people</mat-icon>
+            <h3>Intern management</h3>
+          </div>
+          <div class="intern-management-shell" *ngIf="activeInternOptions.length; else noInternsForProject">
+            <div class="grid-row two-cols intern-management-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Select an intern</mat-label>
+                <mat-select [value]="selectedInternAllocationId" (selectionChange)="onInternSelectionChanged($event.value)">
+                  <mat-option value="">Choose an intern</mat-option>
+                  <mat-option *ngFor="let intern of activeInternOptions" [value]="intern.internAllocationId">
+                    {{ intern.internName }}
+                  </mat-option>
+                </mat-select>
+                <mat-icon matPrefix>school</mat-icon>
+              </mat-form-field>
+
+              <div class="intern-supervision-card">
+                <label>Supervision hours</label>
+                <div class="input-wrapper">
+                  <mat-icon>schedule</mat-icon>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.25"
+                    [value]="internDraftHours"
+                    (input)="onInternDraftHoursChanged($event)"
+                    placeholder="0"
+                  />
+                  <span class="unit">h</span>
+                </div>
+                <button type="button" class="intern-save-btn" [disabled]="!canSaveInternDraft" (click)="saveInternDraft()">
+                  <mat-icon>{{ editingInternAllocationId ? 'edit' : 'add' }}</mat-icon>
+                  <span>{{ editingInternAllocationId ? 'Update' : 'Add' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="intern-insights" *ngIf="currentInternOption as currentIntern">
+              <div class="intern-insight-card">
+                <span>Worked</span>
+                <strong>{{ currentIntern.hoursWorked !== null ? (currentIntern.hoursWorked | number:'1.2-2') + ' h' : 'N/A' }}</strong>
+              </div>
+              <div class="intern-insight-card">
+                <span>Allocated</span>
+                <strong>{{ currentIntern.allocatedHours !== null ? (currentIntern.allocatedHours | number:'1.2-2') + ' h' : 'N/A' }}</strong>
+              </div>
+              <div class="intern-insight-card">
+                <span>Remaining</span>
+                <strong>{{ currentIntern.remainingHours !== null ? (currentIntern.remainingHours | number:'1.2-2') + ' h' : 'N/A' }}</strong>
+              </div>
+            </div>
+
+            <div class="saved-interns" *ngIf="selectedInterns.length">
+              <div class="saved-intern-card" *ngFor="let intern of selectedInterns">
+                <div>
+                  <strong>{{ intern.internName }}</strong>
+                  <p>{{ intern.projectLabel }}</p>
+                  <span>{{ intern.hours | number:'1.2-2' }} h</span>
+                </div>
+                <div class="saved-intern-actions">
+                  <button type="button" class="icon-btn" (click)="editInternSelection(intern)" aria-label="Edit intern supervision">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button type="button" class="icon-btn danger" (click)="removeInternSelection(intern.internAllocationId)" aria-label="Remove intern supervision">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <ng-template #noInternsForProject>
+            <div class="empty-history">
+              <mat-icon>info_outline</mat-icon>
+              <span>No supervised intern is linked to the selected project yet.</span>
+            </div>
+          </ng-template>
+        </section>
+
+        <section class="form-section">
+          <div class="section-header">
+            <mat-icon>note_alt</mat-icon>
+            <h3>Context notes</h3>
+          </div>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Observations or special notes</mat-label>
+            <textarea matInput rows="3" formControlName="notes"></textarea>
+          </mat-form-field>
+        </section>
+
+        <div class="form-actions">
+          <button mat-button type="button" *ngIf="editingEntryId" (click)="cancelEdit()">
+            <mat-icon>close</mat-icon>
+            <span>Cancel</span>
+          </button>
+          <button mat-flat-button class="submit-btn" type="submit" [disabled]="isSubmitting || form.invalid || totalOver24">
+            <span class="btn-content" *ngIf="!isSubmitting">
+              <mat-icon>{{ editingEntryId ? 'done_all' : 'save_alt' }}</mat-icon>
+              <span>{{ editingEntryId ? 'Update entry' : 'Save entry' }}</span>
+            </span>
+            <span class="btn-content" *ngIf="isSubmitting">
+              <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+              <span>Saving...</span>
+            </span>
+          </button>
+        </div>
+      </form>
+    </main>
+  </div>
+</section>

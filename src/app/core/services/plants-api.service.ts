@@ -51,8 +51,9 @@ export class PlantsApiService {
   }
 
   listPlantsByBusinessUnit(_businessUnitId: string): Observable<PlantDto[]> {
-    // Backend DTO doesn't tie plants to business units. Return all plants.
-    return this.listPlants();
+    return this.http
+      .get<ApiResponse<unknown[]> | unknown[]>(`${this.apiUrl}/businessunit/${_businessUnitId}`)
+      .pipe(map((r) => this.unwrapList(r).map((item) => this.toPlantDto(item)).filter((x) => !!x.id && !!x.name)));
   }
 
   private unwrapList(response: ApiResponse<unknown[]> | unknown[]): unknown[] {

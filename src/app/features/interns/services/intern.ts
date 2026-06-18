@@ -23,7 +23,10 @@ export class InternService {
   }
 
   getIntern(id: string): Observable<InternDto | null> {
-    return this.getInterns().pipe(map((interns) => interns.find((intern) => intern.id === id) ?? null));
+    return this.http.get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}`).pipe(
+      map((response) => this.unwrapItem(response)),
+      map((item) => (item ? this.toInternDto(item) : null))
+    );
   }
 
   createIntern(payload: CreateInternDto): Observable<InternDto | null> {
@@ -48,6 +51,44 @@ export class InternService {
             return;
           }
           throw new Error(response.message || 'Unable to delete intern');
+        }
+        return;
+      })
+    );
+  }
+
+  getStatistics(id: string): Observable<unknown | null> {
+    return this.http
+      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}/statistics`)
+      .pipe(map((response) => this.unwrapItem(response)));
+  }
+
+  getWorkVisualization(id: string): Observable<unknown | null> {
+    return this.http
+      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}/work-visualization`)
+      .pipe(map((response) => this.unwrapItem(response)));
+  }
+
+  getPeriodStatistics(id: string): Observable<unknown | null> {
+    return this.http
+      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}/period-statistics`)
+      .pipe(map((response) => this.unwrapItem(response)));
+  }
+
+  getSupervisorDashboard(supervisorId: string): Observable<unknown | null> {
+    return this.http
+      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/dashboard/supervisor/${supervisorId}`)
+      .pipe(map((response) => this.unwrapItem(response)));
+  }
+
+  deleteAllData(id: string): Observable<void> {
+    return this.http.delete<ApiResponse<void>>(`${this.apiUrl}/${id}/all-data`).pipe(
+      map((response) => {
+        if (this.isApiResponse(response)) {
+          if (response.success) {
+            return;
+          }
+          throw new Error(response.message || 'Unable to delete intern data');
         }
         return;
       })

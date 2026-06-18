@@ -22,6 +22,52 @@
   pointer-events: none;
 }
 
+.dashboard-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: fit-content;
+  margin-top: 1rem;
+  padding: 0.25rem;
+  border: 1px solid rgba($orange-crisp, 0.22);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.dashboard-view-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.35rem;
+  padding: 0 0.85rem;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: $navy-700;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.dashboard-view-switch button:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
+.dashboard-view-switch mat-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 1.1rem;
+}
+
+.dashboard-view-switch__btn--active {
+  background: $orange-crisp !important;
+  color: #ffffff !important;
+}
+
 .dashboard-hero {
 
   position: relative;
@@ -494,7 +540,7 @@
 
 
 
-  .period-bar__dates {
+  .period-bar__selectors {
 
     padding-left: 0;
 
@@ -708,7 +754,7 @@
   box-shadow: 0 14px 34px rgba(52, 37, 27, 0.055);
 }
 
-.period-bar__dates,
+.period-bar__selectors,
 .period-bar__modes,
 .pm-section-title > div,
 .project-explorer__header > div {
@@ -716,7 +762,7 @@
   align-items: center;
 }
 
-.period-bar__dates {
+.period-bar__selectors {
   gap: 0.75rem;
   padding-left: 0.7rem;
 
@@ -724,23 +770,27 @@
     color: $primary-500;
   }
 
-  input {
-    width: 10.5rem;
-    min-height: 2.35rem;
-    background: transparent;
-    border-color: transparent;
-    font-size: 0.76rem;
-    color: #101828;
-    font-weight: 800;
-    text-transform: uppercase;
+  label {
+    display: grid;
+    gap: 0.25rem;
   }
 
-  span {
+  label > span {
     color: #667085;
     font-size: 0.72rem;
     font-weight: 800;
     text-transform: uppercase;
   }
+}
+
+.period-bar__select {
+  width: 11rem;
+  min-height: 2.35rem;
+  border-color: rgba($border-light, 0.95);
+  background: #ffffff;
+  color: #101828;
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
 .period-bar__modes {
@@ -1308,7 +1358,7 @@
     flex-direction: column;
   }
 
-  .period-bar__dates,
+  .period-bar__selectors,
   .period-bar__modes,
   .target-grid,
   .metric-grid {
@@ -1316,7 +1366,7 @@
     grid-template-columns: 1fr;
   }
 
-  .period-bar__dates input {
+  .period-bar__select {
     width: 100%;
   }
 }
