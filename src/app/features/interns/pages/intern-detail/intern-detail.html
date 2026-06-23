@@ -1,23 +1,4 @@
 <section class="intern-detail-page">
-  <header class="detail-hero">
-    <div class="detail-hero__copy">
-      <span class="eyebrow">Intern profile</span>
-      <h1>{{ intern?.name || 'Intern details' }}</h1>
-      <p>Review role ownership, reporting line and profile metadata exactly as exposed by the current backend.</p>
-    </div>
-
-    <div class="detail-hero__actions">
-      <button type="button" class="pm-btn-secondary" (click)="goBack()">
-        <mat-icon>arrow_back</mat-icon>
-        Back to interns
-      </button>
-      <button type="button" class="pm-btn-primary" (click)="editIntern()" [disabled]="!intern">
-        <mat-icon>edit</mat-icon>
-        Edit profile
-      </button>
-    </div>
-  </header>
-
   <app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
   <div class="state-card state-card--error" *ngIf="!isLoading && errorMessage">
     <mat-icon>error_outline</mat-icon>
@@ -32,71 +13,72 @@
     <section class="detail-card detail-card--identity">
       <div class="identity-badge">{{ initials }}</div>
       <div class="identity-copy">
-        <span class="identity-tag">{{ currentIntern.roleName || 'Role not set' }}</span>
+        <span class="identity-tag">Intern record</span>
         <h2>{{ currentIntern.name }}</h2>
-        <p>{{ currentIntern.supervisorName || 'Supervisor not set' }}</p>
+        <p>Current period: {{ periodLabel }}</p>
+        <div class="identity-chips">
+          <span *ngIf="currentIntern.roleName">
+            <mat-icon>badge</mat-icon>
+            {{ currentIntern.roleName }}
+          </span>
+          <span *ngIf="currentIntern.supervisorName">
+            <mat-icon>supervisor_account</mat-icon>
+            {{ currentIntern.supervisorName }}
+          </span>
+        </div>
+      </div>
+      <div class="identity-actions">
+        <button type="button" class="inline-action" (click)="goBack()">
+          <mat-icon>arrow_back</mat-icon>
+          Back
+        </button>
+        <button type="button" class="inline-action" (click)="editIntern()">
+          <mat-icon>edit</mat-icon>
+          Edit
+        </button>
+        <button type="button" class="inline-action inline-action--strong" (click)="viewPerformance()">
+          <mat-icon>analytics</mat-icon>
+          Performance
+        </button>
       </div>
     </section>
 
+    <section class="metric-grid" *ngIf="statisticCards.length > 0">
+      <article class="metric-card" *ngFor="let card of statisticCards" [class]="'metric-card metric-card--' + card.tone">
+        <div class="metric-card__icon">
+          <mat-icon>{{ card.icon }}</mat-icon>
+        </div>
+        <div>
+          <span>{{ card.note || 'Indicator' }}</span>
+          <strong>{{ card.value }}</strong>
+          <p>{{ card.label }}</p>
+        </div>
+      </article>
+    </section>
+
     <section class="detail-grid">
-      <article class="detail-card" *ngFor="let card of statisticCards">
-        <h3>{{ card.label }}</h3>
-        <dl class="detail-list">
-          <div>
-            <dt>{{ card.note || 'Indicator' }}</dt>
-            <dd>{{ card.value }}</dd>
-          </div>
-        </dl>
-      </article>
-
       <article class="detail-card">
-        <h3>Role assignment</h3>
-        <dl class="detail-list">
+        <div class="section-heading">
+          <mat-icon>person_search</mat-icon>
           <div>
-            <dt>Role</dt>
-            <dd>{{ currentIntern.roleName || 'Unknown role' }}</dd>
+            <h3>Profile summary</h3>
+            <p>Readable business information only, without technical identifiers.</p>
           </div>
-          <div>
-            <dt>Role ID</dt>
-            <dd>{{ currentIntern.roleId || '-' }}</dd>
-          </div>
-        </dl>
-      </article>
-
-      <article class="detail-card">
-        <h3>Supervision</h3>
-        <dl class="detail-list">
-          <div>
-            <dt>Supervisor</dt>
-            <dd>{{ currentIntern.supervisorName || 'Unknown supervisor' }}</dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd>{{ currentIntern.supervisorEmail || '-' }}</dd>
-          </div>
-          <div>
-            <dt>Supervisor ID</dt>
-            <dd>{{ currentIntern.supervisorId || '-' }}</dd>
-          </div>
-        </dl>
-      </article>
-
-      <article class="detail-card">
-        <h3>Audit trail</h3>
-        <dl class="detail-list">
-          <div>
-            <dt>Intern ID</dt>
-            <dd>{{ currentIntern.id }}</dd>
-          </div>
-          <div>
-            <dt>Created at</dt>
-            <dd>{{ formatDate(currentIntern.createdAt) }}</dd>
-          </div>
-          <div>
-            <dt>Updated at</dt>
-            <dd>{{ formatDate(currentIntern.updatedAt) }}</dd>
-          </div>
-        </dl>
+        </div>
+        <div class="profile-list">
+          <article *ngFor="let section of detailSections">
+            <mat-icon>{{ section.icon }}</mat-icon>
+            <div>
+              <h4>{{ section.title }}</h4>
+              <dl class="detail-list">
+                <div *ngFor="let item of section.items">
+                  <dt>{{ item.label }}</dt>
+                  <dd>{{ item.value }}</dd>
+                </div>
+              </dl>
+            </div>
+          </article>
+        </div>
       </article>
     </section>
   </div>

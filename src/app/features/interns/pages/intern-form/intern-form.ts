@@ -153,6 +153,8 @@ export class InternForm implements OnInit {
             roleId: intern.roleId,
             supervisorId: intern.supervisorId,
           });
+        } else {
+          this.setDefaultInternRole();
         }
 
         this.isLoading = false;
@@ -164,6 +166,17 @@ export class InternForm implements OnInit {
         this.cdr.detectChanges();
       },
     });
+  }
+
+  private setDefaultInternRole(): void {
+    if (this.isEditMode || this.form.controls.roleId.value) {
+      return;
+    }
+
+    const internRole = this.roles.find((role) => role.name.trim().toLowerCase() === 'intern');
+    if (internRole) {
+      this.form.patchValue({ roleId: internRole.id });
+    }
   }
 
   private extractErrorMessage(error: unknown, fallback: string): string {

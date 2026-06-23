@@ -552,6 +552,99 @@
   color: #0f172a;
 }
 
+.app-notification-panel__summary button:disabled,
+.app-notification-panel__actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.app-notification-panel__actions {
+  position: sticky;
+  top: 65px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.62rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.app-notification-panel__actions button {
+  min-width: 0;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.52rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  font-size: type.$type-label-size;
+  font-weight: type.$type-label-weight;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.app-notification-panel__actions button:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.app-notification-panel__actions mat-icon {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+}
+
+.app-notification-panel__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0.7rem 0.75rem 0;
+  padding: 0.62rem 0.7rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #b42318;
+  font-size: type.$type-body-sm-size;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.app-notification-panel__error mat-icon {
+  flex: 0 0 auto;
+  width: 1.05rem;
+  height: 1.05rem;
+  font-size: 1.05rem;
+}
+
+.app-notification-loading {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.65rem;
+  color: #64748b;
+  @include type.type-button;
+}
+
+.app-notification-loading__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #e87722;
+  border-radius: 999px;
+  animation: spin 800ms linear infinite;
+}
+
 .app-notification-group {
   padding: 0.55rem 0.7rem 0.7rem;
   border-bottom: 1px solid rgba(251, 146, 60, 0.18);

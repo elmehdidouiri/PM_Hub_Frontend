@@ -809,7 +809,46 @@ export class ProjectEditPage implements OnInit {
 
 
   prettyJson(value: unknown): string {
-    return JSON.stringify(value, null, 2);
+    return JSON.stringify(this.omitIdFields(value), null, 2);
+  }
+
+  getInternMemberLabel(value: unknown): string {
+    if (!value || typeof value !== 'object') {
+      return this.displayPrimitive(value) || '-';
+    }
+
+    const record = value as Record<string, unknown>;
+    return (
+      this.firstText(record, [
+        'internName',
+        'InternName',
+        'fullName',
+        'FullName',
+        'userName',
+        'UserName',
+        'name',
+        'Name',
+        'raw',
+      ]) ||
+      this.getDisplayRecordParts(record)[0] ||
+      '-'
+    );
+  }
+
+  getInternMemberMeta(value: unknown): string {
+    if (!value || typeof value !== 'object') {
+      return '';
+    }
+
+    const record = value as Record<string, unknown>;
+    const parts = [
+      this.firstText(record, ['roleName', 'RoleName']),
+      this.formatHours(record['allocatedHours'] ?? record['AllocatedHours'], 'allocated'),
+      this.formatHours(record['hoursWorked'] ?? record['HoursWorked'], 'worked'),
+      this.firstText(record, ['supervisorName', 'SupervisorName']),
+    ].filter(Boolean);
+
+    return parts.length ? parts.join(' | ') : this.getDisplayRecordParts(record).slice(1).join(' | ');
   }
 
   isOptionSelected(controlName: string, id: string): boolean {
@@ -1014,6 +1053,71 @@ export class ProjectEditPage implements OnInit {
     }
 
     return '';
+  }
+
+  private omitIdFields(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.omitIdFields(item));
+    }
+
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+
+    return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>((acc, [key, child]) => {
+      if (!this.isIdKey(key)) {
+        acc[key] = this.omitIdFields(child);
+      }
+      return acc;
+    }, {});
+  }
+
+  private getDisplayRecordParts(record: Record<string, unknown>): string[] {
+    return Object.entries(record)
+      .filter(([key, value]) => !this.isIdKey(key) && this.isDisplayPrimitive(value))
+      .map(([key, value]) => `${this.humanizeKey(key)}: ${this.displayPrimitive(value)}`)
+      .filter((part) => !part.endsWith(': -'));
+  }
+
+  private isIdKey(key: string): boolean {
+    return key.toLowerCase() === 'id' || key.toLowerCase().endsWith('id');
+  }
+
+  private isDisplayPrimitive(value: unknown): value is string | number | boolean {
+    return ['string', 'number', 'boolean'].includes(typeof value);
+  }
+
+  private displayPrimitive(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '-';
+    }
+
+    if (typeof value === 'string') {
+      return value.trim() || '-';
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? String(value) : '-';
+    }
+
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+
+    return '';
+  }
+
+  private humanizeKey(key: string): string {
+    return key
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_-]+/g, ' ')
+      .trim()
+      .replace(/^./, (char) => char.toUpperCase());
+  }
+
+  private formatHours(value: unknown, label: string): string {
+    const hours = Number(value);
+    return Number.isFinite(hours) && hours > 0 ? `${hours}h ${label}` : '';
   }
 
   private syncMemberRole(userId: string): void {

@@ -144,9 +144,50 @@
     width: auto;
     
     ::ng-deep .mat-mdc-select-trigger { height: auto; line-height: 1; }
+    ::ng-deep .mat-mdc-select-value {
+      max-width: 100%;
+      color: #1e293b;
+    }
+    ::ng-deep .mat-mdc-select-value-text {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     ::ng-deep .mat-mdc-select-arrow-wrapper { display: none !important; }
     ::ng-deep .mdc-line-ripple { display: none !important; }
   }
+}
+
+.flt--project {
+  min-width: 220px;
+  max-width: min(360px, 100%);
+
+  mat-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+::ng-deep .flt-panel {
+  max-width: 280px !important;
+  min-width: 280px !important;
+}
+
+::ng-deep .flt-panel .mat-mdc-option {
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+::ng-deep .flt-panel .mdc-list-item__primary-text {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: #1e293b;
 }
 
 .flt-sep {

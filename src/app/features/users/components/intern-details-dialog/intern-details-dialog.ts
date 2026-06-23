@@ -33,7 +33,7 @@ export class InternDetailsDialog implements OnInit {
 
     // We fetch detailed allocations for each project where the intern is assigned
     const requests = this.data.projectIds.map(pid => 
-      this.projectService.getInternAllocations(pid).pipe(
+      this.projectService.getInternAllocations(pid, { ignoreGlobalError: true }).pipe(
         catchError(() => of([] as ProjectInternAllocationDto[]))
       )
     );

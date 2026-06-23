@@ -36,7 +36,7 @@ export class ProfilePage implements OnInit {
 
   ngOnInit(): void {
     const userId = this.user?.userId;
-    if (!userId) {
+    if (!userId || this.authService.isAdmin(this.user)) {
       return;
     }
 

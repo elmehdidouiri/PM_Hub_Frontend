@@ -59,7 +59,7 @@
     </aside>
   </div>
 
-  <section class="profile-panel password-panel">
+  <section class="profile-panel password-panel" *ngIf="!user?.isAdmin">
     <div class="panel-heading">
       <span class="panel-heading__icon panel-heading__icon--navy">
         <mat-icon>lock_reset</mat-icon>

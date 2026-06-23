@@ -49,7 +49,7 @@ export class AuthService {
     '--projectDashboardPreferences',
   ];
   private apiUrl = `${environment.apiUrl}/auth`;
-  private usersApiUrl = `${environment.apiUrl}/Users`;
+  private usersApiUrl = `${environment.apiUrl}/users`;
   private refreshHttpClient: HttpClient;
   private refreshRequest$: Observable<AuthResponse> | null = null;
 
@@ -250,7 +250,7 @@ export class AuthService {
   }
 
   getAuthUserById(id: string): Observable<unknown | null> {
-    return this.http.get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/users/${id}`).pipe(
+    return this.http.get<ApiResponse<unknown> | unknown>(`${this.usersApiUrl}/${id}`).pipe(
       map((response) => {
         if (typeof response === 'object' && response !== null && 'success' in (response as any)) {
           const api = response as ApiResponse<unknown>;

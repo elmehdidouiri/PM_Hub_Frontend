@@ -391,9 +391,30 @@ export class ProjectDetail implements OnInit {
 
     const record = value as Record<string, unknown>;
     const label =
-      this.readString(record, ['name', 'title', 'label', 'description', 'currentState', 'roadblock', 'summary']);
+      this.readString(record, [
+        'internName',
+        'InternName',
+        'fullName',
+        'FullName',
+        'userName',
+        'UserName',
+        'name',
+        'Name',
+        'title',
+        'Title',
+        'label',
+        'Label',
+        'description',
+        'Description',
+        'currentState',
+        'CurrentState',
+        'roadblock',
+        'Roadblock',
+        'summary',
+        'Summary',
+      ]);
 
-    return label || 'Item';
+    return label || this.getDisplayRecordParts(record)[0] || 'Item';
   }
 
   getRecordMeta(value: unknown): string {
@@ -402,10 +423,15 @@ export class ProjectDetail implements OnInit {
     }
 
     const record = value as Record<string, unknown>;
-    return (
-      this.readString(record, ['statusLabel', 'phaseLabel', 'fileTypeLabel', 'roleName', 'typeLabel']) ||
-      this.readString(record, ['createdAt', 'updatedAt', 'joinedAt'])
-    );
+    const metaParts = [
+      this.readString(record, ['roleName', 'RoleName', 'statusLabel', 'StatusLabel', 'phaseLabel', 'PhaseLabel', 'fileTypeLabel', 'FileTypeLabel', 'typeLabel', 'TypeLabel']),
+      this.formatHours(record['allocatedHours'] ?? record['AllocatedHours'], 'allocated'),
+      this.formatHours(record['hoursWorked'] ?? record['HoursWorked'], 'worked'),
+      this.readString(record, ['supervisorName', 'SupervisorName']),
+      this.readString(record, ['createdAt', 'CreatedAt', 'updatedAt', 'UpdatedAt', 'joinedAt', 'JoinedAt']),
+    ].filter(Boolean);
+
+    return metaParts.length ? metaParts.join(' | ') : this.getDisplayRecordParts(record).slice(1).join(' | ');
   }
 
   displayValue(value: unknown): string {
@@ -594,6 +620,34 @@ export class ProjectDetail implements OnInit {
     }
 
     return '';
+  }
+
+  private getDisplayRecordParts(record: Record<string, unknown>): string[] {
+    return Object.entries(record)
+      .filter(([key, value]) => !this.isIdKey(key) && this.isDisplayPrimitive(value))
+      .map(([key, value]) => `${this.humanizeKey(key)}: ${this.displayValue(value)}`)
+      .filter((part) => !part.endsWith(': (vide)'));
+  }
+
+  private isIdKey(key: string): boolean {
+    return key.toLowerCase() === 'id' || key.toLowerCase().endsWith('id');
+  }
+
+  private isDisplayPrimitive(value: unknown): value is string | number | boolean {
+    return ['string', 'number', 'boolean'].includes(typeof value);
+  }
+
+  private humanizeKey(key: string): string {
+    return key
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_-]+/g, ' ')
+      .trim()
+      .replace(/^./, (char) => char.toUpperCase());
+  }
+
+  private formatHours(value: unknown, label: string): string {
+    const hours = Number(value);
+    return Number.isFinite(hours) && hours > 0 ? `${hours}h ${label}` : '';
   }
 
   getFileByType(typeVal: ProjectFileType): ProjectFileDto | undefined {

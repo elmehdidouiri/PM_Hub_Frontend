@@ -1,4 +1,8 @@
-<div class="toast-card" [attr.data-variant]="data.variant">
+<div
+  class="toast-card"
+  [class.toast-card--clickable]="data.actionUrl"
+  [attr.data-variant]="data.variant"
+  (click)="openAction()">
   <div class="toast-ambient"></div>
   <div class="toast-accent"></div>
 
@@ -16,7 +20,7 @@
     </div>
   </div>
 
-  <button mat-button class="toast-dismiss" type="button" (click)="dismiss()">
+  <button mat-button class="toast-dismiss" type="button" (click)="dismiss(); $event.stopPropagation()">
     Dismiss
   </button>
 </div>

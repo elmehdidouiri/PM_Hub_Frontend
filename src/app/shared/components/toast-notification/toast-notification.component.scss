@@ -22,6 +22,10 @@
   overflow: hidden;
 }
 
+.toast-card--clickable {
+  cursor: pointer;
+}
+
 .toast-card[data-variant='success'] {
   --accent-start: #1f9d55;
   --accent-end: #0f7a3b;

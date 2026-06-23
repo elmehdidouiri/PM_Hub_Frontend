@@ -427,7 +427,7 @@ export class ProjectService {
 
   getProjectsPaged(
     params: ProjectFilterParams = {},
-    options?: { noCache?: boolean }
+    options?: { noCache?: boolean; ignoreGlobalError?: boolean }
   ): Observable<PaginatedResponse<ProjectSummaryDto>> {
     let httpParams = new HttpParams();
     const requestedPageNumber = Number(params.PageNumber ?? params.pageNumber ?? 1) || 1;
@@ -446,6 +446,9 @@ export class ProjectService {
       headers = headers
         .set('Cache-Control', 'no-cache, no-store, must-revalidate')
         .set('Pragma', 'no-cache');
+    }
+    if (options?.ignoreGlobalError) {
+      headers = headers.set('X-Ignore-Error-Interceptor', 'true');
     }
 
     return this.http
@@ -702,10 +705,15 @@ export class ProjectService {
       );
   }
 
-  getInternAllocations(projectId: string): Observable<ProjectInternAllocationDto[]> {
+  getInternAllocations(projectId: string, options?: { ignoreGlobalError?: boolean }): Observable<ProjectInternAllocationDto[]> {
+    let headers = this.buildHeaders();
+    if (options?.ignoreGlobalError) {
+      headers = headers.set('X-Ignore-Error-Interceptor', 'true');
+    }
+
     return this.http
       .get<ApiResponse<ProjectInternAllocationDto[]> | ProjectInternAllocationDto[]>(`${this.apiUrl}/${projectId}/interns`, {
-        headers: this.buildHeaders(),
+        headers,
       })
       .pipe(map((response) => (Array.isArray(response) ? response : response.data || [])));
   }

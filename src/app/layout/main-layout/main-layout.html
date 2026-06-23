@@ -53,20 +53,61 @@
                     [attr.aria-expanded]="notificationMenuOpen"
                     (click)="toggleNotificationMenu($event)">
                     <mat-icon>notifications_none</mat-icon>
-                    <span class="app-header__badge" *ngIf="notifications?.totalCount">
-                      {{ notifications?.totalCount }}
+                    <span class="app-header__badge" *ngIf="unreadNotificationCount">
+                      {{ unreadNotificationCount }}
                     </span>
                   </button>
 
                   <div class="app-notification-panel" *ngIf="notificationMenuOpen">
                     <div class="app-notification-panel__summary">
                       <div>
-                        <strong>{{ notifications?.totalCount || 0 }} notifications</strong>
-                        <span>{{ notifications?.criticalCount || 0 }} urgent</span>
+                        <strong>{{ unreadNotificationCount }} unread</strong>
+                        <span>{{ notifications?.totalCount || 0 }} visible notifications</span>
                       </div>
-                      <button type="button" aria-label="Refresh notifications" (click)="loadNotifications()">
+                      <button
+                        type="button"
+                        aria-label="Refresh notifications"
+                        [disabled]="notificationsLoading || !!notificationActionLoading"
+                        (click)="loadNotifications(true); $event.stopPropagation()">
                         <mat-icon>refresh</mat-icon>
                       </button>
+                    </div>
+
+                    <div class="app-notification-panel__actions">
+                      <button
+                        type="button"
+                        [disabled]="!hasVisibleNotifications || !!notificationActionLoading"
+                        (click)="markAllNotificationsAsRead($event)">
+                        <mat-icon>done_all</mat-icon>
+                        <span>{{ notificationActionLoading === 'mark-read' ? 'Marking...' : 'Mark all as read' }}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        [disabled]="!hasVisibleNotifications || !!notificationActionLoading"
+                        (click)="clearAllNotifications($event)">
+                        <mat-icon>clear_all</mat-icon>
+                        <span>{{ notificationActionLoading === 'clear' ? 'Clearing...' : 'Clear all' }}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        *ngIf="isAdmin"
+                        [disabled]="!!notificationActionLoading"
+                        (click)="resetNotifications($event)">
+                        <mat-icon>restart_alt</mat-icon>
+                        <span>{{ notificationActionLoading === 'reset' ? 'Resetting...' : 'Reset' }}</span>
+                      </button>
+                    </div>
+
+                    <div class="app-notification-panel__error" *ngIf="notificationError">
+                      <mat-icon>error_outline</mat-icon>
+                      <span>{{ notificationError }}</span>
+                    </div>
+
+                    <div class="app-notification-loading" *ngIf="notificationsLoading && !hasVisibleNotifications">
+                      <span class="app-notification-loading__spinner"></span>
+                      <span>Loading notifications...</span>
                     </div>
 
                     <ng-container *ngIf="notifications?.groups?.length; else noNotifications">
@@ -130,7 +171,7 @@
                     </ng-container>
 
                     <ng-template #noNotifications>
-                      <div class="app-notification-empty">
+                      <div class="app-notification-empty" *ngIf="!notificationsLoading && !hasVisibleNotifications">
                         <mat-icon>notifications_off</mat-icon>
                         <span>No notifications</span>
                       </div>

@@ -110,7 +110,7 @@ export class InternList implements OnInit {
     if (!intern?.id) return;
     
     this.isLoading = true;
-    this.projectService.getProjectsPaged({ InternId: intern.id, pageSize: 50 }).subscribe({
+    this.projectService.getProjectsPaged({ InternId: intern.id, pageSize: 50 }, { ignoreGlobalError: true }).subscribe({
       next: (res) => {
         this.isLoading = false;
         const projectIds = (res.data || []).map((p) => p.id);

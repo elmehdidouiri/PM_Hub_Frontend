@@ -1,6 +1,7 @@
-import { Component, HostListener, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener, NgZone, OnDestroy, OnInit, inject } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
-import { filter } from 'rxjs/operators';
+import { Subject } from 'rxjs';
+import { filter, finalize, takeUntil, timeout } from 'rxjs/operators';
 
 import { AuthService } from '../../core/services/auth';
 import { BreadcrumbService } from '../../core/services/breadcrumb.service';
@@ -47,11 +48,13 @@ interface NotificationPageContext {
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.scss',
 })
-export class MainLayout implements OnInit {
+export class MainLayout implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private router = inject(Router);
   private breadcrumbService = inject(BreadcrumbService);
   private notificationService = inject(NotificationService);
+  private readonly zone = inject(NgZone);
+  private readonly cdr = inject(ChangeDetectorRef);
   private viewportInitialized = false;
 
   user: User | null = null;
@@ -62,11 +65,13 @@ export class MainLayout implements OnInit {
   profileMenuOpen = false;
   notificationMenuOpen = false;
   notifications?: HeaderNotificationSummary;
+  notificationsLoading = false;
+  notificationError: string | null = null;
+  notificationActionLoading: 'mark-read' | 'clear' | 'reset' | null = null;
   activeNotificationContext: NotificationPageContext | null = null;
   expandedNotificationGroups = new Set<string>();
   private readonly notificationContextStorageKey = 'pmhub.activeNotificationContext';
-  private readonly readNotificationStorageKey = 'pmhub.readNotifications';
-  private readNotificationIds = new Set<string>();
+  private readonly destroy$ = new Subject<void>();
 
   readonly navItems: NavItem[] = [
     {
@@ -150,7 +155,7 @@ export class MainLayout implements OnInit {
 
   ngOnInit(): void {
     // Sync user state and loading flag
-    this.authService.currentUser$.subscribe(u => {
+    this.authService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(u => {
       this.user = u;
       this.isLoadingUser = false; // Always stop loading once we have a definitive answer
       if (u) {
@@ -168,13 +173,13 @@ export class MainLayout implements OnInit {
       this.isLoadingUser = false;
     }
 
-    this.readNotificationIds = this.loadReadNotificationIds();
     this.updateViewportState();
     this.loadNotifications();
     this.syncActiveNotificationContext(this.router.url);
 
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
+      .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         if (this.isMobile) {
           this.sidebarOpen = false;
@@ -184,6 +189,20 @@ export class MainLayout implements OnInit {
         this.notificationMenuOpen = false;
         this.syncActiveNotificationContext(this.router.url);
       });
+
+    this.notificationService.bookingActivityNotification$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((notification) => {
+        this.runNotificationUiUpdate(() => {
+          this.notifications = this.prependNotification(this.notifications, notification);
+          this.expandedNotificationGroups.add(notification.groupKey);
+        });
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   @HostListener('window:resize')
@@ -401,21 +420,158 @@ export class MainLayout implements OnInit {
     event.stopPropagation();
     this.profileMenuOpen = false;
     this.notificationMenuOpen = !this.notificationMenuOpen;
-    this.loadNotifications();
+    if (this.notificationMenuOpen) {
+      this.loadNotifications();
+    }
   }
 
   closeNotificationMenu(): void {
     this.notificationMenuOpen = false;
   }
 
-  loadNotifications(): void {
-    this.notificationService.getHeaderNotifications().subscribe({
+  loadNotifications(force = false): void {
+    if (!this.authService.isAuthenticated()) {
+      this.notifications = this.emptyNotificationSummary();
+      return;
+    }
+
+    if (this.notificationsLoading && !force) {
+      return;
+    }
+
+    this.runNotificationUiUpdate(() => {
+      this.notificationsLoading = true;
+      this.notificationError = null;
+    });
+
+    this.notificationService.getHeaderNotifications().pipe(
+      timeout(15000),
+      finalize(() => {
+        this.runNotificationUiUpdate(() => {
+          this.notificationsLoading = false;
+        });
+      })
+    ).subscribe({
       next: (response) => {
-        this.notifications = this.withLocalReadState(response.data ?? undefined);
-        this.expandedNotificationGroups.clear();
+        this.runNotificationUiUpdate(() => {
+          if (!response.success) {
+            const message = response.message || 'Unable to load notifications.';
+            this.notificationError = message;
+            this.notificationService.showError(message);
+            return;
+          }
+
+          this.notifications = this.normalizeNotificationSummary(response.data);
+          this.expandedNotificationGroups.clear();
+        });
       },
       error: (err) => {
-        console.error('Failed to load header notifications', err);
+        this.runNotificationUiUpdate(() => {
+          console.error('Failed to load header notifications', err);
+          const message = this.notificationErrorMessage(err, 'Unable to load notifications.');
+          this.notificationError = message;
+          this.notificationService.showError(message);
+        });
+      },
+    });
+  }
+
+  markAllNotificationsAsRead(event?: MouseEvent): void {
+    event?.stopPropagation();
+    if (this.notificationActionLoading || !this.notifications?.items.length) {
+      return;
+    }
+
+    this.notificationActionLoading = 'mark-read';
+    this.notificationError = null;
+
+    this.notificationService.markAllHeaderNotificationsAsRead().pipe(
+      finalize(() => {
+        this.notificationActionLoading = null;
+      })
+    ).subscribe({
+      next: (response) => {
+        if (!response.success) {
+          const message = response.message || 'Unable to mark notifications as read.';
+          this.notificationError = message;
+          this.notificationService.showError(message);
+          return;
+        }
+
+        this.notifications = this.markSummaryItemsAsRead(this.notifications);
+        this.notificationService.showSuccess(response.message || 'All notifications marked as read.');
+      },
+      error: (err) => {
+        const message = this.notificationErrorMessage(err, 'Unable to mark notifications as read.');
+        this.notificationError = message;
+        this.notificationService.showError(message);
+      },
+    });
+  }
+
+  clearAllNotifications(event?: MouseEvent): void {
+    event?.stopPropagation();
+    if (this.notificationActionLoading || !this.notifications?.items.length) {
+      return;
+    }
+
+    this.notificationActionLoading = 'clear';
+    this.notificationError = null;
+
+    this.notificationService.clearHeaderNotifications().pipe(
+      finalize(() => {
+        this.notificationActionLoading = null;
+      })
+    ).subscribe({
+      next: (response) => {
+        if (!response.success) {
+          const message = response.message || 'Unable to clear notifications.';
+          this.notificationError = message;
+          this.notificationService.showError(message);
+          return;
+        }
+
+        this.notifications = this.emptyNotificationSummary();
+        this.expandedNotificationGroups.clear();
+        this.notificationService.showSuccess(response.message || 'All notifications cleared.');
+      },
+      error: (err) => {
+        const message = this.notificationErrorMessage(err, 'Unable to clear notifications.');
+        this.notificationError = message;
+        this.notificationService.showError(message);
+      },
+    });
+  }
+
+  resetNotifications(event?: MouseEvent): void {
+    event?.stopPropagation();
+    if (this.notificationActionLoading) {
+      return;
+    }
+
+    this.notificationActionLoading = 'reset';
+    this.notificationError = null;
+
+    this.notificationService.resetHeaderNotifications().pipe(
+      finalize(() => {
+        this.notificationActionLoading = null;
+      })
+    ).subscribe({
+      next: (response) => {
+        if (!response.success) {
+          const message = response.message || 'Unable to reset notifications.';
+          this.notificationError = message;
+          this.notificationService.showError(message);
+          return;
+        }
+
+        this.notificationService.showSuccess(response.message || 'Notification state reset.');
+        this.loadNotifications();
+      },
+      error: (err) => {
+        const message = this.notificationErrorMessage(err, 'Unable to reset notifications.');
+        this.notificationError = message;
+        this.notificationService.showError(message);
       },
     });
   }
@@ -438,7 +594,15 @@ export class MainLayout implements OnInit {
   }
 
   isNotificationRead(item: HeaderNotification): boolean {
-    return item.isRead || this.readNotificationIds.has(item.id);
+    return item.isRead;
+  }
+
+  get unreadNotificationCount(): number {
+    return this.notifications?.items.filter((item) => !item.isRead).length ?? 0;
+  }
+
+  get hasVisibleNotifications(): boolean {
+    return Boolean(this.notifications?.items.length);
   }
 
   onNotificationClick(item: HeaderNotification): void {
@@ -534,26 +698,7 @@ export class MainLayout implements OnInit {
   }
 
   private resolveNotificationRoute(item: HeaderNotification): string | null {
-    const explicitRoute = this.normalizeNotificationRoute(item.actionUrl);
-    if (explicitRoute) {
-      return explicitRoute;
-    }
-
-    const targetType = this.normalizedNotificationTargetType(item);
-    const projectId = item.projectId || (targetType === 'Project' ? item.targetId : undefined);
-
-    switch (targetType) {
-      case 'Project':
-        return item.targetId ? `/projects/${encodeURIComponent(item.targetId)}` : null;
-      case 'Roadblock':
-        return projectId ? `/projects/${encodeURIComponent(projectId)}` : null;
-      case 'User':
-        return item.targetId ? `/users/${encodeURIComponent(item.targetId)}` : null;
-      case 'Intern':
-        return item.targetId ? `/interns/${encodeURIComponent(item.targetId)}` : null;
-      default:
-        return null;
-    }
+    return this.normalizeNotificationRoute(item.actionUrl);
   }
 
   private normalizeNotificationRoute(actionUrl?: string): string | null {
@@ -632,9 +777,6 @@ export class MainLayout implements OnInit {
       return;
     }
 
-    this.readNotificationIds.add(notificationId);
-    this.persistReadNotificationIds();
-
     if (!this.notifications?.items.length) {
       return;
     }
@@ -645,47 +787,6 @@ export class MainLayout implements OnInit {
         item.id === notificationId ? { ...item, isRead: true } : item
       ),
     };
-  }
-
-  private withLocalReadState(summary?: HeaderNotificationSummary): HeaderNotificationSummary | undefined {
-    if (!summary?.items?.length) {
-      return summary;
-    }
-
-    return {
-      ...summary,
-      items: summary.items.map((item) => ({
-        ...item,
-        isRead: item.isRead || this.readNotificationIds.has(item.id),
-      })),
-    };
-  }
-
-  private loadReadNotificationIds(): Set<string> {
-    if (typeof localStorage === 'undefined') {
-      return new Set<string>();
-    }
-
-    const rawValue = localStorage.getItem(this.readNotificationStorageKey);
-    if (!rawValue) {
-      return new Set<string>();
-    }
-
-    try {
-      const ids = JSON.parse(rawValue);
-      return Array.isArray(ids) ? new Set(ids.filter((id): id is string => typeof id === 'string')) : new Set<string>();
-    } catch {
-      localStorage.removeItem(this.readNotificationStorageKey);
-      return new Set<string>();
-    }
-  }
-
-  private persistReadNotificationIds(): void {
-    if (typeof localStorage === 'undefined') {
-      return;
-    }
-
-    localStorage.setItem(this.readNotificationStorageKey, JSON.stringify([...this.readNotificationIds]));
   }
 
   private syncActiveNotificationContext(currentRoute: string): void {
@@ -739,6 +840,112 @@ export class MainLayout implements OnInit {
 
   private routePath(route: string): string {
     return route.split('?')[0].split('#')[0];
+  }
+
+  private markSummaryItemsAsRead(summary?: HeaderNotificationSummary): HeaderNotificationSummary | undefined {
+    if (!summary) {
+      return summary;
+    }
+
+    return {
+      ...summary,
+      items: summary.items.map((item) => ({ ...item, isRead: true })),
+    };
+  }
+
+  private prependNotification(
+    summary: HeaderNotificationSummary | undefined,
+    notification: HeaderNotification
+  ): HeaderNotificationSummary {
+    const currentSummary = this.normalizeNotificationSummary(summary);
+    const items = [
+      notification,
+      ...currentSummary.items.filter((item) => item.id !== notification.id),
+    ];
+
+    return this.normalizeNotificationSummary({
+      ...currentSummary,
+      totalCount: items.length,
+      criticalCount: items.filter((item) => item.severity === 'critical').length,
+      warningCount: items.filter((item) => item.severity === 'warning').length,
+      infoCount: items.filter((item) => item.severity === 'info').length,
+      generatedAt: new Date().toISOString(),
+      groups: this.groupsFromNotificationItems(items),
+      items,
+    });
+  }
+
+  private emptyNotificationSummary(): HeaderNotificationSummary {
+    return {
+      totalCount: 0,
+      criticalCount: 0,
+      warningCount: 0,
+      infoCount: 0,
+      generatedAt: new Date().toISOString(),
+      groups: [],
+      items: [],
+    };
+  }
+
+  private normalizeNotificationSummary(summary: HeaderNotificationSummary | null | undefined): HeaderNotificationSummary {
+    if (!summary) {
+      return this.emptyNotificationSummary();
+    }
+
+    const items = Array.isArray(summary.items) ? summary.items : [];
+    const groups = Array.isArray(summary.groups) && summary.groups.length
+      ? summary.groups
+      : this.groupsFromNotificationItems(items);
+
+    return {
+      totalCount: Number(summary.totalCount ?? items.length) || 0,
+      criticalCount: Number(summary.criticalCount ?? items.filter((item) => item.severity === 'critical').length) || 0,
+      warningCount: Number(summary.warningCount ?? items.filter((item) => item.severity === 'warning').length) || 0,
+      infoCount: Number(summary.infoCount ?? items.filter((item) => item.severity === 'info').length) || 0,
+      generatedAt: summary.generatedAt || new Date().toISOString(),
+      groups,
+      items,
+    };
+  }
+
+  private groupsFromNotificationItems(items: HeaderNotification[]): HeaderNotificationSummary['groups'] {
+    const groups = new Map<string, HeaderNotificationSummary['groups'][number]>();
+
+    items.forEach((item) => {
+      const key = item.groupKey || 'notifications';
+      const existing = groups.get(key) ?? {
+        key,
+        label: item.groupLabel || 'Notifications',
+        count: 0,
+        criticalCount: 0,
+        warningCount: 0,
+        infoCount: 0,
+      };
+
+      existing.count += 1;
+      if (item.severity === 'critical') {
+        existing.criticalCount += 1;
+      } else if (item.severity === 'warning') {
+        existing.warningCount += 1;
+      } else {
+        existing.infoCount += 1;
+      }
+      groups.set(key, existing);
+    });
+
+    return [...groups.values()];
+  }
+
+  private notificationErrorMessage(error: unknown, fallback: string): string {
+    const err = error as { error?: { message?: string }; message?: string };
+    return err?.error?.message || err?.message || fallback;
+  }
+
+  private runNotificationUiUpdate(update: () => void): void {
+    this.zone.run(() => {
+      update();
+      this.cdr.detectChanges();
+    });
   }
 
   logoutFromMenu(): void {

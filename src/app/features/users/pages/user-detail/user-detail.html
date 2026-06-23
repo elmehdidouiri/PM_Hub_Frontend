@@ -53,9 +53,9 @@
 
     <div class="filter-group">
       <label>Project Scope</label>
-      <div class="flt" (click)="projectPicker.open()" [class.flt--on]="currentFilters().projectId">
+      <div class="flt flt--project" (click)="projectPicker.open()" [class.flt--on]="currentFilters().projectId">
         <mat-icon>assignment</mat-icon>
-        <mat-select #projectPicker [value]="currentFilters().projectId" (selectionChange)="updateFilter('projectId', $event.value)" (click)="$event.stopPropagation()" panelClass="flt-panel">
+        <mat-select #projectPicker [value]="currentFilters().projectId" (selectionChange)="updateFilter('projectId', $event.value)" (click)="$event.stopPropagation()" panelClass="flt-panel" panelWidth="280px">
           <mat-select-trigger>{{ projectLabel() }}</mat-select-trigger>
           <mat-option [value]="undefined">All Projects</mat-option>
           <mat-option *ngFor="let p of projects()" [value]="p.id">{{ p.name }}</mat-option>

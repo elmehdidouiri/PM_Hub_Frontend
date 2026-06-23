@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
@@ -13,6 +13,7 @@ type UnknownRecord = Record<string, unknown>;
 })
 export class InternService {
   private readonly apiUrl = `${environment.apiUrl}/interns`;
+  private readonly ignoreGlobalErrorHeader = { 'X-Ignore-Error-Interceptor': 'true' };
 
   constructor(private readonly http: HttpClient) {}
 
@@ -59,19 +60,34 @@ export class InternService {
 
   getStatistics(id: string): Observable<unknown | null> {
     return this.http
-      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}/statistics`)
+      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}/statistics`, {
+        headers: this.ignoreGlobalErrorHeader,
+      })
       .pipe(map((response) => this.unwrapItem(response)));
   }
 
   getWorkVisualization(id: string): Observable<unknown | null> {
     return this.http
-      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}/work-visualization`)
+      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}/work-visualization`, {
+        headers: this.ignoreGlobalErrorHeader,
+      })
       .pipe(map((response) => this.unwrapItem(response)));
   }
 
-  getPeriodStatistics(id: string): Observable<unknown | null> {
+  getPeriodStatistics(id: string, period?: { year?: number; month?: number }): Observable<unknown | null> {
+    let params = new HttpParams();
+    if (period?.year) {
+      params = params.set('year', String(period.year));
+    }
+    if (period?.month) {
+      params = params.set('month', String(period.month));
+    }
+
     return this.http
-      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}/period-statistics`)
+      .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/${id}/period-statistics`, {
+        headers: this.ignoreGlobalErrorHeader,
+        params,
+      })
       .pipe(map((response) => this.unwrapItem(response)));
   }
 
@@ -119,15 +135,15 @@ export class InternService {
     const record = this.asRecord(value);
 
     return {
-      id: this.readString(record, ['id']),
-      name: this.readString(record, ['name']),
-      roleId: this.readString(record, ['roleId']),
-      roleName: this.readString(record, ['roleName']),
-      supervisorId: this.readString(record, ['supervisorId']),
-      supervisorName: this.readString(record, ['supervisorName']),
-      supervisorEmail: this.readString(record, ['supervisorEmail']),
-      createdAt: this.readString(record, ['createdAt']),
-      updatedAt: this.readNullableString(record, ['updatedAt']),
+      id: this.readString(record, ['id', 'Id', 'internId', 'InternId']),
+      name: this.readString(record, ['name', 'Name', 'fullName', 'FullName']),
+      roleId: this.readString(record, ['roleId', 'RoleId']),
+      roleName: this.readString(record, ['roleName', 'RoleName']),
+      supervisorId: this.readString(record, ['supervisorId', 'SupervisorId']),
+      supervisorName: this.readString(record, ['supervisorName', 'SupervisorName']),
+      supervisorEmail: this.readString(record, ['supervisorEmail', 'SupervisorEmail']),
+      createdAt: this.readString(record, ['createdAt', 'CreatedAt']),
+      updatedAt: this.readNullableString(record, ['updatedAt', 'UpdatedAt']),
     };
   }
 
