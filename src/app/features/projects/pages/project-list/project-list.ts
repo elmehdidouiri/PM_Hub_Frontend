@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { Subscription } from 'rxjs';
 import { finalize, timeout } from 'rxjs/operators';
 import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
+import { ProjectQuickPreviewDialog } from './project-quick-preview-dialog';
 
 import {
   ProjectType,
@@ -19,8 +20,30 @@ import {
 import { ProjectService } from '../../services/project';
 import { AuthService } from '../../../../core/services/auth';
 import { NotificationService } from '../../../../core/services/notification.service';
+import { StorageService } from '../../../../core/services/storage.service';
 import { environment } from '../../../../../environments/environment';
 import * as XLSX from 'xlsx';
+
+interface ProjectListViewState {
+  searchTerm: string;
+  currentPage: number;
+  pageSize: number;
+  selectedStatus: string;
+  selectedPhase: string;
+  selectedManagementType: string;
+  selectedIncompleteOnly: boolean;
+  selectedDelayedOnly: boolean;
+  selectedDepartmentId: string;
+  selectedBusinessUnitId: string;
+  selectedPlantId: string;
+  selectedProcessStatus: string;
+  startDate: string | null;
+  endDate: string | null;
+  year: number | null;
+  month: number | null;
+  selectedYtd: boolean;
+  selectedProjectScope: 'mine' | 'all' | null;
+}
 
 @Component({
   selector: 'app-project-list',
@@ -103,6 +126,7 @@ export class ProjectList implements OnInit, AfterViewInit {
   selectedProjectIds = new Set<string>();
   private hasTriggeredInitialLoad = false;
   private loadSubscription?: Subscription;
+  private readonly storageKeyPrefix = 'pmhub.project-list.view-state';
 
   selectedStatus: string = 'all';
   selectedPhase: string = 'all';
@@ -197,6 +221,7 @@ export class ProjectList implements OnInit, AfterViewInit {
     private readonly router: Router,
     private readonly authService: AuthService,
     private readonly notificationService: NotificationService,
+    private readonly storage: StorageService,
     private readonly dialog: MatDialog,
     private readonly cdr: ChangeDetectorRef,
     private readonly route: ActivatedRoute
@@ -247,6 +272,7 @@ export class ProjectList implements OnInit, AfterViewInit {
   onPageChange(page: number): void {
     if (page >= 1 && page <= this.totalPagesCount) {
       this.currentPage = page;
+      this.persistViewState();
       this.loadProjects();
     }
   }
@@ -255,16 +281,19 @@ export class ProjectList implements OnInit, AfterViewInit {
     const parsedSize = Number(newSize);
     this.pageSize = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : 5;
     this.currentPage = 1;
+    this.persistViewState();
     this.loadProjects();
   }
 
   onFiltersChanged(): void {
     this.currentPage = 1;
+    this.persistViewState();
     this.loadProjects();
   }
 
   onSearch(): void {
     this.currentPage = 1;
+    this.persistViewState();
     this.loadProjects();
   }
 
@@ -353,6 +382,7 @@ export class ProjectList implements OnInit, AfterViewInit {
 
     this.selectedProjectScope = scope;
     this.currentPage = 1;
+    this.persistViewState();
 
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -371,6 +401,7 @@ export class ProjectList implements OnInit, AfterViewInit {
   clearSearch(): void {
     this.searchTerm = '';
     this.currentPage = 1;
+    this.persistViewState();
     this.loadProjects();
   }
 
@@ -406,6 +437,7 @@ export class ProjectList implements OnInit, AfterViewInit {
     this.month = null;
     this.selectedYtd = false;
     this.selectedProjectScope = null;
+    this.persistViewState();
     
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -448,6 +480,7 @@ export class ProjectList implements OnInit, AfterViewInit {
   onSearchTermChange(term: string): void {
     this.searchTerm = term;
     this.currentPage = 1;
+    this.persistViewState();
 
     if (this.searchDebounceTimer) {
       clearTimeout(this.searchDebounceTimer);
@@ -480,7 +513,23 @@ export class ProjectList implements OnInit, AfterViewInit {
   }
 
   openDetails(projectId: string): void {
+    this.persistViewState();
     void this.router.navigate([this.projectsBasePath(), projectId]);
+  }
+
+  openQuickPreview(projectId: string): void {
+    const dialogRef = this.dialog.open(ProjectQuickPreviewDialog, {
+      data: { projectId },
+      maxWidth: '92vw',
+      maxHeight: '92vh',
+      panelClass: 'pm-project-preview-dialog',
+    });
+
+    dialogRef.afterClosed().subscribe((action) => {
+      if (action === 'open-details') {
+        this.openDetails(projectId);
+      }
+    });
   }
 
   openEdit(projectId: string): void {
@@ -903,6 +952,7 @@ export class ProjectList implements OnInit, AfterViewInit {
 
           this.rebuildDisplayProjects();
           this.pruneSelection();
+          this.persistViewState();
           this.cdr.detectChanges();
         },
         error: (error) => {
@@ -920,9 +970,96 @@ export class ProjectList implements OnInit, AfterViewInit {
     this.hasTriggeredInitialLoad = true;
     
     this.route.queryParams.subscribe((params) => {
-      this.applyRouteFilters(params);
+      if (this.hasProjectListRouteState(params)) {
+        this.applyRouteFilters(params);
+        this.persistViewState();
+      } else {
+        this.restoreViewState();
+      }
       this.loadProjects();
     });
+  }
+
+  private hasProjectListRouteState(params: Record<string, unknown>): boolean {
+    const stateKeys = [
+      'Search', 'search', 'Status', 'status', 'Phase', 'phase',
+      'ProjectManagementType', 'projectManagementType', 'IncompleteOnly', 'incompleteOnly',
+      'DelayedOnly', 'delayedOnly', 'BusinessUnitId', 'businessUnitId',
+      'DepartmentId', 'departmentId', 'PlantId', 'plantId', 'ProcessStatus',
+      'processStatus', 'startDate', 'endDate', 'year', 'month', 'ytd',
+      'projectScope', 'ProjectScope', 'all', 'All', 'dashboardView', 'DashboardView', 'source'
+    ];
+
+    return stateKeys.some((key) => params[key] !== undefined && params[key] !== null);
+  }
+
+  private persistViewState(): void {
+    if (!this.isBrowser) {
+      return;
+    }
+
+    this.storage.setItem(this.getStorageKey(), {
+      searchTerm: this.searchTerm,
+      currentPage: this.currentPage,
+      pageSize: this.pageSize,
+      selectedStatus: this.selectedStatus,
+      selectedPhase: this.selectedPhase,
+      selectedManagementType: this.selectedManagementType,
+      selectedIncompleteOnly: this.selectedIncompleteOnly,
+      selectedDelayedOnly: this.selectedDelayedOnly,
+      selectedDepartmentId: this.selectedDepartmentId,
+      selectedBusinessUnitId: this.selectedBusinessUnitId,
+      selectedPlantId: this.selectedPlantId,
+      selectedProcessStatus: this.selectedProcessStatus,
+      startDate: this.startDate,
+      endDate: this.endDate,
+      year: this.year,
+      month: this.month,
+      selectedYtd: this.selectedYtd,
+      selectedProjectScope: this.selectedProjectScope,
+    });
+  }
+
+  private restoreViewState(): void {
+    const state = this.storage.getItem<ProjectListViewState>(this.getStorageKey());
+    if (!state) {
+      return;
+    }
+
+    this.searchTerm = typeof state.searchTerm === 'string' ? state.searchTerm : '';
+    this.currentPage = this.toPositiveNumber(state.currentPage, 1);
+    this.pageSize = this.toPositiveNumber(state.pageSize, 5);
+    this.selectedStatus = state.selectedStatus || 'all';
+    this.selectedPhase = state.selectedPhase || 'all';
+    this.selectedManagementType = state.selectedManagementType || 'all';
+    this.selectedIncompleteOnly = !!state.selectedIncompleteOnly;
+    this.selectedDelayedOnly = !!state.selectedDelayedOnly;
+    this.selectedDepartmentId = state.selectedDepartmentId || 'all';
+    this.selectedBusinessUnitId = state.selectedBusinessUnitId || 'all';
+    this.selectedPlantId = state.selectedPlantId || 'all';
+    this.selectedProcessStatus = state.selectedProcessStatus || 'all';
+    this.startDate = state.startDate || null;
+    this.endDate = state.endDate || null;
+    this.year = this.toOptionalNumber(state.year);
+    this.month = this.toOptionalNumber(state.month);
+    this.selectedYtd = !!state.selectedYtd;
+    this.selectedProjectScope = state.selectedProjectScope === 'mine' || state.selectedProjectScope === 'all'
+      ? state.selectedProjectScope
+      : null;
+  }
+
+  private getStorageKey(): string {
+    return `${this.storageKeyPrefix}.${this.authService.getCurrentUser()?.userId ?? 'anonymous'}`;
+  }
+
+  private toPositiveNumber(value: unknown, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  private toOptionalNumber(value: unknown): number | null {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   private applyRouteFilters(params: Record<string, unknown>): void {

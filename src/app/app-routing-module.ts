@@ -60,6 +60,8 @@ const routes: Routes = [
       },
       {
         path: 'profile',
+        canActivate: [roleGuard],
+        data: { userOnly: true },
         loadChildren: () => import('./features/profile/profile-module').then((m) => m.ProfileModule)
       },
       {

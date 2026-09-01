@@ -468,6 +468,8 @@ export interface DashboardFilterParams {
   projectId?: string;
   startDate?: string;
   endDate?: string;
+  createdProjectsPage?: number;
+  createdProjectsPageSize?: number;
 }
 
 export interface DashboardPerformanceSummaryDto {
@@ -554,6 +556,9 @@ export interface DashboardAdminBiDto {
   charts: DashboardBiChartsDto;
   tables: DashboardBiTablesDto;
   alerts: unknown[];
+  createdProjects?: DashboardCreatedProjectDto[];
+  hasMoreCreatedProjects?: boolean;
+  isCreatedProjectsPeriodSelected?: boolean;
 }
 
 export interface PaginatedResponse<T> {
@@ -605,6 +610,8 @@ export interface ProjectFilterParams {
 }
 export interface DashboardExtendedSummaryDto {
   totalProjects: number;
+  /** Projects created during the selected dashboard period. */
+  createdProjects?: number;
   totalEstimatedHours: number;
   totalTrackedHours: number;
   ytdHours: number;
@@ -620,6 +627,14 @@ export interface DashboardExtendedSummaryDto {
   projectsKpiDelta?: number;
   trackedHoursDeltaPercent?: number;
   delayedProjectsDelta?: number;
+}
+
+export interface DashboardCreatedProjectDto {
+  projectId: string;
+  name: string;
+  status: string | number;
+  phase: string | number;
+  createdAt: string;
 }
 
 export interface DashboardExtendedPortfolioHealthDto {
@@ -690,4 +705,8 @@ export interface DashboardExtendedDto {
   business: DashboardExtendedBusinessDto;
   topProjects: any[];
   alerts: any[];
+  /** Project records created during the selected dashboard period. */
+  createdProjects?: DashboardCreatedProjectDto[];
+  hasMoreCreatedProjects?: boolean;
+  isCreatedProjectsPeriodSelected?: boolean;
 }

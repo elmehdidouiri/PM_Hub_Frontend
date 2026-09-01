@@ -8,6 +8,7 @@ import { InternDto } from '../../models/intern.models';
 import { InternService } from '../../services/intern';
 import { ProjectService } from '../../../projects/services/project';
 import { NotificationService } from '../../../../core/services/notification.service';
+import { NavigationHistoryService } from '../../../../core/services/navigation-history.service';
 import { InternDetailsDialog } from '../../../users/components/intern-details-dialog/intern-details-dialog';
 import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 
@@ -38,6 +39,7 @@ export class InternDetail implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly projectService = inject(ProjectService);
   private readonly notifications = inject(NotificationService);
+  private readonly navigationHistory = inject(NavigationHistoryService);
   private readonly zone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
   private routeSubscription?: Subscription;
@@ -80,7 +82,7 @@ export class InternDetail implements OnInit {
   }
 
   goBack(): void {
-    void this.router.navigate(['/interns']);
+    void this.navigationHistory.back('/interns');
   }
 
   viewPerformance(): void {

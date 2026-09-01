@@ -187,12 +187,12 @@ export class HourEntry implements OnInit {
   }
 
   get monthDailyNeeded(): number {
-    const dashboardDailyNeeded = this.monthlyDashboard?.dailyNeeded;
-    if (typeof dashboardDailyNeeded === 'number' && Number.isFinite(dashboardDailyNeeded)) {
-      return Math.max(0, dashboardDailyNeeded);
+    const workingDaysLeft = this.workingDaysLeftInMonth();
+    if (workingDaysLeft <= 0) {
+      return 0;
     }
 
-    return this.monthRemainingHours / Math.max(1, this.workingDaysLeftInMonth());
+    return Math.max(0, this.monthRemainingHours / workingDaysLeft);
   }
 
   get monthStatusLabel(): string {
@@ -240,7 +240,7 @@ export class HourEntry implements OnInit {
   }
 
   get recentProjectCount(): number {
-    return new Set(this.recentEntries.map((entry) => entry.projectName || 'Non-project activity')).size;
+    return this.projectOptions.length;
   }
 
   get productiveDayCount(): number {

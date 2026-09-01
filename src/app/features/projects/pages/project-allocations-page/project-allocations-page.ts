@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Observable, catchError, finalize, of } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth';
+import { NavigationHistoryService } from '../../../../core/services/navigation-history.service';
 import { HourEntriesApiService } from '../../../../core/services/hour-entries-api.service';
 import { HourEntryDto } from '../../../../core/models/hour-entry.model';
 import { ProjectDto } from '../../models';
@@ -32,6 +33,7 @@ export class ProjectAllocationsPage implements OnInit {
     private readonly hoursAllocationDashboard: HoursAllocationDashboardService,
     private readonly hourEntriesApi: HourEntriesApiService,
     private readonly authService: AuthService,
+    private readonly navigationHistory: NavigationHistoryService,
     private readonly cdr: ChangeDetectorRef
   ) {}
 
@@ -41,7 +43,8 @@ export class ProjectAllocationsPage implements OnInit {
   }
 
   backToProject(): void {
-    this.router.navigate(['/projects', this.project?.id || this.route.snapshot.paramMap.get('id')]);
+    const projectId = this.project?.id || this.route.snapshot.paramMap.get('id');
+    void this.navigationHistory.back(`/projects/${projectId}`);
   }
 
   reload(): void {

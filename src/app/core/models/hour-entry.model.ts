@@ -1,5 +1,3 @@
- 
-
 export enum BookingType {
   Normal = 0,
   Premium = 1,
@@ -15,8 +13,6 @@ export enum DateSelectionMode {
   MultipleDays = 1,
   WeekRange = 2,
 }
-
-
 
 export interface InternSupervisionDto {
   internAllocationId: string;
@@ -199,16 +195,55 @@ export function resolveMyProjectOption(row: unknown): { projectId: string; label
     return null;
   }
   const o = row as Record<string, unknown>;
-  const rawId = o['projectId'] ?? o['id'] ?? o['Id'];
-  const projectId = typeof rawId === 'string' ? rawId : null;
+  const nested = (o['project'] ?? o['Project']) as Record<string, unknown> | undefined;
+
+  const rawId =
+    o['projectId'] ??
+    o['ProjectId'] ??
+    o['id'] ??
+    o['Id'] ??
+    nested?.['projectId'] ??
+    nested?.['ProjectId'] ??
+    nested?.['id'] ??
+    nested?.['Id'];
+
+  if (rawId === null || rawId === undefined) {
+    return null;
+  }
+
+  const projectId = String(rawId).trim();
   if (!projectId) {
     return null;
   }
-  const rawName = o['projectName'] ?? o['name'] ?? o['Name'] ?? o['title'] ?? o['Title'];
-  const label =
-    typeof rawName === 'string' && rawName.trim()
-      ? rawName.trim()
-      : projectId;
+
+  const code =
+    o['code'] ??
+    o['Code'] ??
+    o['projectCode'] ??
+    o['ProjectCode'] ??
+    nested?.['code'] ??
+    nested?.['Code'];
+
+  const rawName =
+    o['projectName'] ??
+    o['ProjectName'] ??
+    o['name'] ??
+    o['Name'] ??
+    o['title'] ??
+    o['Title'] ??
+    nested?.['projectName'] ??
+    nested?.['ProjectName'] ??
+    nested?.['name'] ??
+    nested?.['Name'] ??
+    nested?.['title'] ??
+    nested?.['Title'];
+
+  let label = typeof rawName === 'string' && rawName.trim() ? rawName.trim() : projectId;
+  const strCode = typeof code === 'string' && code.trim() ? code.trim() : typeof code === 'number' ? String(code) : '';
+  if (strCode && !label.toLowerCase().includes(strCode.toLowerCase())) {
+    label = `[${strCode}] ${label}`;
+  }
+
   return { projectId, label };
 }
 
@@ -218,7 +253,7 @@ export function resolveInternAllocationOption(row: unknown): { internAllocationI
   }
   const o = row as Record<string, unknown>;
   const rawId = o['internAllocationId'] ?? o['InternAllocationId'] ?? o['id'] ?? o['Id'];
-  const internAllocationId = typeof rawId === 'string' ? rawId : null;
+  const internAllocationId = typeof rawId === 'string' || typeof rawId === 'number' ? String(rawId) : null;
   if (!internAllocationId) {
     return null;
   }

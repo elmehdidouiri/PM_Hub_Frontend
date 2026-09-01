@@ -3,6 +3,7 @@ import { Subscription } from 'rxjs';
 
 import { User } from './core/models';
 import { AuthService } from './core/services/auth';
+import { NavigationHistoryService } from './core/services/navigation-history.service';
 
 @Component({
   selector: 'app-root',
@@ -16,9 +17,13 @@ export class App implements OnInit, OnDestroy {
   user = signal<User | null>(null);
   private readonly subscriptions = new Subscription();
 
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private navigationHistory: NavigationHistoryService,
+  ) {}
 
   ngOnInit(): void {
+    this.navigationHistory.start();
     this.user.set(this.authService.getCurrentUser());
 
     this.subscriptions.add(

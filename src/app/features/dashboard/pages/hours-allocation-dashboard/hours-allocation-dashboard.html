@@ -12,6 +12,15 @@
         <p>Visualize and analyze time allocation and team productivity at a glance.</p>
 
         <div class="dashboard-page-header__actions">
+          <button 
+            *ngIf="showBackButton"
+            type="button" 
+            class="dashboard-header-btn btn"
+            (click)="goBack()"
+            style="background: #f1f5f9; color: #475467; border: 1px solid #cbd5e1; margin-right: 0.5rem;">
+            <mat-icon>arrow_back</mat-icon>
+            Back
+          </button>
           <button
             type="button"
             class="dashboard-header-btn dashboard-header-btn--primary"

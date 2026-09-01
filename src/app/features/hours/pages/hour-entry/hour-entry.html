@@ -95,14 +95,14 @@
           </div>
         </div>
         <ng-template #noAllocationStats>
-          <p class="muted-line">No allocation trend yet for this month.</p>
+          <p class="muted-line">No allocation trend yet.</p>
         </ng-template>
       </section>
 
       <section class="history-panel">
         <div class="history-header">
           <div>
-            <span class="panel-label">Month history</span>
+            <span class="panel-label">All history</span>
             <h2>Entries</h2>
           </div>
           <span>{{ recentEntries.length }}</span>
@@ -114,7 +114,7 @@
 
         <div class="empty-history" *ngIf="!isLoadingRecentEntries && !recentEntriesError && !recentEntries.length">
           <mat-icon>event_busy</mat-icon>
-          <span>No entry found for the current month.</span>
+          <span>No entry found.</span>
         </div>
 
         <div class="history-list" *ngIf="recentEntries.length">

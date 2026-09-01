@@ -5,6 +5,7 @@ import { forkJoin, of } from 'rxjs';
 
 import { Role } from '../../../../core/models';
 import { NotificationService } from '../../../../core/services/notification.service';
+import { NavigationHistoryService } from '../../../../core/services/navigation-history.service';
 import { RolesApiService } from '../../../../core/services/roles-api.service';
 import { AdminUserDto, UsersApiService } from '../../../../core/services/users-api.service';
 import { CreateInternDto, InternDto, UpdateInternDto } from '../../models/intern.models';
@@ -24,6 +25,7 @@ export class InternForm implements OnInit {
   private readonly rolesApi = inject(RolesApiService);
   private readonly usersApi = inject(UsersApiService);
   private readonly notifications = inject(NotificationService);
+  private readonly navigationHistory = inject(NavigationHistoryService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly form = this.formBuilder.nonNullable.group({
@@ -114,7 +116,7 @@ export class InternForm implements OnInit {
   }
 
   goBack(): void {
-    void this.router.navigate(['/interns']);
+    void this.navigationHistory.back('/interns');
   }
 
   trackById(_: number, item: Role | AdminUserDto): string {

@@ -1,5 +1,6 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { forkJoin } from 'rxjs';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { forkJoin, of } from 'rxjs';
+import { catchError, finalize, timeout } from 'rxjs/operators';
 
 import { HourSummaryApiService } from '../../../../core/services/hour-summary-api.service';
 
@@ -17,6 +18,7 @@ interface HoursReportRow {
 })
 export class HoursSummaryReportPage implements OnInit {
   private readonly hourSummaryApi = inject(HourSummaryApiService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly year = new Date().getFullYear();
   isLoading = false;
@@ -35,22 +37,38 @@ export class HoursSummaryReportPage implements OnInit {
     this.errorMessage = '';
 
     forkJoin({
-      monthly: this.hourSummaryApi.meMonthly(this.year),
-      projects: this.hourSummaryApi.meProject(this.year),
-      topProjects: this.hourSummaryApi.meTopProjects(this.year, 5),
-    }).subscribe({
-      next: ({ monthly, projects, topProjects }) => {
-        this.monthlyRows = this.toRows(monthly, ['monthName', 'MonthName', 'month', 'Month']);
-        this.projectRows = this.toRows(projects, ['projectName', 'ProjectName', 'name', 'Name']);
-        this.topProjectRows = this.toRows(topProjects, ['projectName', 'ProjectName', 'name', 'Name']);
-        this.totalHours = this.projectRows.reduce((sum, row) => sum + row.hours, 0);
-        this.isLoading = false;
-      },
-      error: (error) => {
-        this.isLoading = false;
-        this.errorMessage = error?.message || 'Unable to load hours report.';
-      },
-    });
+      monthly: this.hourSummaryApi.meMonthly(this.year).pipe(catchError(() => of(null))),
+      projects: this.hourSummaryApi.meProject(this.year).pipe(catchError(() => of(null))),
+      topProjects: this.hourSummaryApi.meTopProjects(this.year, 5).pipe(catchError(() => of(null))),
+    })
+      .pipe(
+        timeout(10000),
+        catchError((err) => {
+          console.error('Error loading hours report', err);
+          return of({ monthly: null, projects: null, topProjects: null });
+        }),
+        finalize(() => {
+          this.isLoading = false;
+          this.cdr.markForCheck();
+        })
+      )
+      .subscribe({
+        next: ({ monthly, projects, topProjects }) => {
+          try {
+            this.monthlyRows = this.toRows(monthly, ['monthName', 'MonthName', 'month', 'Month', 'name', 'Name', 'title', 'Title']);
+            this.projectRows = this.toRows(projects, ['projectName', 'ProjectName', 'name', 'Name', 'title', 'Title']);
+            this.topProjectRows = this.toRows(topProjects, ['projectName', 'ProjectName', 'name', 'Name', 'title', 'Title']);
+            const mainRows = this.projectRows.length > 0 ? this.projectRows : this.monthlyRows;
+            this.totalHours = mainRows.reduce((sum, row) => sum + Number(row.hours || 0), 0);
+          } catch (e) {
+            console.error('Error parsing hours report data:', e);
+            this.errorMessage = 'Failed to process report data.';
+          }
+        },
+        error: (error) => {
+          this.errorMessage = error?.message || 'Unable to load hours report.';
+        },
+      });
   }
 
   get hasData(): boolean {
@@ -67,7 +85,7 @@ export class HoursSummaryReportPage implements OnInit {
         const row = this.asRecord(item);
         return {
           label: this.readString(row, labelKeys) || 'Unassigned',
-          hours: this.readNumber(row, ['totalHours', 'TotalHours', 'hours', 'Hours', 'value', 'Value']),
+          hours: this.readNumber(row, ['totalHours', 'TotalHours', 'hours', 'Hours', 'value', 'Value', 'loggedHours', 'LoggedHours']),
           detail: this.readString(row, ['year', 'Year', 'department', 'Department', 'status', 'Status']),
         };
       })
@@ -75,13 +93,31 @@ export class HoursSummaryReportPage implements OnInit {
   }
 
   private asArray(value: unknown): unknown[] {
+    if (!value) {
+      return [];
+    }
+
     if (Array.isArray(value)) {
       return value;
     }
 
     const row = this.asRecord(value);
-    const nested = row['items'] ?? row['Items'] ?? row['data'] ?? row['Data'] ?? row['result'] ?? row['Result'];
-    return Array.isArray(nested) ? nested : [];
+    const nested = row['items'] ?? row['Items'] ?? row['data'] ?? row['Data'] ?? row['result'] ?? row['Result'] ?? row['monthly'] ?? row['projects'] ?? row['topProjects'];
+    if (Array.isArray(nested)) {
+      return nested;
+    }
+
+    const entries = Object.entries(row);
+    if (entries.length > 0) {
+      return entries.map(([key, val]) => {
+        if (val && typeof val === 'object' && !Array.isArray(val)) {
+          return { name: key, ...(val as Record<string, unknown>) };
+        }
+        return { name: key, totalHours: val, value: val };
+      });
+    }
+
+    return [];
   }
 
   private asRecord(value: unknown): Record<string, unknown> {

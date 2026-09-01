@@ -127,16 +127,6 @@
               (change)="updateDateFilter('end', $event)"
               [disabled]="isRefreshing">
           </label>
-          <label>
-            <span>Process status</span>
-            <select
-              class="pm-input period-bar__select period-bar__select--wide"
-              [value]="filterState.selectedProcessStatus"
-              (change)="updateProcessStatusFilter($event)"
-              [disabled]="isRefreshing">
-              <option *ngFor="let status of processStatusOptions" [value]="status.id">{{ status.label }}</option>
-            </select>
-          </label>
         </div>
 
         <div class="period-bar__modes">
@@ -213,6 +203,52 @@
       </section>
 
       <section class="filter-sections" aria-label="Dashboard filters" *ngIf="!isNormalUserPersonalView">
+        <article class="filter-section" *ngIf="user?.isAdmin && filterState.selectedMonth">
+          <header class="pm-section-title">
+            <div>
+              <mat-icon>add_task</mat-icon>
+              <h2>Projects created</h2>
+            </div>
+            <div class="pm-section-title__actions">
+              <span class="pm-section-title__count">{{ createdProjectsCount }} project(s)</span>
+            </div>
+          </header>
+
+          <div class="filter-ticket-grid" *ngIf="createdProjects.length; else noCreatedProjects">
+            <button
+              type="button"
+              class="filter-ticket created-project-ticket"
+              *ngFor="let project of visibleCreatedProjects"
+              (click)="openCreatedProject(project)">
+              <span class="filter-ticket__top">
+                <mat-icon>folder_open</mat-icon>
+                <strong>1</strong>
+              </span>
+              <span class="filter-ticket__label">{{ project.name || 'Untitled project' }}</span>
+              <small>Created {{ formatCreatedProjectDate(project.createdAt) }}</small>
+              <span class="created-project-ticket__meta" *ngIf="project.status !== '' || project.phase !== ''">
+                {{ project.status }}<ng-container *ngIf="project.status !== '' && project.phase !== ''"> · </ng-container>{{ project.phase }}
+              </span>
+              <span class="filter-ticket__drill-down"><mat-icon>arrow_forward</mat-icon></span>
+            </button>
+          </div>
+
+          <ng-template #noCreatedProjects>
+            <p class="created-projects-empty">No project was created during this period.</p>
+          </ng-template>
+
+          <div class="filter-section-more" *ngIf="hiddenCreatedProjectsCount > 0" style="margin-top: 1rem; display: flex; justify-content: center;">
+            <button
+              type="button"
+              class="pm-btn-secondary"
+              style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 999px; background: #fff; border: 1px solid #e4e7ec; color: #df6800; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);"
+              (click)="toggleCreatedProjects()">
+              <mat-icon style="font-size: 1.2rem; width: 1.2rem; height: 1.2rem;">{{ createdProjectsExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+              {{ createdProjectsExpanded ? 'Show less' : 'Show more (' + hiddenCreatedProjectsCount + ')' }}
+            </button>
+          </div>
+        </article>
+
         <article *ngFor="let section of filterSections" class="filter-section">
           <header class="pm-section-title">
             <div>

@@ -5,6 +5,7 @@ import { filter, finalize, takeUntil, timeout } from 'rxjs/operators';
 
 import { AuthService } from '../../core/services/auth';
 import { BreadcrumbService } from '../../core/services/breadcrumb.service';
+import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { User } from '../../core/models';
 import {
   HeaderNotification,
@@ -52,6 +53,7 @@ export class MainLayout implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private router = inject(Router);
   private breadcrumbService = inject(BreadcrumbService);
+  private navigationHistory = inject(NavigationHistoryService);
   private notificationService = inject(NotificationService);
   private readonly zone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
@@ -83,6 +85,7 @@ export class MainLayout implements OnInit, OnDestroy {
         { label: 'Overview', route: '/dashboard', exact: true },
         { label: 'Analytics', route: '/dashboard/analytics', adminOnly: true },
         { label: 'Hours allocation', route: '/dashboard/hours-allocation', adminOnly: true },
+        { label: 'Capacity & Price', route: '/dashboard/capacity-price', adminOnly: true },
       ],
     },
     {
@@ -375,6 +378,10 @@ export class MainLayout implements OnInit, OnDestroy {
 
   get isDashboardLanding(): boolean {
     return this.routeSegments.length === 1 && this.routeSegments[0] === 'dashboard';
+  }
+
+  goBack(): void {
+    void this.navigationHistory.back('/dashboard');
   }
 
   private get routeSegments(): string[] {

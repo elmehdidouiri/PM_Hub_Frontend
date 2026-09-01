@@ -1,0 +1,490 @@
+<section class="analytics-page">
+  <!-- ═══ Page Header ═══════════════════════════════════════════════ -->
+  <header class="dashboard-page-header analytics-header">
+    <div class="dashboard-page-header__content analytics-header__content">
+      <div class="dashboard-page-header__eyebrow analytics-eyebrow">
+        <mat-icon>monetization_on</mat-icon>
+        <span>Financial Analytics</span>
+      </div>
+      <h1>Capacity &amp; Price Dashboard</h1>
+      <p>Analyze team capacity, booked hours, and financial projections against targets.</p>
+
+      <div class="dashboard-page-header__actions analytics-header__actions">
+        <div class="quick-chips">
+          <button type="button" class="chip-btn" (click)="setQuickDate('current')">Current Month</button>
+          <button type="button" class="chip-btn" (click)="setQuickDate('previous')">Last Month</button>
+        </div>
+        <button type="button" (click)="openSynthesisModal()" class="dashboard-header-btn dashboard-header-btn--accent btn btn--secondary synthesis-header-btn">
+          <mat-icon>table_chart</mat-icon>
+          Monthly Synthesis
+        </button>
+        <button type="button" (click)="loadDashboard()" class="dashboard-header-btn dashboard-header-btn--primary btn btn--primary" [disabled]="isRefreshing">
+          <mat-icon [class.rotate-180]="isRefreshing">refresh</mat-icon>
+          Sync Data
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══ Filter Panel ══════════════════════════════════════════════ -->
+  <section class="filter-panel" [class.filter-panel--busy]="isLoading || isRefreshing">
+    <div class="filter-panel__main">
+      <div class="filter-group" style="align-items: flex-end;">
+        <label>
+          <span>Year</span>
+          <select [(ngModel)]="query.year" (ngModelChange)="markFilterChanged()">
+            <option *ngFor="let year of yearOptions" [ngValue]="year">{{ year }}</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Month</span>
+          <select [(ngModel)]="query.month" (ngModelChange)="markFilterChanged()">
+            <option *ngFor="let month of monthOptions" [ngValue]="month.value">{{ month.label }}</option>
+          </select>
+        </label>
+
+        <label *ngIf="viewMode === 'team'">
+          <span>Target Hrs/Member</span>
+          <input type="number" [(ngModel)]="query.targetHoursPerMember" (ngModelChange)="markFilterChanged()" min="0">
+        </label>
+
+        <label *ngIf="viewMode === 'interns'">
+          <span>Target Hrs/Intern</span>
+          <input type="number" [(ngModel)]="query.targetHoursPerIntern" (ngModelChange)="markFilterChanged()" min="0">
+        </label>
+
+        <label>
+          <span>Hourly Rate ($)</span>
+          <input type="number" [(ngModel)]="query.hourlyRate" (ngModelChange)="markFilterChanged()" min="0">
+        </label>
+
+        <div class="filter-actions" *ngIf="hasFilterChanges || !isDefaultFilter" style="display: flex; gap: 0.5rem; margin-bottom: 2px;">
+          <button *ngIf="hasFilterChanges" type="button" class="btn btn--primary" style="height: 38px; display: flex; align-items: center; gap: 0.25rem; padding: 0 1rem; border-radius: 8px;" (click)="applyFilters()">
+            <mat-icon style="font-size: 1.25rem; width: 1.25rem; height: 1.25rem;">check</mat-icon>
+            Apply
+          </button>
+          <button *ngIf="hasFilterChanges || !isDefaultFilter" type="button" class="btn btn--secondary" style="height: 38px; display: flex; align-items: center; gap: 0.25rem; padding: 0 1rem; border-radius: 8px;" (click)="resetFilters()">
+            <mat-icon style="font-size: 1.25rem; width: 1.25rem; height: 1.25rem;">refresh</mat-icon>
+            Default
+          </button>
+        </div>
+      </div>
+
+      <div class="filter-panel__toggle">
+        <mat-button-toggle-group [(ngModel)]="viewMode" (change)="onViewModeChange()">
+          <mat-button-toggle value="team">Team Members</mat-button-toggle>
+          <mat-button-toggle value="interns">Interns</mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Error Alert ═══════════════════════════════════════════════ -->
+  <div class="analytics-alert" *ngIf="errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+
+  <!-- ═══ Main Content ══════════════════════════════════════════════ -->
+  <div class="analytics-content-container">
+    <app-loading-spinner *ngIf="isLoading || isRefreshing" [fullPage]="false"></app-loading-spinner>
+
+    <ng-container *ngIf="dashboard || internDashboard">
+
+      <!-- ─── Metric Strip ──────────────────────────────────── -->
+      <section class="metric-strip">
+        <div class="metric-card" [style.--metric-tone]="'#3b82f6'">
+          <span class="metric-card__line"></span>
+          <div class="metric-card__head">
+            <div class="metric-card__info">
+              <div class="metric-card__icon-badge">
+                <mat-icon>groups</mat-icon>
+              </div>
+              <span class="metric-card__label">{{ viewMode === 'team' ? 'Total Members' : 'Total Interns' }}</span>
+            </div>
+          </div>
+          <div class="metric-card__body">
+            <div class="metric-card__values">
+              <strong>{{ viewMode === 'team' ? (dashboard?.memberCapacities?.length || 0) : (internDashboard?.totalInterns || 0) }}</strong>
+              <span class="metric-card__sub" *ngIf="viewMode === 'team'">Active this month</span>
+              <span class="metric-card__sub" *ngIf="viewMode === 'interns'">{{ internDashboard?.activeInternsWithEntries || 0 }} with entries</span>
+            </div>
+          </div>
+          <mat-icon class="metric-card__watermark">groups</mat-icon>
+        </div>
+
+        <div class="metric-card" [style.--metric-tone]="'#10b981'">
+          <span class="metric-card__line"></span>
+          <div class="metric-card__head">
+            <div class="metric-card__info">
+              <div class="metric-card__icon-badge">
+                <mat-icon>schedule</mat-icon>
+              </div>
+              <span class="metric-card__label">Total Booked</span>
+            </div>
+          </div>
+          <div class="metric-card__body">
+            <div class="metric-card__values">
+              <strong>{{ activeCapacityTarget?.actualBookedHours | number:'1.1-1' }}h</strong>
+              <span class="metric-card__sub">of {{ activeCapacityTarget?.targetHours | number:'1.0-0' }}h target</span>
+            </div>
+          </div>
+          <mat-icon class="metric-card__watermark">schedule</mat-icon>
+        </div>
+
+        <div class="metric-card" [style.--metric-tone]="'#f59e0b'">
+          <span class="metric-card__line"></span>
+          <div class="metric-card__head">
+            <div class="metric-card__info">
+              <div class="metric-card__icon-badge">
+                <mat-icon>attach_money</mat-icon>
+              </div>
+              <span class="metric-card__label">Booked Revenue</span>
+            </div>
+          </div>
+          <div class="metric-card__body">
+            <div class="metric-card__values">
+              <strong>${{ activePriceTarget?.bookedPrice | number:'1.0-0' }}</strong>
+              <span class="metric-card__sub">Total billed value</span>
+            </div>
+          </div>
+          <mat-icon class="metric-card__watermark">attach_money</mat-icon>
+        </div>
+
+        <div class="metric-card" [style.--metric-tone]="'#8b5cf6'">
+          <span class="metric-card__line"></span>
+          <div class="metric-card__head">
+            <div class="metric-card__info">
+              <div class="metric-card__icon-badge">
+                <mat-icon>savings</mat-icon>
+              </div>
+              <span class="metric-card__label">Remaining Capacity</span>
+            </div>
+          </div>
+          <div class="metric-card__body">
+            <div class="metric-card__values">
+              <strong>${{ activePriceTarget?.remainingPrice | number:'1.0-0' }}</strong>
+              <span class="metric-card__sub">Unbilled capacity value</span>
+            </div>
+          </div>
+          <mat-icon class="metric-card__watermark">savings</mat-icon>
+        </div>
+      </section>
+
+      <!-- ─── Capacity Section ──────────────────────────────── -->
+      <section class="analytics-section">
+        <header class="section-header">
+          <div>
+            <mat-icon>bar_chart</mat-icon>
+            <h2>Capacity Analysis</h2>
+          </div>
+          <span>{{ memberCapacitiesData.length || 0 }} {{ viewMode === 'team' ? 'members' : 'interns' }}</span>
+        </header>
+
+        <div class="performance-grid performance-grid--kpis">
+          <article class="chart-card performance-card" data-tone="blue">
+            <header class="kpi-card-header">
+              <div class="kpi-card-header__title">
+                <mat-icon>donut_small</mat-icon>
+                <div>
+                  <strong>{{ viewMode === 'team' ? 'Member' : 'Intern' }} Capacities (Hours)</strong>
+                  <span>Booked hours breakdown</span>
+                </div>
+              </div>
+            </header>
+            <div class="kpi-chart-wrapper">
+              <div #memberCapacitiesChart class="kpi-chart-container" [hidden]="!memberCapacitiesData.length"></div>
+              <div class="chart-no-data" *ngIf="!memberCapacitiesData.length">
+                <mat-icon>donut_small</mat-icon>
+                <span>No capacity data available</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="chart-card performance-card" data-tone="green">
+            <header class="kpi-card-header">
+              <div class="kpi-card-header__title">
+                <mat-icon>pie_chart</mat-icon>
+                <div>
+                  <strong>Capacity vs Target</strong>
+                  <span>Remaining {{ activeCapacityTarget?.remainingHours | number:'1.0-0' }}h · Target {{ activeCapacityTarget?.targetHours | number:'1.0-0' }}h</span>
+                </div>
+              </div>
+            </header>
+            <div class="kpi-chart-wrapper">
+              <div #capacityTargetChart class="kpi-chart-container" [hidden]="!activeCapacityTarget"></div>
+              <div class="chart-no-data" *ngIf="!activeCapacityTarget">
+                <mat-icon>pie_chart</mat-icon>
+                <span>No capacity target data available</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ─── Price Section ─────────────────────────────────── -->
+      <section class="analytics-section">
+        <header class="section-header">
+          <div>
+            <mat-icon>payments</mat-icon>
+            <h2>Financial Analysis</h2>
+          </div>
+          <span>{{ memberPricesData.length || 0 }} {{ viewMode === 'team' ? 'members' : 'interns' }}</span>
+        </header>
+
+        <div class="performance-grid performance-grid--kpis">
+          <article class="chart-card performance-card" data-tone="orange">
+            <header class="kpi-card-header">
+              <div class="kpi-card-header__title">
+                <mat-icon>attach_money</mat-icon>
+                <div>
+                  <strong>{{ viewMode === 'team' ? 'Member' : 'Intern' }} Revenue</strong>
+                  <span>Financial value generated</span>
+                </div>
+              </div>
+            </header>
+            <div class="kpi-chart-wrapper">
+              <div #memberPricesChart class="kpi-chart-container" [hidden]="!memberPricesData.length"></div>
+              <div class="chart-no-data" *ngIf="!memberPricesData.length">
+                <mat-icon>attach_money</mat-icon>
+                <span>No price data available</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="chart-card performance-card" data-tone="purple">
+            <header class="kpi-card-header">
+              <div class="kpi-card-header__title">
+                <mat-icon>donut_large</mat-icon>
+                <div>
+                  <strong>Revenue vs Target</strong>
+                  <span>Remaining ${{ activePriceTarget?.remainingPrice | number:'1.0-0' }} · Target ${{ priceTargetAmount | number:'1.0-0' }}</span>
+                </div>
+              </div>
+            </header>
+            <div class="kpi-chart-wrapper">
+              <div #priceTargetChart class="kpi-chart-container" [hidden]="!activePriceTarget"></div>
+              <div class="chart-no-data" *ngIf="!activePriceTarget">
+                <mat-icon>donut_large</mat-icon>
+                <span>No price target data available</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ─── Intern Detailed Tables ────────────────────────── -->
+      <ng-container *ngIf="viewMode === 'interns' && internDashboard">
+        <section class="analytics-section mt-4">
+          <header class="section-header">
+            <div>
+              <mat-icon>assignment_ind</mat-icon>
+              <h2>Intern Detail Breakdown</h2>
+            </div>
+          </header>
+          
+          <div class="table-container p-4">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Intern Name</th>
+                  <th>Role</th>
+                  <th>Supervisor</th>
+                  <th class="text-right">Booked Hrs</th>
+                  <th class="text-right">Progress</th>
+                  <th class="text-right">Revenue</th>
+                  <th class="text-right">Entries</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let intern of internDashboard.internDetails">
+                  <td class="font-bold">{{ intern.internName }}</td>
+                  <td><span class="role-badge">{{ intern.role }}</span></td>
+                  <td>{{ intern.supervisorName }}</td>
+                  <td class="text-right">{{ intern.bookedHours | number:'1.1-1' }}h</td>
+                  <td class="text-right">
+                    <div class="progress-cell">
+                      <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" [style.width.%]="intern.progressionPercentage | number:'1.0-0'" [class.over-target]="intern.progressionPercentage > 100"></div>
+                      </div>
+                      <span>{{ intern.progressionPercentage | number:'1.0-1' }}%</span>
+                    </div>
+                  </td>
+                  <td class="text-right">${{ intern.bookedPrice | number:'1.0-0' }}</td>
+                  <td class="text-right">{{ intern.entriesCount }}</td>
+                </tr>
+                <tr *ngIf="!internDashboard.internDetails.length">
+                  <td colspan="7" class="empty-cell">No intern data found for this period.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="analytics-section mt-4">
+          <header class="section-header">
+            <div>
+              <mat-icon>business_center</mat-icon>
+              <h2>Project Contribution by Interns</h2>
+            </div>
+          </header>
+          
+          <div class="table-container p-4">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Project Name</th>
+                  <th class="text-right">Interns Count</th>
+                  <th class="text-right">Booked Hrs</th>
+                  <th class="text-right">Revenue</th>
+                  <th class="text-right">Entries</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let proj of internDashboard.projectDetails">
+                  <td class="font-bold">{{ proj.projectName }}</td>
+                  <td class="text-right">{{ proj.internsCount }}</td>
+                  <td class="text-right">{{ proj.bookedHours | number:'1.1-1' }}h</td>
+                  <td class="text-right">${{ proj.bookedPrice | number:'1.0-0' }}</td>
+                  <td class="text-right">{{ proj.entriesCount }}</td>
+                </tr>
+                <tr *ngIf="!internDashboard.projectDetails.length">
+                  <td colspan="5" class="empty-cell">No project data found for this period.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </ng-container>
+
+
+    </ng-container>
+  </div>
+</section>
+
+<!-- ═══ Modal Dialog for Monthly Synthesis ═══════════════════════ -->
+<div class="synthesis-modal-overlay" *ngIf="isSynthesisModalOpen" (click)="closeSynthesisModal()">
+  <div class="synthesis-modal-card" (click)="$event.stopPropagation()">
+    <header class="synthesis-modal-header">
+      <div class="synthesis-modal-header__title">
+        <div class="header-icon-badge">
+          <mat-icon>table_chart</mat-icon>
+        </div>
+        <div>
+          <h3>Monthly Synthesis TE &amp; Subcontractors</h3>
+          <p>Consolidated view of TE (Employees), Subcontractors, TEffectiveness, and TAH for {{ query.year }}</p>
+        </div>
+      </div>
+      <button type="button" class="btn-close-modal" (click)="closeSynthesisModal()" title="Close">
+        <mat-icon>close</mat-icon>
+      </button>
+    </header>
+
+    <div class="synthesis-modal-toolbar">
+      <div class="search-box">
+        <mat-icon>search</mat-icon>
+        <input type="text" [(ngModel)]="synthesisSearchQuery" placeholder="Search by month, TAH, TEffectiveness...">
+      </div>
+      <div class="toolbar-actions">
+        <button type="button" class="btn-icon-text" [disabled]="isExportingSynthesis" (click)="exportSynthesisCsv()">
+          <mat-icon>file_download</mat-icon>
+          <span>{{ isExportingSynthesis ? 'Exporting...' : 'Export Excel' }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="synthesis-modal-body">
+      <div class="table-summary-bar">
+        <div class="summary-chip">
+          <span class="chip-label">TE Employees</span>
+          <strong class="chip-val">{{ totalTeCount }} members</strong>
+        </div>
+        <div class="summary-chip">
+          <span class="chip-label">Subcontractors</span>
+          <strong class="chip-val">{{ totalSubcontractorCount }} members</strong>
+        </div>
+        <div class="summary-chip">
+          <span class="chip-label">Avg. TEffectiveness</span>
+          <strong class="chip-val text-emerald">{{ avgYtdEffectiveness }}%</strong>
+        </div>
+        <div class="summary-chip">
+          <span class="chip-label">Cumulative TAH</span>
+          <strong class="chip-val text-indigo">{{ totalYtdTah | number:'1.1-1' }} h</strong>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table synthesis-table">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th class="text-center">TE (Employees)</th>
+              <th class="text-center">Subcontractors</th>
+              <th class="text-right">TEffectiveness</th>
+              <th class="text-right">TAH (Hours)</th>
+              <th class="text-center">TE / Sub Ratio</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of filteredSynthesisData" [class.highlight-current]="item.month === query.month">
+              <td class="font-bold month-name-cell">
+                <mat-icon class="month-icon">calendar_today</mat-icon>
+                <span>{{ item.monthName }}</span>
+                <span class="badge-current-month" *ngIf="item.month === query.month">Current</span>
+              </td>
+              <td class="text-center">
+                <div class="te-badge">
+                  <span class="te-count">{{ item.teEmployeesCount }} TE</span>
+                  <span class="te-sub">{{ item.teHours | number:'1.0-0' }}h</span>
+                </div>
+              </td>
+              <td class="text-center">
+                <div class="sub-badge">
+                  <span class="sub-count">{{ item.subcontractorsCount }} Sub</span>
+                  <span class="sub-sub">{{ item.subcontractorHours | number:'1.0-0' }}h</span>
+                </div>
+              </td>
+              <td class="text-right">
+                <span class="effectiveness-tag" [ngClass]="item.status">
+                  <mat-icon>{{ item.status === 'optimal' ? 'trending_up' : item.status === 'warning' ? 'trending_flat' : 'schedule' }}</mat-icon>
+                  {{ item.tEffectiveness | number:'1.1-1' }}%
+                </span>
+              </td>
+              <td class="text-right font-bold tah-cell">
+                {{ item.tah | number:'1.1-1' }} h
+              </td>
+              <td class="text-center ratio-cell">
+                <div class="split-progress-bar" title="TE: {{ item.employeeSharePercentage | number:'1.0-1' }}% | Sub: {{ item.subcontractorSharePercentage | number:'1.0-1' }}%">
+                  <div class="split-fill te-fill" [style.width.%]="item.employeeSharePercentage"></div>
+                  <div class="split-fill sub-fill" [style.width.%]="item.subcontractorSharePercentage"></div>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="!filteredSynthesisData.length">
+              <td colspan="6" class="empty-cell">No data found for this search.</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="table-total-row">
+              <td class="font-bold">Total / Annual Average</td>
+              <td class="text-center font-bold">{{ totalTeCount }} TE</td>
+              <td class="text-center font-bold">{{ totalSubcontractorCount }} Sub</td>
+              <td class="text-right font-bold text-emerald">{{ avgYtdEffectiveness }}%</td>
+              <td class="text-right font-bold text-indigo">{{ totalYtdTah | number:'1.1-1' }} h</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <footer class="synthesis-modal-footer">
+      <button type="button" class="btn-icon-text" (click)="closeSynthesisModal()">
+        <mat-icon>close</mat-icon>
+        <span>Close</span>
+      </button>
+    </footer>
+  </div>
+</div>
+

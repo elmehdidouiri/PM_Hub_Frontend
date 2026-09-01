@@ -820,6 +820,30 @@
   transition: color 0.15s ease;
 }
 
+.project-name--preview {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid #ea580c;
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+}
+
+.project-row--preview {
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid #ea580c;
+    outline-offset: -2px;
+  }
+}
+
 /* Badges Modernization */
 .type-badge {
   display: inline-block;

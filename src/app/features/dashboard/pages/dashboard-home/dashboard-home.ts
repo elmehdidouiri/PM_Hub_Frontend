@@ -31,7 +31,12 @@ import { PlantsApiService } from '../../../../core/services/plants-api.service';
 
 import { ProjectService } from '../../../projects/services/project';
 
-import { DashboardFilterParams, DashboardGroupedDistributionDto, GroupedDistributionItem } from '../../../projects/models';
+import {
+  DashboardCreatedProjectDto,
+  DashboardFilterParams,
+  DashboardGroupedDistributionDto,
+  GroupedDistributionItem,
+} from '../../../projects/models';
 
 import {
 
@@ -102,10 +107,6 @@ export class DashboardHome implements OnInit {
 
   readonly yearOptions = Array.from({ length: 8 }, (_, index) => this.currentFiscalYear + 1 - index);
 
-  readonly processStatusOptions = DashboardFilterService.PROCESS_STATUS_OPTIONS;
-
-
-
   filterState: DashboardFilterState = this.filterService.defaultFilterState();
 
 
@@ -133,6 +134,9 @@ export class DashboardHome implements OnInit {
   belowTargetCount = 0;
 
   delayedProjects = 0;
+  createdProjectsCount = 0;
+  createdProjects: DashboardCreatedProjectDto[] = [];
+  createdProjectsExpanded = false;
   personalLoggedHours = 0;
   personalYtdHours = 0;
   personalExpectedHours = 0;
@@ -235,6 +239,14 @@ export class DashboardHome implements OnInit {
     return !!this.user && !this.user.isAdmin && this.normalUserView === 'projects' && this.projectStatsScope === 'all';
   }
 
+  get visibleCreatedProjects(): DashboardCreatedProjectDto[] {
+    return this.createdProjectsExpanded ? this.createdProjects : this.createdProjects.slice(0, 3);
+  }
+
+  get hiddenCreatedProjectsCount(): number {
+    return Math.max(this.createdProjects.length - 3, 0);
+  }
+
 
 
   get metrics(): DashboardMetric[] {
@@ -275,7 +287,7 @@ export class DashboardHome implements OnInit {
       ];
     }
 
-    return [
+    const projectMetrics: DashboardMetric[] = [
 
       {
 
@@ -337,10 +349,11 @@ export class DashboardHome implements OnInit {
         tone: this.delayedProjects > 0 ? 'red' : 'green',
         actionLabel: 'View delayed projects',
 
-      },
+      }
 
     ];
 
+    return projectMetrics;
   }
 
 
@@ -372,7 +385,7 @@ export class DashboardHome implements OnInit {
     allTickets: FilterTicket[],
     selectedId: string
   ): FilterSection {
-    const validTickets = allTickets.filter(t => t.id !== 'all' && !!t.label);
+    const validTickets = allTickets.filter(t => t.id !== 'all' && !!t.label && t.count > 0);
     let visibleTickets = validTickets;
     let hiddenCount = 0;
 
@@ -409,7 +422,7 @@ export class DashboardHome implements OnInit {
       this.buildSection('businessUnit', 'Business units', 'corporate_fare', this.businessUnitTickets, this.filterState.selectedBusinessUnit),
       this.buildSection('department', 'Departments', 'business', this.departmentTickets, this.filterState.selectedDepartment),
       this.buildSection('plant', 'Plants', 'factory', this.plantTickets, this.filterState.selectedPlant),
-    ];
+    ].filter(section => section.tickets.length > 0);
   }
 
   setNormalUserView(view: 'projects' | 'personal'): void {
@@ -649,7 +662,28 @@ export class DashboardHome implements OnInit {
       return;
     }
 
+    if (label === 'financials') {
+      void this.router.navigate(['/dashboard/capacity-price']);
+      return;
+    }
+
     void this.router.navigate(['/dashboard/analytics']);
+  }
+
+  openCreatedProject(project: DashboardCreatedProjectDto): void {
+    if (!project.projectId) {
+      return;
+    }
+
+    void this.router.navigate(['/projects', project.projectId]);
+  }
+
+  toggleCreatedProjects(): void {
+    this.createdProjectsExpanded = !this.createdProjectsExpanded;
+  }
+
+  formatCreatedProjectDate(value: string): string {
+    return this.formatDateLabel(value);
   }
 
   openTicketProjects(section: FilterSection, ticket: FilterTicket): void {
@@ -831,24 +865,6 @@ export class DashboardHome implements OnInit {
     this.loadDashboard();
 
   }
-
-  updateProcessStatusFilter(event: Event): void {
-
-    if (this.isLoading || this.isRefreshing) {
-
-      return;
-
-    }
-
-    const input = event.target as HTMLSelectElement;
-
-    this.filterState.selectedProcessStatus = input.value || 'all';
-
-    this.loadDashboard();
-
-  }
-
-
 
   updateDateFilter(kind: 'start' | 'end', event: Event): void {
 
@@ -1175,6 +1191,8 @@ export class DashboardHome implements OnInit {
 
         this.delayedProjects = stats.delayedProjects;
 
+        this.applyCreatedProjects(dashboard.raw ?? dashboard);
+
         this.aboveTargetCount = stats.aboveTargetCount;
 
         this.belowTargetCount = stats.belowTargetCount;
@@ -1423,6 +1441,27 @@ export class DashboardHome implements OnInit {
 
     return this.projectService.getAdminDashboardGroupedDistribution(params).pipe(catchError(() => of(null)));
 
+  }
+
+  private applyCreatedProjects(rawDashboard: any): void {
+    const summary = rawDashboard?.summary ?? rawDashboard ?? {};
+    const rawProjects = rawDashboard?.createdProjects ?? rawDashboard?.CreatedProjects;
+
+    this.createdProjects = Array.isArray(rawProjects)
+      ? rawProjects
+          .map((project: any): DashboardCreatedProjectDto => ({
+            projectId: String(project?.projectId ?? project?.ProjectId ?? project?.id ?? project?.Id ?? '').trim(),
+            name: String(project?.name ?? project?.Name ?? project?.nom ?? project?.projectName ?? project?.ProjectName ?? '').trim(),
+            status: project?.status ?? project?.Status ?? project?.statut ?? '',
+            phase: project?.phase ?? project?.Phase ?? '',
+            createdAt: String(project?.createdAt ?? project?.CreatedAt ?? ''),
+          }))
+          .filter((project: DashboardCreatedProjectDto) => project.projectId || project.name)
+      : [];
+
+    const responseCount = Number(summary?.createdProjects ?? summary?.CreatedProjects);
+    this.createdProjectsCount = Number.isFinite(responseCount) ? responseCount : this.createdProjects.length;
+    this.createdProjectsExpanded = false;
   }
 
 

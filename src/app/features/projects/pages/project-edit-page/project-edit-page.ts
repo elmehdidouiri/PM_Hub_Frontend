@@ -6,6 +6,7 @@ import { MatDialog } from '@angular/material/dialog';
 
 import { NotificationService } from '../../../../core/services/notification.service';
 import { AuthService } from '../../../../core/services/auth';
+import { NavigationHistoryService } from '../../../../core/services/navigation-history.service';
 import { HourEntriesApiService } from '../../../../core/services/hour-entries-api.service';
 import { HourEntryDto } from '../../../../core/models/hour-entry.model';
 import { InternDto } from '../../../interns/models/intern.models';
@@ -155,6 +156,7 @@ export class ProjectEditPage implements OnInit {
     private readonly router: Router,
     private readonly cdr: ChangeDetectorRef,
     private readonly authService: AuthService,
+    private readonly navigationHistory: NavigationHistoryService,
     private readonly projectFilesApi: ProjectFilesApiService,
     private readonly hoursAllocationDashboard: HoursAllocationDashboardService,
     private readonly hourEntriesApi: HourEntriesApiService,
@@ -1167,11 +1169,11 @@ export class ProjectEditPage implements OnInit {
   }
 
   backToList(): void {
-    this.router.navigate([this.projectsBasePath()]);
+    void this.navigationHistory.back(this.projectsBasePath());
   }
 
   backToDetails(): void {
-    this.router.navigate(['/projects', this.project.id]);
+    void this.navigationHistory.back(`/projects/${this.project.id}`);
   }
 
   private projectsBasePath(): string {

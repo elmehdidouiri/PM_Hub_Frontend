@@ -29,7 +29,7 @@ interface AnalyticsMetric extends DashboardMetric {
 }
 
 interface KpiChartConfig {
-  key: 'effectiveness' | 'otd' | 'csat';
+  key: 'effectiveness' | 'otd';
   title: string;
   subtitle: string;
   icon: string;
@@ -88,13 +88,6 @@ export class AnalyticsDashboard implements OnInit {
       icon: 'schedule',
       tone: 'blue',
     },
-    {
-      key: 'csat',
-      title: 'Customer Satisfaction',
-      subtitle: 'Monthly average CSAT percentage',
-      icon: 'star',
-      tone: 'orange',
-    },
   ];
 
   readonly hourCategories: HourCategoryConfig[] = [
@@ -125,6 +118,17 @@ export class AnalyticsDashboard implements OnInit {
   selectedBusinessUnitId: string | null = null;
   selectedPlantId: string | null = null;
   private isDefaultFilter = true;
+
+  /** KPI trends are meaningful only across the fiscal YTD period. */
+  get showKpiAnalytics(): boolean {
+    return this.periodFilterMode === 'ytd';
+  }
+
+  get visibleTabs(): Array<{ id: AnalyticsTab; label: string; icon: string }> {
+    return this.showKpiAnalytics
+      ? this.tabs
+      : this.tabs.filter((tab) => tab.id !== 'kpis');
+  }
 
   ngOnInit(): void {
     this.periodFilterMode = 'ytd';
@@ -178,7 +182,7 @@ export class AnalyticsDashboard implements OnInit {
     const kpiTrend = this.dashboard?.kpis?.monthlyTrend ?? [];
     const utilTrend = this.dashboard?.hours?.utilizationTrend ?? [];
 
-    const getKpiPoints = (key: 'effectiveness' | 'otd' | 'csat') => 
+    const getKpiPoints = (key: 'effectiveness' | 'otd') => 
       kpiTrend.map(t => Number(t[key] || 0));
 
     const getTrendInfo = (points: number[]) => {
@@ -201,7 +205,6 @@ export class AnalyticsDashboard implements OnInit {
     return [
       makeMetric('Effectiveness', this.formatPercent(summary?.averageEffectiveness), 'Portfolio average', 'verified', this.percentTone(summary?.averageEffectiveness), getKpiPoints('effectiveness'), 'Open KPI quality'),
       makeMetric('OTD', this.formatPercent(summary?.averageOtd), 'On-time delivery', 'schedule', this.percentTone(summary?.averageOtd), getKpiPoints('otd'), 'Open KPI quality'),
-      makeMetric('CSAT', this.formatPercent(summary?.averageCsat), 'Customer satisfaction', 'star', this.percentTone(summary?.averageCsat), getKpiPoints('csat'), 'Open KPI quality'),
       makeMetric('Utilization', this.formatPercent(summary?.averageUtilization), 'Team capacity usage', 'speed', this.percentTone(summary?.averageUtilization), utilTrend.map(t => t.utilizationPercentage || 0), 'Open utilization'),
       {
         label: 'Total Hours',
@@ -355,6 +358,9 @@ export class AnalyticsDashboard implements OnInit {
   }
 
   setTab(tab: AnalyticsTab): void {
+    if (tab === 'kpis' && !this.showKpiAnalytics) {
+      tab = 'overview';
+    }
     this.activeTab = tab;
     this.disposeCharts();
     if (isPlatformBrowser(this.platformId)) {
@@ -367,7 +373,7 @@ export class AnalyticsDashboard implements OnInit {
 
   openMetricTarget(metric: AnalyticsMetric): void {
     const label = metric.label.toLowerCase();
-    this.setTab(label === 'effectiveness' || label === 'otd' || label === 'csat' ? 'kpis' : 'hours');
+    this.setTab(label === 'effectiveness' || label === 'otd' ? 'kpis' : 'hours');
   }
 
   private disposeCharts(): void {
@@ -401,6 +407,10 @@ export class AnalyticsDashboard implements OnInit {
     if (this.isLoading) return;
     this.clearDefaultIfActive();
     this.periodFilterMode = mode;
+
+    if (!this.showKpiAnalytics && this.activeTab === 'kpis') {
+      this.activeTab = 'overview';
+    }
 
     if (this.periodFilterMode === 'ytd') {
       this.selectedMonth = null;
@@ -1159,10 +1169,6 @@ export class AnalyticsDashboard implements OnInit {
     const period = dashboard?.period;
     if (!period) return;
 
-    if (this.selectedYear !== null) {
-      this.selectedYear = period.fiscalYear || period.year || this.selectedYear;
-    }
-    
     if (this.periodFilterMode === 'month') {
       this.selectedMonth = period.month || this.selectedMonth;
     }

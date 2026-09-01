@@ -136,9 +136,43 @@ export class HourEntriesApiService {
 
   // ─── Private unwrap helpers ───────────────────────────────────────────────
 
-  private unwrapList(response: ApiResponse<unknown[]> | unknown[]): unknown[] {
-    if (Array.isArray(response)) return response;
-    if (this.isApiResponse(response) && Array.isArray(response.data)) return response.data;
+  private unwrapList(response: any): unknown[] {
+    const asArray = (value: unknown): unknown[] | null => {
+      if (Array.isArray(value)) {
+        return value;
+      }
+      if (value && typeof value === 'object' && Array.isArray((value as { $values?: unknown[] }).$values)) {
+        return (value as { $values: unknown[] }).$values;
+      }
+      return null;
+    };
+
+    if (!response) {
+      return [];
+    }
+
+    const direct = asArray(response);
+    if (direct) {
+      return direct;
+    }
+
+    const keys = ['data', 'result', 'items', 'value', 'projects', 'Projects'];
+    for (const key of keys) {
+      const inner = response[key];
+      const found = asArray(inner);
+      if (found) {
+        return found;
+      }
+      if (inner && typeof inner === 'object') {
+        for (const nestedKey of keys) {
+          const nested = asArray((inner as Record<string, unknown>)[nestedKey]);
+          if (nested) {
+            return nested;
+          }
+        }
+      }
+    }
+
     return [];
   }
 

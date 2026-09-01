@@ -123,6 +123,7 @@
 
         <div class="metric-card__body">
           <div class="metric-card__values">
+            
             <strong>{{ metric.value }}</strong>
           </div>
 
@@ -177,6 +178,20 @@
                 <div>
                   <strong>{{ chart.title }}</strong>
                   <span>{{ chart.subtitle }}</span>
+                  <div class="kpi-card-header__formula" *ngIf="chart.key === 'effectiveness'">
+                    <mat-icon>functions</mat-icon>
+                    <div>
+                      <small>Calculation formula</small>
+                      <p>Actual project progress ÷ planned project progress × 100</p>
+                    </div>
+                  </div>
+                  <div class="kpi-card-header__formula" *ngIf="chart.key === 'otd'">
+                    <mat-icon>functions</mat-icon>
+                    <div>
+                      <small>Calculation formula</small>
+                      <p>Projects delivered on or before the due date ÷ completed projects × 100</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </header>

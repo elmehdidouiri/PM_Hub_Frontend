@@ -18,6 +18,7 @@ export interface AdminUserDto {
   isAdmin?: boolean;
   isActive?: boolean;
   isApproved?: boolean;
+  memberType?: number;
   createdAt?: string;
 }
 
@@ -65,6 +66,10 @@ export class UsersApiService {
     );
   }
 
+  updateMemberType(id: string, memberType: number): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${id}/member-type`, { memberType });
+  }
+
   private unwrapList(response: ApiResponse<unknown[]> | unknown[]): unknown[] {
     if (Array.isArray(response)) {
       return response;
@@ -95,6 +100,7 @@ export class UsersApiService {
       isAdmin: this.readBoolean(record, ['isAdmin']),
       isActive: this.readBoolean(record, ['isActive']),
       isApproved: this.readBoolean(record, ['isApproved', 'approved']),
+      memberType: this.readNumber(record, ['memberType']),
       createdAt: this.readString(record, ['createdAt']),
     };
   }
@@ -125,6 +131,16 @@ export class UsersApiService {
 
   private isApiResponse(value: unknown): value is ApiResponse<any> {
     return typeof value === 'object' && value !== null && 'success' in (value as any);
+  }
+
+  private readNumber(record: UnknownRecord, keys: string[]): number | undefined {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'number') {
+        return value;
+      }
+    }
+    return undefined;
   }
 }
 

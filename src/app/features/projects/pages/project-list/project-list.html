@@ -228,8 +228,15 @@
         <tbody>
           <tr
             *ngFor="let project of paginatedProjects; trackBy: trackByProjectId"
-            [class.project-row--selected]="isProjectSelected(project.id)">
-            <td class="selection-column" data-label="Select">
+            [class.project-row--selected]="isProjectSelected(project.id)"
+            class="project-row--preview"
+            tabindex="0"
+            role="button"
+            [attr.aria-label]="'Preview ' + project.name"
+            (click)="openQuickPreview(project.id)"
+            (keydown.enter)="openQuickPreview(project.id)"
+            (keydown.space)="$event.preventDefault(); openQuickPreview(project.id)">
+            <td class="selection-column" data-label="Select" (click)="$event.stopPropagation()">
               <label class="selection-control selection-control--row">
                 <input
                   type="checkbox"
@@ -284,7 +291,7 @@
                 {{ project.actualHours }}h
               </strong>
             </td>
-            <td class="text-right" data-label="Actions">
+            <td class="text-right" data-label="Actions" (click)="$event.stopPropagation()">
               <div class="action-cell-wrapper">
                 <button type="button" class="action-trigger-btn" [matMenuTriggerFor]="actionMenu" aria-label="Project actions">
                   <mat-icon>more_vert</mat-icon>

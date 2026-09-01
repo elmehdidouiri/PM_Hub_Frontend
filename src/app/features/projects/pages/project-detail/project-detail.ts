@@ -20,6 +20,7 @@ import { ProjectFilesApiService } from '../../../../core/services/project-files-
 import { FileService } from '../../../files/services/file';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { AuthService } from '../../../../core/services/auth';
+import { NavigationHistoryService } from '../../../../core/services/navigation-history.service';
 import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import {
   HoursAllocationByProjectUserDto,
@@ -132,6 +133,7 @@ export class ProjectDetail implements OnInit {
     private readonly fileService: FileService,
     private readonly notificationService: NotificationService,
     private readonly authService: AuthService,
+    private readonly navigationHistory: NavigationHistoryService,
     private readonly dialog: MatDialog
   ) {}
 
@@ -143,7 +145,7 @@ export class ProjectDetail implements OnInit {
   }
 
   backToList(): void {
-    this.router.navigate([this.projectsBasePath()]);
+    void this.navigationHistory.back(this.projectsBasePath());
   }
 
   editProject(): void {

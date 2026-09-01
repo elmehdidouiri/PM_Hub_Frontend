@@ -53,11 +53,11 @@ export class ProjectService {
 
   getProjects(): Observable<ProjectSummaryDto[]> {
     return this.http
-      .get<ApiResponse<ProjectSummaryDto[]>>(this.apiUrl, {
+      .get<ApiResponse<ProjectSummaryDto[]> | unknown>(this.apiUrl, {
         headers: this.buildHeaders(),
       })
       .pipe(
-        map((response) => this.unwrapResponse(response, 'Unable to load projects')),
+        map((response) => this.normalizeProjectsList(response)),
         catchError(() =>
           this.http
             .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/paged`, {

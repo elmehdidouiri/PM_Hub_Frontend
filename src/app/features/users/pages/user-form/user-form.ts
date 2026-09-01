@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { AuthService } from '../../../../core/services/auth';
 import { NotificationService } from '../../../../core/services/notification.service';
+import { NavigationHistoryService } from '../../../../core/services/navigation-history.service';
 import { RoleService } from '../../../../core/services/role.service';
 import { AdminUserDto, UsersApiService } from '../../../../core/services/users-api.service';
 import { Role } from '../../../../core/models';
@@ -22,6 +23,7 @@ export class UserForm implements OnInit {
   private readonly roleService = inject(RoleService);
   private readonly usersApi = inject(UsersApiService);
   private readonly notifications = inject(NotificationService);
+  private readonly navigationHistory = inject(NavigationHistoryService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   form!: FormGroup;
@@ -172,7 +174,7 @@ export class UserForm implements OnInit {
   }
 
   goBack(): void {
-    void this.router.navigate(['/users']);
+    void this.navigationHistory.back('/users');
   }
 
   getErrorMessage(field: string): string {

@@ -204,7 +204,7 @@
                     </div>
                   </div>
 
-                  <a class="app-profile-menu__item" routerLink="/profile" (click)="closeProfileMenu()">
+                  <a *ngIf="!isAdmin" class="app-profile-menu__item" routerLink="/profile" (click)="closeProfileMenu()">
                     <mat-icon>person</mat-icon>
                     <span>Profile</span>
                   </a>
@@ -218,7 +218,16 @@
             </div>
           </div>
 
-          <div class="app-header__bottom" *ngIf="!isDashboardLanding">
+          <div class="app-header__bottom">
+            <button
+              type="button"
+              class="app-header__back-button"
+              (click)="goBack()"
+              aria-label="Go back to the previous page">
+              <mat-icon>arrow_back</mat-icon>
+              <span>Back</span>
+            </button>
+
             <div class="app-header__breadcrumbs">
               <ng-container *ngFor="let crumb of breadcrumbs; let last = last">
                 <span [class.app-header__crumb--current]="last">{{ crumb }}</span>

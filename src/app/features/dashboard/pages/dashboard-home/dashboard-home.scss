@@ -954,6 +954,31 @@
   }
 }
 
+.created-project-ticket {
+  text-align: left;
+
+  .filter-ticket__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.created-project-ticket__meta {
+  display: block;
+  margin-top: 0.35rem;
+  color: #475467;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.created-projects-empty {
+  margin: 0;
+  padding: 1rem;
+  color: $text-muted;
+  text-align: center;
+}
+
 .target-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

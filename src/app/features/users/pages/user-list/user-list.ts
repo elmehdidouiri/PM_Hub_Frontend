@@ -26,6 +26,7 @@ export class UserList implements OnInit {
   isRefreshing = false;
   errorMessage = '';
   deletingUserId: string | null = null;
+  isUpdatingMemberType: string | null = null;
 
   ngOnInit(): void {
     this.refreshUsers();
@@ -148,6 +149,35 @@ export class UserList implements OnInit {
           this.cdr.markForCheck();
         });
       },
+    });
+  }
+
+  onMemberTypeChange(user: AdminUserDto, newMemberType: number): void {
+    const id = user.id || user.userId;
+    if (!id) {
+      this.notifications.showError('Missing user id');
+      return;
+    }
+
+    this.isUpdatingMemberType = id;
+    this.usersApi.updateMemberType(id, newMemberType).subscribe({
+      next: () => {
+        this.zone.run(() => {
+          this.notifications.showSuccess('Member type updated successfully');
+          user.memberType = newMemberType;
+          this.isUpdatingMemberType = null;
+          this.cdr.markForCheck();
+        });
+      },
+      error: () => {
+        this.zone.run(() => {
+          this.notifications.showError('Unable to update member type');
+          this.isUpdatingMemberType = null;
+          this.cdr.markForCheck();
+          // Optionally revert the value or refresh
+          this.refreshUsers();
+        });
+      }
     });
   }
 

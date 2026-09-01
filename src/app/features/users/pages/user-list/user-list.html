@@ -61,6 +61,7 @@
           <th>Collaborator</th>
           <th>Account Email</th>
           <th>Role / Permission</th>
+          <th>Member Type</th>
           <th class="text-right">Action Hub</th>
         </tr>
       </thead>
@@ -82,6 +83,16 @@
             <span class="pm-badge pm-badge--primary">
               {{ user.roleName || 'Unknown' }}
             </span>
+          </td>
+          <td>
+            <select
+              [ngModel]="user.memberType"
+              (ngModelChange)="onMemberTypeChange(user, $event)"
+              class="pm-select-sm"
+              [disabled]="isUpdatingMemberType === (user.id || user.userId)">
+              <option [ngValue]="1">Employee</option>
+              <option [ngValue]="2">Subcontractor</option>
+            </select>
           </td>
           <td class="text-right">
             <div class="flex justify-end gap-2 opacity-0 transition-opacity">

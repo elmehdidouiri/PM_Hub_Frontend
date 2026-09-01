@@ -1,8 +1,9 @@
 import { DashboardMetric } from '../../models/dashboard-metric.model';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { ActivatedRoute } from '@angular/router';
 import { catchError, finalize, of } from 'rxjs';
 import * as XLSX from 'xlsx';
 
@@ -45,6 +46,8 @@ export class HoursAllocationDashboard implements OnInit {
   private readonly service = inject(HoursAllocationDashboardService);
   private readonly loadingService = inject(LoadingService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly route = inject(ActivatedRoute);
+  private readonly location = inject(Location);
   private readonly now = new Date();
 
   filters: HoursAllocationFiltersDto = this.emptyFilters();
@@ -58,6 +61,7 @@ export class HoursAllocationDashboard implements OnInit {
   showAdvancedFilters = false;
   errorMessage = '';
   successMessage = '';
+  showBackButton = false;
 
   selectedUserId: string | null = null;
   selectedProjectId: string | null = null;
@@ -80,7 +84,30 @@ export class HoursAllocationDashboard implements OnInit {
   private latestBookingHoursPreviewRequest = 0;
 
   ngOnInit(): void {
-    this.loadInitialData();
+    // Read query params from route to pre-select filters if coming from drill-down
+    this.route.queryParams.subscribe(params => {
+      if (params['from'] === 'capacity') {
+        this.showBackButton = true;
+      }
+      if (params['userId']) {
+        this.selectedUserId = params['userId'];
+      }
+      if (params['year']) {
+        this.selectedYear = +params['year'];
+      }
+      if (params['month']) {
+        this.selectedMonth = +params['month'];
+        this.selectedQuickSelect = 'month';
+        this.fromDate = this.toDateInputValue(new Date(this.selectedYear, this.selectedMonth - 1, 1));
+        this.toDate = this.toDateInputValue(new Date(this.selectedYear, this.selectedMonth, 0));
+      }
+      
+      this.loadInitialData();
+    });
+  }
+
+  goBack(): void {
+    this.location.back();
   }
 
   get summaryCards(): SummaryCard[] {

@@ -1,9 +1,9 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
-import { ApiResponse } from '../../../core/models';
+import { ApiResponse, CapacityPriceDashboardDto, CapacityPriceQueryDto, InternCapacityPriceAnalyticsDto, MemberTahDashboardDto, MemberTahQuery } from '../../../core/models';
 import {
   AnalyticsDashboardDto,
   AnalyticsDashboardParams,
@@ -26,6 +26,50 @@ export class AnalyticsDashboardService {
       .pipe(map((response) => this.normalizeDashboard(this.unwrap(response))));
   }
 
+  getCapacityPriceDashboard(params: CapacityPriceQueryDto): Observable<CapacityPriceDashboardDto> {
+    let httpParams = new HttpParams();
+    if (params.year) httpParams = httpParams.set('year', params.year.toString());
+    if (params.month) httpParams = httpParams.set('month', params.month.toString());
+    if (params.targetHoursPerMember) httpParams = httpParams.set('targetHoursPerMember', params.targetHoursPerMember.toString());
+    if (params.hourlyRate) httpParams = httpParams.set('hourlyRate', params.hourlyRate.toString());
+
+    return this.http
+      .get<ApiResponse<CapacityPriceDashboardDto> | CapacityPriceDashboardDto>(`${this.apiUrl}/capacity-price`, {
+        params: httpParams,
+      })
+      .pipe(map((response) => this.normalizeCapacityPriceDashboard(this.unwrap(response))));
+  }
+
+  getInternCapacityPriceDashboard(params: CapacityPriceQueryDto): Observable<InternCapacityPriceAnalyticsDto> {
+    let httpParams = new HttpParams();
+    if (params.year) httpParams = httpParams.set('year', params.year.toString());
+    if (params.month) httpParams = httpParams.set('month', params.month.toString());
+    if (params.targetHoursPerIntern) httpParams = httpParams.set('targetHoursPerIntern', params.targetHoursPerIntern.toString());
+    if (params.hourlyRate) httpParams = httpParams.set('hourlyRate', params.hourlyRate.toString());
+
+    return this.http
+      .get<ApiResponse<InternCapacityPriceAnalyticsDto> | InternCapacityPriceAnalyticsDto>(`${this.apiUrl}/intern-capacity-price`, {
+        params: httpParams,
+      })
+      .pipe(map((response) => this.normalizeInternCapacityPriceDashboard(this.unwrap(response))));
+  }
+
+  getMemberTahDashboard(params: MemberTahQuery): Observable<MemberTahDashboardDto> {
+    return this.http
+      .get<ApiResponse<MemberTahDashboardDto> | MemberTahDashboardDto>(`${this.apiUrl}/member-tah`, {
+        params: this.buildMemberTahParams(params),
+      })
+      .pipe(map((response) => this.normalizeMemberTahDashboard(this.unwrap(response))));
+  }
+
+  exportMemberTahDashboard(params: MemberTahQuery): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.apiUrl}/member-tah/export`, {
+      observe: 'response',
+      params: this.buildMemberTahParams(params),
+      responseType: 'blob',
+    });
+  }
+
   getFilters(): Observable<AnalyticsFiltersDto> {
     return this.http
       .get<ApiResponse<AnalyticsFiltersDto> | AnalyticsFiltersDto>(`${this.apiUrl}/filters`)
@@ -46,6 +90,33 @@ export class AnalyticsDashboardService {
         params: buildAnalyticsQueryParams(params),
       })
       .pipe(map((response) => this.unwrap(response)));
+  }
+
+  private buildMemberTahParams(params: MemberTahQuery): HttpParams {
+    let httpParams = new HttpParams();
+    const entries: Array<[keyof MemberTahQuery, string | number | undefined]> = [
+      ['year', params.year],
+      ['month', params.month],
+      ['fiscalYear', params.fiscalYear],
+      ['tahMonthlyHoursTarget', params.tahMonthlyHoursTarget],
+      ['periodMode', params.periodMode],
+      ['quickSelect', params.quickSelect],
+      ['userId', params.userId],
+      ['projectId', params.projectId],
+      ['departmentId', params.departmentId],
+      ['businessUnitId', params.businessUnitId],
+      ['plantId', params.plantId],
+      ['projectStatus', params.projectStatus],
+      ['projectPhase', params.projectPhase],
+    ];
+
+    for (const [key, value] of entries) {
+      if (value !== undefined && value !== null && value !== '') {
+        httpParams = httpParams.set(key, String(value));
+      }
+    }
+
+    return httpParams;
   }
 
   private unwrap<T>(response: ApiResponse<T> | T): T {
@@ -300,6 +371,165 @@ export class AnalyticsDashboardService {
         label: this.str(r, ['label', 'Label', 'name', 'Name', 'fullName', 'FullName']),
       };
     }).filter((item) => item.id || item.label);
+  }
+
+  private normalizeCapacityPriceDashboard(raw: unknown): CapacityPriceDashboardDto {
+    const row = this.asRecord(raw);
+    return {
+      memberCapacities: this.array(this.pick(row, ['memberCapacities', 'MemberCapacities'])).map((item) =>
+        this.normalizeMemberCapacity(item)
+      ),
+      capacityTarget: this.normalizeCapacityTarget(this.pick(row, ['capacityTarget', 'CapacityTarget'])),
+      memberPrices: this.array(this.pick(row, ['memberPrices', 'MemberPrices'])).map((item) =>
+        this.normalizeMemberPrice(item)
+      ),
+      priceTarget: this.normalizePriceTarget(this.pick(row, ['priceTarget', 'PriceTarget'])),
+    };
+  }
+
+  private normalizeInternCapacityPriceDashboard(raw: unknown): InternCapacityPriceAnalyticsDto {
+    const row = this.asRecord(raw);
+    return {
+      totalInterns: this.num(row, ['totalInterns', 'TotalInterns']),
+      activeInternsWithEntries: this.num(row, ['activeInternsWithEntries', 'ActiveInternsWithEntries']),
+      capacityTarget: this.normalizeCapacityTarget(this.pick(row, ['capacityTarget', 'CapacityTarget'])),
+      priceTarget: this.normalizePriceTarget(this.pick(row, ['priceTarget', 'PriceTarget'])),
+      internDetails: this.array(this.pick(row, ['internDetails', 'InternDetails'])).map((item) => {
+        const r = this.asRecord(item);
+        return {
+          internId: this.str(r, ['internId', 'InternId']),
+          internName: this.str(r, ['internName', 'InternName']),
+          role: this.str(r, ['role', 'Role']),
+          supervisorName: this.str(r, ['supervisorName', 'SupervisorName']),
+          bookedHours: this.num(r, ['bookedHours', 'BookedHours']),
+          progressionPercentage: this.num(r, ['progressionPercentage', 'ProgressionPercentage']),
+          bookedPrice: this.num(r, ['bookedPrice', 'BookedPrice']),
+          entriesCount: this.num(r, ['entriesCount', 'EntriesCount']),
+        };
+      }),
+      projectDetails: this.array(this.pick(row, ['projectDetails', 'ProjectDetails'])).map((item) => {
+        const r = this.asRecord(item);
+        return {
+          projectId: this.str(r, ['projectId', 'ProjectId']),
+          projectName: this.str(r, ['projectName', 'ProjectName']),
+          bookedHours: this.num(r, ['bookedHours', 'BookedHours']),
+          bookedPrice: this.num(r, ['bookedPrice', 'BookedPrice']),
+          internsCount: this.num(r, ['internsCount', 'InternsCount']),
+          entriesCount: this.num(r, ['entriesCount', 'EntriesCount']),
+        };
+      }),
+    };
+  }
+
+  private normalizeMemberTahDashboard(raw: unknown): MemberTahDashboardDto {
+    const row = this.asRecord(raw);
+    const period = this.asRecord(this.pick(row, ['period', 'Period']));
+    const summary = this.asRecord(this.pick(row, ['summary', 'Summary']));
+    
+    return {
+      period: {
+        year: this.num(period, ['year']),
+        month: this.num(period, ['month']),
+        monthName: this.str(period, ['monthName']),
+        startDate: this.str(period, ['startDate']),
+        endDate: this.str(period, ['endDate']),
+        fiscalYear: this.num(period, ['fiscalYear']),
+        fiscalYearStartMonth: this.num(period, ['fiscalYearStartMonth']),
+        fiscalYearStartDate: this.str(period, ['fiscalYearStartDate']),
+        fiscalYearEndDate: this.str(period, ['fiscalYearEndDate'])
+      },
+      tahMonthlyHoursTarget: this.num(row, ['tahMonthlyHoursTarget']),
+      summary: {
+        employeeCount: this.num(summary, ['employeeCount']),
+        subcontractorCount: this.num(summary, ['subcontractorCount']),
+        averageEffectiveness: this.num(summary, ['averageEffectiveness']),
+        cumulativeTahHours: this.num(summary, ['cumulativeTahHours']),
+        employeeTahHours: this.num(summary, ['employeeTahHours']),
+        subcontractorTahHours: this.num(summary, ['subcontractorTahHours']),
+        employeeSharePercentage: this.num(summary, ['employeeSharePercentage']),
+        subcontractorSharePercentage: this.num(summary, ['subcontractorSharePercentage']),
+      },
+      monthlyBreakdown: this.array(this.pick(row, ['monthlyBreakdown'])).map((item) => {
+        const r = this.asRecord(item);
+        return {
+          year: this.num(r, ['year']),
+          month: this.num(r, ['month']),
+          monthName: this.str(r, ['monthName']),
+          employeeCount: this.num(r, ['employeeCount']),
+          subcontractorCount: this.num(r, ['subcontractorCount']),
+          averageEffectiveness: this.num(r, ['averageEffectiveness']),
+          tahHours: this.num(r, ['tahHours']),
+          employeeTahHours: this.num(r, ['employeeTahHours']),
+          subcontractorTahHours: this.num(r, ['subcontractorTahHours']),
+          employeeSharePercentage: this.num(r, ['employeeSharePercentage']),
+          subcontractorSharePercentage: this.num(r, ['subcontractorSharePercentage']),
+        };
+      }),
+      members: this.array(this.pick(row, ['members'])).map((item) => {
+        const r = this.asRecord(item);
+        return {
+          userId: this.str(r, ['userId']),
+          userName: this.str(r, ['userName']),
+          memberType: this.num(r, ['memberType']) as any,
+          memberTypeLabel: this.str(r, ['memberTypeLabel']) as any,
+          bookedHours: this.num(r, ['bookedHours']),
+          effectiveness: this.num(r, ['effectiveness']),
+          tahHours: this.num(r, ['tahHours']),
+          monthly: this.array(this.pick(r, ['monthly'])).map((mItem) => {
+            const mr = this.asRecord(mItem);
+            return {
+              year: this.num(mr, ['year']),
+              month: this.num(mr, ['month']),
+              monthName: this.str(mr, ['monthName']),
+              bookedHours: this.num(mr, ['bookedHours']),
+              effectiveness: this.num(mr, ['effectiveness']),
+              tahHours: this.num(mr, ['tahHours']),
+            };
+          }),
+        };
+      }),
+    };
+  }
+
+  private normalizeMemberCapacity(item: unknown) {
+    const r = this.asRecord(item);
+    return {
+      userId: this.str(r, ['userId', 'UserId']),
+      userName: this.str(r, ['userName', 'UserName']),
+      bookedHours: this.num(r, ['bookedHours', 'BookedHours']),
+      percentage: this.num(r, ['percentage', 'Percentage']),
+    };
+  }
+
+  private normalizeMemberPrice(item: unknown) {
+    const r = this.asRecord(item);
+    return {
+      userId: this.str(r, ['userId', 'UserId']),
+      userName: this.str(r, ['userName', 'UserName']),
+      bookedPrice: this.num(r, ['bookedPrice', 'BookedPrice']),
+      percentage: this.num(r, ['percentage', 'Percentage']),
+    };
+  }
+
+  private normalizeCapacityTarget(raw: unknown) {
+    const r = this.asRecord(raw);
+    return {
+      actualBookedHours: this.num(r, ['actualBookedHours', 'ActualBookedHours']),
+      targetHours: this.num(r, ['targetHours', 'TargetHours']),
+      remainingHours: this.num(r, ['remainingHours', 'RemainingHours']),
+    };
+  }
+
+  private normalizePriceTarget(raw: unknown) {
+    const r = this.asRecord(raw);
+    const bookedPrice = this.num(r, ['bookedPrice', 'BookedPrice']);
+    const remainingPrice = this.num(r, ['remainingPrice', 'RemainingPrice']);
+    const targetPrice = this.num(r, ['targetPrice', 'TargetPrice']);
+    return {
+      bookedPrice,
+      remainingPrice,
+      targetPrice: targetPrice || bookedPrice + remainingPrice,
+    };
   }
 
   private pick(record: Record<string, unknown>, keys: string[]): unknown {

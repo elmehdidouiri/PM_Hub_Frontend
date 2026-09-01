@@ -11,6 +11,7 @@ import { StorageService } from './storage.service';
 import { NotificationService } from './notification.service';
 import { UserSessionService } from './user-session.service';
 import { TokenStoreService } from './token-store.service';
+import { NavigationHistoryService } from './navigation-history.service';
 import {
   ApiResponse,
   AuthResponse,
@@ -99,6 +100,7 @@ export class AuthService {
     private notificationService: NotificationService,
     private userSessionService: UserSessionService,
     private tokenStore: TokenStoreService,
+    private navigationHistory: NavigationHistoryService,
     @Inject(PLATFORM_ID) private platformId: any
   ) {
     this.refreshHttpClient = new HttpClient(httpBackend);
@@ -250,7 +252,7 @@ export class AuthService {
   }
 
   getAuthUserById(id: string): Observable<unknown | null> {
-    return this.http.get<ApiResponse<unknown> | unknown>(`${this.usersApiUrl}/${id}`).pipe(
+    return this.http.get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/users/${encodeURIComponent(id)}`).pipe(
       map((response) => {
         if (typeof response === 'object' && response !== null && 'success' in (response as any)) {
           const api = response as ApiResponse<unknown>;
@@ -358,6 +360,7 @@ export class AuthService {
   }
 
   private clearAuthData(): void {
+    this.navigationHistory.clear();
     this.clearAccessTokenData();
     this.storageService.removeItem(environment.refreshTokenKey);
     this.tokenStore.setRefreshToken(null);
