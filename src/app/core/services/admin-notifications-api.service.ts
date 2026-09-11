@@ -5,6 +5,11 @@ import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models';
 
+export interface EmailNotificationToggleResponse {
+  success: boolean;
+  message: string;
+}
+
 export type NotificationAudienceType = 'hour-booking' | 'monthly-target' | 'inactive-users';
 
 export interface AdminNotificationUserDto {
@@ -19,6 +24,7 @@ export interface AdminNotificationUserDto {
   monthlyTargetHours: number;
   bookedHours: number;
   missingHours: number;
+  emailNotificationsEnabled: boolean;
 }
 
 @Injectable({
@@ -51,6 +57,20 @@ export class AdminNotificationsApiService {
 
   sendInactiveUserReminder(userId: string): Observable<void> {
     return this.sendReminder(`${this.apiUrl}/inactive-user-notifications/${userId}/send-reminder`);
+  }
+
+  toggleEmailNotifications(userId: string, enabled: boolean): Observable<EmailNotificationToggleResponse> {
+    return this.http.put<ApiResponse<EmailNotificationToggleResponse> | EmailNotificationToggleResponse>(
+      `${environment.apiUrl}/users/${userId}/email-notifications`,
+      { emailNotificationsEnabled: enabled }
+    ).pipe(
+      map((response) => {
+        if (this.isApiResponse(response)) {
+          return response.data as EmailNotificationToggleResponse ?? { success: response.success, message: response.message ?? '' };
+        }
+        return response as EmailNotificationToggleResponse;
+      })
+    );
   }
 
   private getUsers(url: string): Observable<AdminNotificationUserDto[]> {
@@ -100,12 +120,13 @@ export class AdminNotificationsApiService {
       email: this.str(record, ['email', 'Email']),
       roleName: this.str(record, ['roleName', 'RoleName', 'role', 'Role']),
       departmentName: this.str(record, ['departmentName', 'DepartmentName', 'department', 'Department']),
-      lastBookingDate: this.str(record, ['lastBookingDate', 'LastBookingDate', 'lastBookedAt', 'LastBookedAt']),
-      lastActivityDate: this.str(record, ['lastActivityDate', 'LastActivityDate', 'lastLoginAt', 'LastLoginAt']),
-      inactiveDays: this.num(record, ['inactiveDays', 'InactiveDays', 'daysInactive', 'DaysInactive']),
-      monthlyTargetHours: this.num(record, ['monthlyTargetHours', 'MonthlyTargetHours', 'targetHours', 'TargetHours']),
-      bookedHours: this.num(record, ['bookedHours', 'BookedHours', 'monthlyBookedHours', 'MonthlyBookedHours']),
-      missingHours: this.num(record, ['missingHours', 'MissingHours', 'remainingHours', 'RemainingHours']),
+      lastBookingDate: this.str(record, ['lastBookingDate', 'LastBookingDate']),
+      lastActivityDate: this.str(record, ['lastActivityDate', 'LastActivityDate']),
+      inactiveDays: this.num(record, ['daysWithoutBooking', 'DaysWithoutBooking', 'inactiveDays', 'InactiveDays']),
+      monthlyTargetHours: this.num(record, ['targetHours', 'TargetHours', 'monthlyTargetHours', 'MonthlyTargetHours']),
+      bookedHours: this.num(record, ['bookedHours', 'BookedHours']),
+      missingHours: this.num(record, ['missingHours', 'MissingHours']),
+      emailNotificationsEnabled: this.bool(record, ['emailNotificationsEnabled', 'EmailNotificationsEnabled']),
     };
   }
 
@@ -131,6 +152,16 @@ export class AdminNotificationsApiService {
       }
     }
     return 0;
+  }
+
+  private bool(record: Record<string, unknown>, keys: string[], defaultValue = true): boolean {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'boolean') {
+        return value;
+      }
+    }
+    return defaultValue;
   }
 
   private isApiResponse<T>(value: ApiResponse<T> | T): value is ApiResponse<T> {

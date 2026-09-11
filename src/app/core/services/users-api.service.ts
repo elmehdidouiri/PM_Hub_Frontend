@@ -19,6 +19,7 @@ export interface AdminUserDto {
   isActive?: boolean;
   isApproved?: boolean;
   memberType?: number;
+  emailNotificationsEnabled?: boolean;
   createdAt?: string;
 }
 
@@ -70,6 +71,10 @@ export class UsersApiService {
     return this.http.put<void>(`${this.apiUrl}/${id}/member-type`, { memberType });
   }
 
+  updateEmailNotifications(id: string, emailNotificationsEnabled: boolean): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${id}/email-notifications`, { emailNotificationsEnabled });
+  }
+
   private unwrapList(response: ApiResponse<unknown[]> | unknown[]): unknown[] {
     if (Array.isArray(response)) {
       return response;
@@ -101,6 +106,7 @@ export class UsersApiService {
       isActive: this.readBoolean(record, ['isActive']),
       isApproved: this.readBoolean(record, ['isApproved', 'approved']),
       memberType: this.readNumber(record, ['memberType']),
+      emailNotificationsEnabled: this.readBoolean(record, ['emailNotificationsEnabled']),
       createdAt: this.readString(record, ['createdAt']),
     };
   }

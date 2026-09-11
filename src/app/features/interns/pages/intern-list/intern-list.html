@@ -19,7 +19,7 @@
         <mat-icon [class.animate-spin]="isRefreshing">refresh</mat-icon>
         <span>{{ isRefreshing ? 'Synchronizing...' : 'Sync Data' }}</span>
       </button>
-      <button type="button" class="pm-btn-primary" (click)="createIntern()">
+      <button type="button" class="pm-btn-primary" (click)="createIntern()" *ngIf="canOnboardIntern">
         <mat-icon>person_add</mat-icon>
         <span>Onboard Intern</span>
       </button>
@@ -80,7 +80,7 @@
       <h3 class="text-xl font-black text-navy-500">Registry Empty</h3>
       <p class="text-sm font-semibold text-slate-500">No intern records found in the system database.</p>
     </div>
-    <button type="button" class="pm-btn-primary" (click)="createIntern()">Onboard First Intern</button>
+    <button type="button" class="pm-btn-primary" (click)="createIntern()" *ngIf="canOnboardIntern">Onboard First Intern</button>
   </div>
 
   <div class="pm-surface p-20 flex flex-col items-center justify-center text-center gap-6" *ngIf="!isLoading && !errorMessage && hasInterns && !hasFilteredInterns">

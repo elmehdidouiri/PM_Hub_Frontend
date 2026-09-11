@@ -8,6 +8,7 @@ import {
   NotificationAudienceType,
 } from '../../../../core/services/admin-notifications-api.service';
 import { NotificationService } from '../../../../core/services/notification.service';
+import { UsersApiService } from '../../../../core/services/users-api.service';
 
 interface NotificationAudience {
   type: NotificationAudienceType;
@@ -26,9 +27,13 @@ interface NotificationAudience {
 })
 export class HourBookingNotificationsPage implements OnInit {
   private readonly api = inject(AdminNotificationsApiService);
+  private readonly usersApi = inject(UsersApiService);
   private readonly notifications = inject(NotificationService);
   private readonly zone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
+
+  /** Tracks userIds currently being toggled to prevent double-clicks */
+  togglingEmailIds = new Set<string>();
 
   readonly audiences: NotificationAudience[] = [
     {
@@ -299,6 +304,47 @@ export class HourBookingNotificationsPage implements OnInit {
     return this.api.sendHourBookingReminder(userId);
   }
 
+  toggleEmailNotifications(user: AdminNotificationUserDto): void {
+    if (!user.userId || this.togglingEmailIds.has(user.userId)) {
+      return;
+    }
+
+    const newValue = !user.emailNotificationsEnabled;
+    // Optimistic update
+    user.emailNotificationsEnabled = newValue;
+    this.togglingEmailIds.add(user.userId);
+    this.cdr.markForCheck();
+
+    this.usersApi.updateEmailNotifications(user.userId, newValue)
+      .pipe(
+        finalize(() => {
+          this.zone.run(() => {
+            this.togglingEmailIds.delete(user.userId);
+            this.cdr.markForCheck();
+          });
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.zone.run(() => {
+            const label = newValue ? 'activées' : 'désactivées';
+            this.notifications.showSuccess(`Notifications email ${label} pour ${user.fullName || user.email}.`);
+            // User stays in the list even when notifications are disabled,
+            // the "Opt-out" badge and disabled send button already signal the state.
+            this.cdr.markForCheck();
+          });
+        },
+        error: () => {
+          this.zone.run(() => {
+            // Revert optimistic update on failure
+            user.emailNotificationsEnabled = !newValue;
+            this.notifications.showError(`Impossible de modifier les notifications pour ${user.fullName || user.email}.`);
+            this.cdr.markForCheck();
+          });
+        },
+      });
+  }
+
   private loadAudience(type: NotificationAudienceType) {
     const request =
       type === 'monthly-target'
@@ -359,5 +405,12 @@ export class HourBookingNotificationsPage implements OnInit {
         this.selectedUserIds[type].delete(userId);
       }
     });
+  }
+
+  private removeUserFromAllAudiences(userId: string): void {
+    for (const audience of this.audiences) {
+      audience.users = audience.users.filter((u) => u.userId !== userId);
+      this.selectedUserIds[audience.type].delete(userId);
+    }
   }
 }

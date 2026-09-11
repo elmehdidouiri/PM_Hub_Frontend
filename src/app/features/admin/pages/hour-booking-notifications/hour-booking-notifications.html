@@ -137,10 +137,10 @@
               <span class="sr-only">Selection</span>
             </th>
             <th>User</th>
-            <th>Role</th>
             <th>Last booking</th>
             <th>Monthly target</th>
             <th>Inactive</th>
+            <th class="notif-toggle-col">Email notifs</th>
             <th class="actions-col">Action</th>
           </tr>
         </thead>
@@ -166,10 +166,6 @@
                 </div>
               </div>
             </td>
-            <td data-label="Role">
-              <span class="table-badge">{{ user.roleName || 'Unknown' }}</span>
-              <small>{{ user.departmentName || 'No department' }}</small>
-            </td>
             <td data-label="Last booking">{{ formatDate(user.lastBookingDate) }}</td>
             <td data-label="Monthly target">
               <span>{{ user.bookedHours }}h / {{ user.monthlyTargetHours }}h</span>
@@ -179,12 +175,36 @@
               <span>{{ user.inactiveDays || 0 }} days</span>
               <small>{{ formatDate(user.lastActivityDate) }}</small>
             </td>
+            <td data-label="Email notifs" class="notif-toggle-col">
+              <div class="email-toggle-wrap">
+                <button
+                  type="button"
+                  class="email-toggle"
+                  [class.email-toggle--on]="user.emailNotificationsEnabled"
+                  [class.email-toggle--toggling]="togglingEmailIds.has(user.userId)"
+                  (click)="toggleEmailNotifications(user)"
+                  [disabled]="togglingEmailIds.has(user.userId) || sendingKey !== null"
+                  [attr.aria-label]="(user.emailNotificationsEnabled ? 'Désactiver' : 'Activer') + ' les notifications email pour ' + (user.fullName || user.email)"
+                  [attr.aria-pressed]="user.emailNotificationsEnabled">
+                  <span class="email-toggle__track">
+                    <span class="email-toggle__thumb">
+                      <mat-icon *ngIf="togglingEmailIds.has(user.userId)">hourglass_top</mat-icon>
+                      <mat-icon *ngIf="!togglingEmailIds.has(user.userId) && user.emailNotificationsEnabled">notifications_active</mat-icon>
+                      <mat-icon *ngIf="!togglingEmailIds.has(user.userId) && !user.emailNotificationsEnabled">notifications_off</mat-icon>
+                    </span>
+                  </span>
+                </button>
+                <span class="email-toggle-label" *ngIf="!user.emailNotificationsEnabled">
+                  <mat-icon>block</mat-icon> Opt-out
+                </span>
+              </div>
+            </td>
             <td data-label="Action" class="actions-col">
               <button
                 type="button"
                 class="send-action"
                 (click)="sendReminder(user)"
-                [disabled]="sendingKey !== null || !user.userId">
+                [disabled]="sendingKey !== null || !user.userId || !user.emailNotificationsEnabled">
                 <mat-icon>{{ isSending(user) ? 'hourglass_top' : 'outgoing_mail' }}</mat-icon>
                 <span>{{ isSending(user) ? 'Sending...' : 'Send reminder' }}</span>
               </button>

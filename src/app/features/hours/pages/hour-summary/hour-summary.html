@@ -77,47 +77,26 @@
       </article>
     </section>
 
-    <section class="summary-grid">
-      <article class="summary-panel summary-panel--breakdown pm-surface">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">Breakdown</span>
-            <h2>Hour details</h2>
-          </div>
-          <mat-icon>donut_large</mat-icon>
+    <article class="summary-panel summary-panel--breakdown pm-surface">
+      <div class="panel-heading">
+        <div>
+          <span class="panel-kicker">Breakdown</span>
+          <h2>Hour details</h2>
         </div>
+        <mat-icon>donut_large</mat-icon>
+      </div>
 
-        <div class="breakdown-list" *ngIf="breakdownCards.length; else noBreakdown">
-          <div class="breakdown-item" *ngFor="let item of breakdownCards">
-            <div class="breakdown-item__top">
-              <strong>{{ item.label }}</strong>
-            <span>{{ item.hours | number:'1.2-2' }} h</span>
-            </div>
-            <div class="breakdown-track">
-              <div class="breakdown-fill" [style.width.%]="item.percent"></div>
-            </div>
-            <span class="breakdown-percent">{{ item.percent }}%</span>
+      <div class="breakdown-list" *ngIf="breakdownCards.length; else noBreakdown">
+        <div class="breakdown-item" *ngFor="let item of breakdownCards">
+          <strong class="breakdown-item__label">{{ item.label }}</strong>
+          <div class="breakdown-track">
+            <div class="breakdown-fill" [style.width.%]="item.percent"></div>
           </div>
+          <span class="breakdown-item__hours">{{ item.hours | number:'1.2-2' }} h</span>
+          <span class="breakdown-percent">{{ item.percent }}%</span>
         </div>
-      </article>
-
-      <article class="summary-panel summary-panel--overview pm-surface">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">Project view</span>
-            <h2>Project overview</h2>
-          </div>
-          <mat-icon>workspaces</mat-icon>
-        </div>
-
-        <div class="overview-cards" *ngIf="projectOverviewCards.length; else noOverview">
-          <div class="overview-card" *ngFor="let card of projectOverviewCards">
-            <span>{{ card.title }}</span>
-            <strong>{{ card.value | number:'1.2-2' }} {{ card.suffix }}</strong>
-          </div>
-        </div>
-      </article>
-    </section>
+      </div>
+    </article>
 
     <section class="summary-panel summary-panel--projects pm-surface">
       <div class="panel-heading">
@@ -150,13 +129,6 @@
     <div class="empty-panel">
       <mat-icon>info_outline</mat-icon>
       <span>No breakdown data is available for the selected period.</span>
-    </div>
-  </ng-template>
-
-  <ng-template #noOverview>
-    <div class="empty-panel">
-      <mat-icon>info_outline</mat-icon>
-      <span>No project metric is available yet.</span>
     </div>
   </ng-template>
 

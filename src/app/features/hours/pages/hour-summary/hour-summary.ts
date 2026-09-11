@@ -50,7 +50,6 @@ export class HourSummary implements OnInit {
   monthlySummary: SummaryMetricCard[] = [];
   totalHoursCard: SummaryMetricCard | null = null;
   breakdownCards: BreakdownCard[] = [];
-  projectOverviewCards: SummaryMetricCard[] = [];
   topProjects: TopProjectCard[] = [];
 
   ngOnInit(): void {
@@ -98,7 +97,6 @@ export class HourSummary implements OnInit {
 
     forkJoin({
       monthly: this.hourService.summaryMonthlyMe(year).pipe(catchError(() => of(null))),
-      project: this.hourService.summaryProjectMe(year).pipe(catchError(() => of(null))),
       totalHours: this.hourService.summaryTotalHoursMe({ year, month, projectId: scopedProjectId }).pipe(catchError(() => of(null))),
       breakdown: this.hourService.summaryBreakdownMe({ year, month, projectId: scopedProjectId }).pipe(catchError(() => of(null))),
       topProjects: this.hourService.summaryTopProjectsMe(year, 5).pipe(catchError(() => of(null))),
@@ -110,14 +108,13 @@ export class HourSummary implements OnInit {
           this.cdr.markForCheck();
         })
       )
-      .subscribe(({ monthly, project, totalHours, breakdown, topProjects }) => {
+      .subscribe(({ monthly, totalHours, breakdown, topProjects }) => {
         this.monthlySummary = this.buildMonthlyCards(monthly);
         this.totalHoursCard = this.buildTotalHoursCard(totalHours);
         this.breakdownCards = this.buildBreakdownCards(breakdown);
-        this.projectOverviewCards = this.buildProjectOverviewCards(project);
         this.topProjects = this.buildTopProjects(topProjects);
 
-        if (!this.monthlySummary.length && !this.breakdownCards.length && !this.projectOverviewCards.length && !this.topProjects.length) {
+        if (!this.monthlySummary.length && !this.breakdownCards.length && !this.topProjects.length) {
           this.summaryError = 'No summary data is available for the selected period yet.';
         }
 
@@ -179,23 +176,6 @@ export class HourSummary implements OnInit {
         percent: total > 0 ? Math.round(((value as number) / total) * 100) : 0,
       }))
       .sort((a, b) => b.hours - a.hours);
-  }
-
-  private buildProjectOverviewCards(source: unknown): SummaryMetricCard[] {
-    const record = this.asRecord(source);
-    if (!record) {
-      return [];
-    }
-
-    return Object.entries(record)
-      .filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
-      .slice(0, 4)
-      .map(([key, value]) => ({
-        title: this.labelizeKey(key),
-        value: value as number,
-        suffix: 'h',
-        accent: 'neutral',
-      }));
   }
 
   private buildTopProjects(source: unknown): TopProjectCard[] {

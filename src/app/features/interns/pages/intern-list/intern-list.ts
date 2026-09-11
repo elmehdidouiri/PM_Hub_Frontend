@@ -8,6 +8,7 @@ import { InternService } from '../../services/intern';
 import { ProjectService } from '../../../projects/services/project';
 import { InternDetailsDialog } from '../../../users/components/intern-details-dialog/intern-details-dialog';
 import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
+import { AuthService } from '../../../../core/services/auth';
 
 @Component({
   selector: 'app-intern-list',
@@ -23,6 +24,7 @@ export class InternList implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly dialog = inject(MatDialog);
   private readonly projectService = inject(ProjectService);
+  private readonly authService = inject(AuthService);
 
   interns: InternDto[] = [];
   filteredInterns: InternDto[] = [];
@@ -43,6 +45,10 @@ export class InternList implements OnInit {
 
   get hasFilteredInterns(): boolean {
     return this.filteredInterns.length > 0;
+  }
+
+  get canOnboardIntern(): boolean {
+    return this.authService.isAdmin();
   }
 
   refreshInterns(): void {

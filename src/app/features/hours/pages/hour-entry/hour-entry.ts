@@ -680,7 +680,11 @@ export class HourEntry implements OnInit {
     this.recentEntriesError = '';
 
     forkJoin({
-      entries: this.hours.myEntriesByMonth(today.getFullYear(), today.getMonth() + 1).pipe(
+      // The Entries history is intentionally unfiltered: normal users must see all
+      // of their allocations, regardless of the month they were recorded in.
+      // The dashboard request below remains monthly so its summary calculations
+      // continue to reflect only the current month.
+      entries: this.hours.myEntries().pipe(
         catchError(() => {
           this.recentEntriesError = 'Unable to load your recent entries.';
           return of([] as HourEntryDto[]);
