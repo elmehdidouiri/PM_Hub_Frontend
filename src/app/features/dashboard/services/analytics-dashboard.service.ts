@@ -375,6 +375,7 @@ export class AnalyticsDashboardService {
 
   private normalizeCapacityPriceDashboard(raw: unknown): CapacityPriceDashboardDto {
     const row = this.asRecord(raw);
+    const memberCounts = this.asRecord(this.pick(row, ['memberCounts', 'MemberCounts']));
     return {
       memberCapacities: this.array(this.pick(row, ['memberCapacities', 'MemberCapacities'])).map((item) =>
         this.normalizeMemberCapacity(item)
@@ -384,6 +385,11 @@ export class AnalyticsDashboardService {
         this.normalizeMemberPrice(item)
       ),
       priceTarget: this.normalizePriceTarget(this.pick(row, ['priceTarget', 'PriceTarget'])),
+      memberCounts: {
+        employeeCount: this.num(memberCounts, ['employeeCount', 'EmployeeCount']),
+        internCount: this.num(memberCounts, ['internCount', 'InternCount']),
+        subcontractorCount: this.num(memberCounts, ['subcontractorCount', 'SubcontractorCount']),
+      },
     };
   }
 
@@ -391,31 +397,37 @@ export class AnalyticsDashboardService {
     const row = this.asRecord(raw);
     return {
       totalInterns: this.num(row, ['totalInterns', 'TotalInterns']),
-      activeInternsWithEntries: this.num(row, ['activeInternsWithEntries', 'ActiveInternsWithEntries']),
+      activeInternsWithEntries: this.num(row, ['internsWithLoggedHours', 'InternsWithLoggedHours', 'activeInternsWithEntries', 'ActiveInternsWithEntries']),
       capacityTarget: this.normalizeCapacityTarget(this.pick(row, ['capacityTarget', 'CapacityTarget'])),
       priceTarget: this.normalizePriceTarget(this.pick(row, ['priceTarget', 'PriceTarget'])),
-      internDetails: this.array(this.pick(row, ['internDetails', 'InternDetails'])).map((item) => {
+      internDetails: this.array(this.pick(row, ['interns', 'Interns', 'internDetails', 'InternDetails'])).map((item) => {
         const r = this.asRecord(item);
         return {
           internId: this.str(r, ['internId', 'InternId']),
           internName: this.str(r, ['internName', 'InternName']),
-          role: this.str(r, ['role', 'Role']),
+          role: this.str(r, ['roleName', 'RoleName', 'role', 'Role']),
           supervisorName: this.str(r, ['supervisorName', 'SupervisorName']),
           bookedHours: this.num(r, ['bookedHours', 'BookedHours']),
-          progressionPercentage: this.num(r, ['progressionPercentage', 'ProgressionPercentage']),
+          targetHours: this.num(r, ['targetHours', 'TargetHours']),
+          remainingHours: this.num(r, ['remainingHours', 'RemainingHours']),
+          directBookedHours: this.num(r, ['directBookedHours', 'DirectBookedHours']),
+          supervisionHours: this.num(r, ['supervisionHours', 'SupervisionHours']),
+          progressionPercentage: this.num(r, ['percentage', 'Percentage', 'progressionPercentage', 'ProgressionPercentage']),
           bookedPrice: this.num(r, ['bookedPrice', 'BookedPrice']),
-          entriesCount: this.num(r, ['entriesCount', 'EntriesCount']),
+          targetPrice: this.num(r, ['targetPrice', 'TargetPrice']),
+          remainingPrice: this.num(r, ['remainingPrice', 'RemainingPrice']),
+          entriesCount: this.num(r, ['hourEntryCount', 'HourEntryCount', 'entriesCount', 'EntriesCount']),
         };
       }),
-      projectDetails: this.array(this.pick(row, ['projectDetails', 'ProjectDetails'])).map((item) => {
+      projectDetails: this.array(this.pick(row, ['projects', 'Projects', 'projectDetails', 'ProjectDetails'])).map((item) => {
         const r = this.asRecord(item);
         return {
           projectId: this.str(r, ['projectId', 'ProjectId']),
           projectName: this.str(r, ['projectName', 'ProjectName']),
           bookedHours: this.num(r, ['bookedHours', 'BookedHours']),
           bookedPrice: this.num(r, ['bookedPrice', 'BookedPrice']),
-          internsCount: this.num(r, ['internsCount', 'InternsCount']),
-          entriesCount: this.num(r, ['entriesCount', 'EntriesCount']),
+          internsCount: this.num(r, ['internCount', 'InternCount', 'internsCount', 'InternsCount']),
+          entriesCount: this.num(r, ['hourEntryCount', 'HourEntryCount', 'entriesCount', 'EntriesCount']),
         };
       }),
     };
@@ -496,7 +508,11 @@ export class AnalyticsDashboardService {
     return {
       userId: this.str(r, ['userId', 'UserId']),
       userName: this.str(r, ['userName', 'UserName']),
+      memberType: this.str(r, ['memberType', 'MemberType']),
       bookedHours: this.num(r, ['bookedHours', 'BookedHours']),
+      targetHours: this.num(r, ['targetHours', 'TargetHours']),
+      remainingHours: this.num(r, ['remainingHours', 'RemainingHours']),
+      varianceHours: this.num(r, ['varianceHours', 'VarianceHours']),
       percentage: this.num(r, ['percentage', 'Percentage']),
     };
   }
@@ -506,7 +522,11 @@ export class AnalyticsDashboardService {
     return {
       userId: this.str(r, ['userId', 'UserId']),
       userName: this.str(r, ['userName', 'UserName']),
+      memberType: this.str(r, ['memberType', 'MemberType']),
       bookedPrice: this.num(r, ['bookedPrice', 'BookedPrice']),
+      targetPrice: this.num(r, ['targetPrice', 'TargetPrice']),
+      remainingPrice: this.num(r, ['remainingPrice', 'RemainingPrice']),
+      variancePrice: this.num(r, ['variancePrice', 'VariancePrice']),
       percentage: this.num(r, ['percentage', 'Percentage']),
     };
   }
@@ -517,6 +537,8 @@ export class AnalyticsDashboardService {
       actualBookedHours: this.num(r, ['actualBookedHours', 'ActualBookedHours']),
       targetHours: this.num(r, ['targetHours', 'TargetHours']),
       remainingHours: this.num(r, ['remainingHours', 'RemainingHours']),
+      varianceHours: this.num(r, ['varianceHours', 'VarianceHours']),
+      achievementPercentage: this.num(r, ['achievementPercentage', 'AchievementPercentage']),
     };
   }
 
@@ -529,6 +551,8 @@ export class AnalyticsDashboardService {
       bookedPrice,
       remainingPrice,
       targetPrice: targetPrice || bookedPrice + remainingPrice,
+      variancePrice: this.num(r, ['variancePrice', 'VariancePrice']),
+      achievementPercentage: this.num(r, ['achievementPercentage', 'AchievementPercentage']),
     };
   }
 

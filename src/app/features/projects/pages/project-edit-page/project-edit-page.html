@@ -285,6 +285,14 @@
           </div>
         </div>
 
+        <div class="info-item" *ngIf="project.status === ProjectStatus.OnHold">
+          <div class="info-icon-wrapper"><mat-icon>event</mat-icon></div>
+          <div class="info-content">
+            <label>Estimated start date</label>
+            <span>{{ (project.estimatedStartDate | date) || '-' }}</span>
+          </div>
+        </div>
+
         <div class="info-item">
           <div class="info-icon-wrapper"><mat-icon>layers</mat-icon></div>
           <div class="info-content">
@@ -331,6 +339,14 @@
 
             </select>
 
+          </div>
+
+          <div class="field" *ngIf="statusForm.get('status')?.value === ProjectStatus.OnHold">
+            <label>Estimated start date *</label>
+            <input type="date" formControlName="estimatedStartDate">
+            <small *ngIf="statusForm.errors?.['estimatedStartDateRequired'] && (statusForm.get('estimatedStartDate')?.touched || statusForm.touched)">
+              Estimated start date is required for projects on hold.
+            </small>
           </div>
 
           <div class="field">
@@ -396,6 +412,7 @@
       <div class="info-display" *ngIf="editingSection !== 'timeline'">
         <div class="info-item"><label>Start Date</label><span>{{ (project.startDate | date) || '-' }}</span></div>
         <div class="info-item"><label>End Date</label><span>{{ (project.endDate | date) || '-' }}</span></div>
+        <div class="info-item" *ngIf="project.status === ProjectStatus.OnHold"><label>Estimated start date</label><span>{{ (project.estimatedStartDate | date) || '-' }}</span></div>
         <div class="info-item"><label>Est. Due Date</label><span>{{ (project.estimatedDueDate | date) || '-' }}</span>
         </div>
         <div class="info-item"><label>Est. Hours</label><span>{{ project.estimatedHours || 0 }}h</span></div>
@@ -405,6 +422,7 @@
         <div class="form-grid">
           <div class="field"><label>Start Date *</label><input type="date" formControlName="startDate"></div>
           <div class="field"><label>End Date</label><input type="date" formControlName="endDate"></div>
+          <div class="field" *ngIf="project.status === ProjectStatus.OnHold"><label>Estimated start date *</label><input type="date" formControlName="estimatedStartDate"><small *ngIf="timelineForm.get('estimatedStartDate')?.hasError('required') && timelineForm.get('estimatedStartDate')?.touched">Estimated start date is required for projects on hold.</small></div>
           <div class="field"><label>Est. Due Date</label><input type="date" formControlName="estimatedDueDate"></div>
           <small *ngIf="timelineForm.errors?.['endDateInvalid']">Project end date must be strictly after the start
             date.</small>

@@ -52,6 +52,8 @@ interface ProjectListViewState {
   styleUrl: './project-list.scss',
 })
 export class ProjectList implements OnInit, AfterViewInit {
+  readonly ProjectStatus = ProjectStatus;
+
   private readonly statusLabels: Record<ProjectStatus, string> = {
     [ProjectStatus.Planned]: 'Planned',
     [ProjectStatus.Ongoing]: 'Ongoing',

@@ -9,7 +9,11 @@ export interface CapacityPriceQueryDto {
 export interface MemberCapacityDto {
   userId: string;
   userName: string;
+  memberType: 'Employee' | 'Subcontractor' | string;
   bookedHours: number;
+  targetHours: number;
+  remainingHours: number;
+  varianceHours: number;
   percentage: number;
 }
 
@@ -17,12 +21,18 @@ export interface CapacityTargetDto {
   actualBookedHours: number;
   targetHours: number;
   remainingHours: number;
+  varianceHours: number;
+  achievementPercentage: number;
 }
 
 export interface MemberPriceDto {
   userId: string;
   userName: string;
+  memberType: 'Employee' | 'Subcontractor' | string;
   bookedPrice: number;
+  targetPrice: number;
+  remainingPrice: number;
+  variancePrice: number;
   percentage: number;
 }
 
@@ -30,6 +40,14 @@ export interface PriceTargetDto {
   bookedPrice: number;
   remainingPrice: number;
   targetPrice: number;
+  variancePrice: number;
+  achievementPercentage: number;
+}
+
+export interface MemberCountsDto {
+  employeeCount: number;
+  internCount: number;
+  subcontractorCount: number;
 }
 
 export interface CapacityPriceDashboardDto {
@@ -37,6 +55,7 @@ export interface CapacityPriceDashboardDto {
   capacityTarget: CapacityTargetDto;
   memberPrices: MemberPriceDto[];
   priceTarget: PriceTargetDto;
+  memberCounts: MemberCountsDto;
 }
 
 export interface InternDetailDto {
@@ -45,8 +64,14 @@ export interface InternDetailDto {
   role: string;
   supervisorName: string;
   bookedHours: number;
+  targetHours: number;
+  remainingHours: number;
+  directBookedHours: number;
+  supervisionHours: number;
   progressionPercentage: number;
   bookedPrice: number;
+  targetPrice: number;
+  remainingPrice: number;
   entriesCount: number;
 }
 

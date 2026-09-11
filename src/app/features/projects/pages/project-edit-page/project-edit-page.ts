@@ -256,12 +256,17 @@ export class ProjectEditPage implements OnInit {
       status: [this.project.status, Validators.required],
       phase: [this.project.phase, Validators.required],
       processStatus: [this.project.processStatus],
-      progressPercentage: [this.project.progressPercentage || 0, [Validators.min(0), Validators.max(100)]]
-    }, { validators: this.phaseStatusValidator });
+      progressPercentage: [this.project.progressPercentage || 0, [Validators.min(0), Validators.max(100)]],
+      estimatedStartDate: [this.formatDateForInput(this.project.estimatedStartDate)],
+    }, { validators: [this.phaseStatusValidator, this.estimatedStartDateValidator] });
 
     // ── Timeline & Effort ──
     this.timelineForm = this.fb.group({
       startDate: [this.formatDateForInput(this.project.startDate), Validators.required],
+      estimatedStartDate: [
+        this.formatDateForInput(this.project.estimatedStartDate),
+        this.project.status === ProjectStatus.OnHold ? Validators.required : [],
+      ],
       endDate: [this.formatDateForInput(this.project.endDate)],
       estimatedDueDate: [this.formatDateForInput(this.project.estimatedDueDate)],
       estimatedHours: [this.project.estimatedHours, Validators.min(0)],
@@ -410,6 +415,10 @@ export class ProjectEditPage implements OnInit {
         this.notificationService.showWarning('Project end date must be strictly after the start date.');
       } else if (section === 'timeline' && form.errors?.['estimatedDateInvalid']) {
         this.notificationService.showWarning('Estimated due date must be strictly after the start date.');
+      } else if (section === 'status' && form.errors?.['estimatedStartDateRequired']) {
+        this.notificationService.showWarning('Estimated start date is required for projects on hold.');
+      } else if (section === 'timeline' && form.get('estimatedStartDate')?.hasError('required')) {
+        this.notificationService.showWarning('Estimated start date is required for projects on hold.');
       }
       return;
     }
@@ -513,6 +522,7 @@ export class ProjectEditPage implements OnInit {
             ? null
             : Number(status.processStatus),
           progressPercentage: Number(status.progressPercentage) || 0,
+          estimatedStartDate: this.toNullableDate(status.estimatedStartDate),
         };
       }
 
@@ -520,6 +530,7 @@ export class ProjectEditPage implements OnInit {
         const timeline = this.timelineForm.getRawValue();
         return {
           startDate: this.toNullableDate(timeline.startDate),
+          estimatedStartDate: this.toNullableDate(timeline.estimatedStartDate),
           endDate: this.toNullableDate(timeline.endDate),
           estimatedDueDate: this.toNullableDate(timeline.estimatedDueDate),
           estimatedHours: this.toNullableNumber(timeline.estimatedHours),
@@ -1239,6 +1250,15 @@ export class ProjectEditPage implements OnInit {
     }
 
     return null;
+  }
+
+  private estimatedStartDateValidator(group: AbstractControl): { estimatedStartDateRequired: true } | null {
+    const status = group.get('status')?.value as ProjectStatus | null;
+    const estimatedStartDate = String(group.get('estimatedStartDate')?.value || '').trim();
+
+    return status === ProjectStatus.OnHold && !estimatedStartDate
+      ? { estimatedStartDateRequired: true }
+      : null;
   }
 
   private dateValidator(group: AbstractControl): { endDateInvalid?: true; estimatedDateInvalid?: true } | null {

@@ -96,6 +96,7 @@ export interface CreateProjectDto {
   technologyIds: string[];
   solutionDomainIds: string[];
   startDate: string;
+  estimatedStartDate: string | null;
   endDate: string | null;
   estimatedDueDate: string | null;
   estimatedHours: number | null;
@@ -127,6 +128,7 @@ export interface CreateFullProjectPayload {
   departmentId: string;
   budget: number;
   startDate: string;
+  estimatedStartDate: string | null;
   projectManagerId: string | null;
   endDate: string | null;
   estimatedDueDate: string | null;
@@ -165,6 +167,7 @@ export interface UpdateProjectPayload {
   departmentId: string;
   budget: number;
   startDate: string;
+  estimatedStartDate: string | null;
   projectManagerId: string | null;
   endDate: string | null;
   estimatedDueDate: string | null;
@@ -206,6 +209,7 @@ export interface ProjectDto {
   strategicScore: number;
   strategicCategory: string;
   startDate: string;
+  estimatedStartDate: string | null;
   endDate: string | null;
   estimatedDueDate: string | null;
   createdAt: string;
@@ -354,6 +358,7 @@ export interface ProjectSummaryDto {
   projectManagerName: string | null;
   projectManagerId: string | null;
   startDate: string;
+  estimatedStartDate: string | null;
   endDate?: string | null;
   estimatedDueDate: string | null;
   budget: number;

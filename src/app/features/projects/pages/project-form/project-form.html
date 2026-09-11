@@ -158,6 +158,18 @@
 
           </div>
 
+          <div class="field" *ngIf="step2Group.get('status')?.value === ProjectStatus.OnHold">
+
+            <label>Estimated start date *</label>
+
+            <input type="date" formControlName="estimatedStartDate" />
+
+            <small *ngIf="step2Group.errors?.['estimatedStartDateRequired'] && (step2Group.get('estimatedStartDate')?.touched || step2Group.touched)">
+              Estimated start date is required for projects on hold.
+            </small>
+
+          </div>
+
           <div class="field span-2">
 
             <label>Description</label>

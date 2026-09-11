@@ -83,6 +83,7 @@ export interface ProjectQuickPreviewDialogData {
             <h3><mat-icon>event</mat-icon> Planning</h3>
             <dl>
               <div><dt>Start date</dt><dd>{{ project.startDate | date:'dd MMM y' }}</dd></div>
+              <div *ngIf="project.status === ProjectStatus.OnHold"><dt>Estimated start date</dt><dd>{{ project.estimatedStartDate ? (project.estimatedStartDate | date:'dd MMM y') : 'Not set' }}</dd></div>
               <div><dt>End date</dt><dd>{{ project.endDate ? (project.endDate | date:'dd MMM y') : 'Not set' }}</dd></div>
               <div><dt>Process status</dt><dd>{{ project.processStatusLabel || project.processStatus }}</dd></div>
               <div><dt>Last update</dt><dd>{{ project.updatedAt ? (project.updatedAt | date:'dd MMM y') : 'Not set' }}</dd></div>
@@ -156,6 +157,8 @@ export interface ProjectQuickPreviewDialogData {
   `],
 })
 export class ProjectQuickPreviewDialog implements OnInit {
+  readonly ProjectStatus = ProjectStatus;
+
   project: ProjectDto | null = null;
   isLoading = true;
 

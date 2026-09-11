@@ -263,6 +263,9 @@
                 <span class="status-indicator"></span>
                 <span class="status-label">{{ project.statusLabel }}</span>
               </div>
+              <small *ngIf="project.raw.status === ProjectStatus.OnHold">
+                Estimated start: {{ project.raw.estimatedStartDate ? (project.raw.estimatedStartDate | date:'mediumDate') : '-' }}
+              </small>
             </td>
             <td class="text-center" data-label="Completion">
               <div class="completion-wrapper" [matTooltip]="project.isDataComplete ? 'All details complete' : 'Missing fields: ' + project.missingFields?.join(', ')" matTooltipPosition="above">

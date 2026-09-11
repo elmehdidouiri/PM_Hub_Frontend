@@ -134,8 +134,9 @@ export class ProjectForm implements OnInit {
         name: this.fb.nonNullable.control('', Validators.required),
         phase: this.fb.control<ProjectPhase | null>(null, Validators.required),
         status: this.fb.control<ProjectStatus | null>(null, Validators.required),
+        estimatedStartDate: this.fb.nonNullable.control(''),
         description: this.fb.nonNullable.control(''),
-      }, { validators: this.phaseStatusValidator }),
+      }, { validators: [this.phaseStatusValidator, this.estimatedStartDateValidator] }),
       step3: this.fb.group({
         projectManagerId: this.fb.control<string | null>(null),
         sponsor: this.fb.nonNullable.control(''),
@@ -623,6 +624,8 @@ export class ProjectForm implements OnInit {
         this.notificationService.showWarning('Estimated due date must be strictly after the start date.');
       } else if (this.step2Group.errors?.['invalidPhaseStatus']) {
         this.notificationService.showWarning(this.phaseStatusError());
+      } else if (this.step2Group.errors?.['estimatedStartDateRequired']) {
+        this.notificationService.showWarning('Estimated start date is required for projects on hold.');
       } else {
         this.notificationService.showWarning('Please complete all required fields before submitting.');
       }
@@ -776,6 +779,7 @@ export class ProjectForm implements OnInit {
       name: step2.name.trim(),
       phase: step2.phase as ProjectPhase,
       status: step2.status as ProjectStatus,
+      estimatedStartDate: this.toApiDate(step2.estimatedStartDate),
       description: this.emptyToNull(step2.description),
       projectManagerId: step3.projectManagerId || null,
       sponsor: this.emptyToNull(step3.sponsor),
@@ -836,6 +840,15 @@ export class ProjectForm implements OnInit {
     }
 
     return null;
+  }
+
+  private estimatedStartDateValidator(group: AbstractControl): { estimatedStartDateRequired: true } | null {
+    const status = group.get('status')?.value as ProjectStatus | null;
+    const estimatedStartDate = String(group.get('estimatedStartDate')?.value || '').trim();
+
+    return status === ProjectStatus.OnHold && !estimatedStartDate
+      ? { estimatedStartDateRequired: true }
+      : null;
   }
 
   private syncMemberRole(userId: string): void {

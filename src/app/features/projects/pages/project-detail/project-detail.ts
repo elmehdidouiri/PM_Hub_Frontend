@@ -35,6 +35,8 @@ import { HoursAllocationDashboardService } from '../../../dashboard/services/hou
   styleUrl: './project-detail.scss',
 })
 export class ProjectDetail implements OnInit {
+  readonly ProjectStatus = ProjectStatus;
+
   private readonly statusLabels: Record<ProjectStatus, string> = {
     [ProjectStatus.Planned]: 'Planned',
     [ProjectStatus.Ongoing]: 'Ongoing',

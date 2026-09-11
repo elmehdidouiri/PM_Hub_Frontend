@@ -346,6 +346,7 @@ export class ProjectService {
       departmentIds: form.departmentIds || (form.departmentId ? [form.departmentId] : []),
       projectManagerId: form.projectManagerId,
       startDate: this.toNullableDate(form.startDate),
+      estimatedStartDate: this.toNullableDate(form.estimatedStartDate),
       endDate: this.toNullableDate(form.endDate),
       estimatedDueDate: this.toNullableDate(form.estimatedDueDate || form.endDate),
       phase: Number(form.phase) || 0,

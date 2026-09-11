@@ -3,6 +3,7 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Router, ActivatedRoute } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import * as echarts from 'echarts';
 import * as XLSX from 'xlsx';
@@ -27,6 +28,20 @@ export interface MonthlySynthesisItem {
   employeeSharePercentage: number;
   subcontractorSharePercentage: number;
   status: 'optimal' | 'warning' | 'neutral';
+}
+
+interface PopulationSummary {
+  label: string;
+  headcount: number;
+  bookedHours: number;
+  targetHours: number;
+  remainingHours: number;
+  hoursAchievement: number;
+  bookedPrice: number;
+  targetPrice: number;
+  remainingPrice: number;
+  priceAchievement: number;
+  includesSupervision: boolean;
 }
 
 @Component({
@@ -137,27 +152,18 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
     this.errorMessage = '';
     this.loadSynthesisData();
     
-    if (this.viewMode === 'team') {
-      this.analyticsService.getCapacityPriceDashboard(this.query)
-        .pipe(finalize(() => this.finalizeLoad()))
-        .subscribe({
-          next: (dashboard) => {
-            this.dashboard = dashboard;
-            this.internDashboard = null;
-          },
-          error: (err) => this.handleError(err)
-        });
-    } else {
-      this.analyticsService.getInternCapacityPriceDashboard(this.query)
-        .pipe(finalize(() => this.finalizeLoad()))
-        .subscribe({
-          next: (dashboard) => {
-            this.internDashboard = dashboard;
-            this.dashboard = null;
-          },
-          error: (err) => this.handleError(err)
-        });
-    }
+    forkJoin({
+      team: this.analyticsService.getCapacityPriceDashboard(this.query),
+      interns: this.analyticsService.getInternCapacityPriceDashboard(this.query),
+    })
+      .pipe(finalize(() => this.finalizeLoad()))
+      .subscribe({
+        next: ({ team, interns }) => {
+          this.dashboard = team;
+          this.internDashboard = interns;
+        },
+        error: (err) => this.handleError(err),
+      });
   }
 
   private finalizeLoad(): void {
@@ -215,16 +221,81 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
     return this.viewMode === 'team' ? this.dashboard?.priceTarget : this.internDashboard?.priceTarget;
   }
 
+  get activeEmployeeCount(): number {
+    return this.dashboard?.memberCounts?.employeeCount ?? this.dashboard?.memberCapacities.length ?? 0;
+  }
+
+  get activeMemberCountsDisplay(): string {
+    const counts = this.dashboard?.memberCounts;
+    if (!counts) return String(this.activeEmployeeCount);
+    return `${counts.employeeCount} / ${counts.internCount} / ${counts.subcontractorCount}`;
+  }
+
   get priceTargetAmount(): number {
     const data = this.activePriceTarget;
     if (!data) return 0;
     return data.targetPrice ?? ((data.bookedPrice || 0) + (data.remainingPrice || 0));
   }
 
+  get populationSummaries(): PopulationSummary[] {
+    const members = this.dashboard?.memberCapacities || [];
+    const memberPrices = new Map((this.dashboard?.memberPrices || []).map((item) => [item.userId, item]));
+    const summaryForMemberType = (memberType: string, label: string): PopulationSummary => {
+      const population = members.filter((member) => member.memberType.toLowerCase() === memberType);
+      const prices = population.map((member) => memberPrices.get(member.userId));
+      const bookedHours = population.reduce((total, member) => total + member.bookedHours, 0);
+      const targetHours = population.reduce((total, member) => total + member.targetHours, 0);
+      const bookedPrice = prices.reduce((total, price) => total + (price?.bookedPrice || 0), 0);
+      const targetPrice = prices.reduce((total, price) => total + (price?.targetPrice || 0), 0);
+
+      return this.createPopulationSummary(label, population.length, bookedHours, targetHours, bookedPrice, targetPrice, false);
+    };
+
+    const interns = this.internDashboard?.internDetails || [];
+    const internBookedHours = interns.reduce((total, intern) => total + intern.bookedHours, 0);
+    const internTargetHours = interns.reduce((total, intern) => total + intern.targetHours, 0);
+    const internBookedPrice = interns.reduce((total, intern) => total + intern.bookedPrice, 0);
+    const internTargetPrice = interns.reduce((total, intern) => total + intern.targetPrice, 0);
+
+    return [
+      summaryForMemberType('employee', 'Employés TE'),
+      summaryForMemberType('subcontractor', 'Sous-traitants'),
+      this.createPopulationSummary('Stagiaires', interns.length, internBookedHours, internTargetHours, internBookedPrice, internTargetPrice, true),
+    ];
+  }
+
+  private createPopulationSummary(
+    label: string,
+    headcount: number,
+    bookedHours: number,
+    targetHours: number,
+    bookedPrice: number,
+    targetPrice: number,
+    includesSupervision: boolean,
+  ): PopulationSummary {
+    return {
+      label,
+      headcount,
+      bookedHours,
+      targetHours,
+      remainingHours: Math.max(0, targetHours - bookedHours),
+      hoursAchievement: targetHours > 0 ? (bookedHours / targetHours) * 100 : 0,
+      bookedPrice,
+      targetPrice,
+      remainingPrice: Math.max(0, targetPrice - bookedPrice),
+      priceAchievement: targetPrice > 0 ? (bookedPrice / targetPrice) * 100 : 0,
+      includesSupervision,
+    };
+  }
+
   private readonly chartFont = 'Inter, system-ui, sans-serif';
 
   private formatFullNumber(number: number): string {
     return Intl.NumberFormat('en-US').format(Math.round(number));
+  }
+
+  private formatHours(number: number): string {
+    return Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(number);
   }
 
   setQuickDate(period: 'current' | 'previous'): void {
@@ -427,8 +498,8 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
     const remaining = data.remainingHours || 0;
     const target = data.targetHours || 0;
     const remainingPct = target > 0 ? ((remaining / target) * 100).toFixed(1) : '0';
-    const remainingLabel = `${this.formatFullNumber(remaining)}h`;
-    const targetLabel = `${this.formatFullNumber(target)}h`;
+    const remainingLabel = `${this.formatHours(remaining)}h`;
+    const targetLabel = `${this.formatHours(target)}h`;
 
     const option: echarts.EChartsOption = {
       animationDuration: 1000,
@@ -441,7 +512,7 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
         padding: [10, 14],
         textStyle: { fontFamily: this.chartFont, fontSize: 13, fontWeight: 600, color: '#fff' },
         formatter: () =>
-          `<strong>Hours vs Target</strong><br/>Remaining: ${remainingLabel}<br/>Target: ${targetLabel}<br/>Booked: ${this.formatFullNumber(data.actualBookedHours || 0)}h`
+          `<strong>Hours vs Target</strong><br/>Remaining: ${remainingLabel}<br/>Target: ${targetLabel}<br/>Booked: ${this.formatHours(data.actualBookedHours || 0)}h`
       },
       graphic: [{
         type: 'group',
@@ -451,9 +522,9 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
           {
             type: 'text',
             style: {
-              text: `${remainingPct}% remaining`,
-              fill: '#64748b',
-              font: `600 13px ${this.chartFont}`,
+              text: 'TARGET',
+              fill: '#047857',
+              font: `800 11px ${this.chartFont}`,
               align: 'center'
             },
             left: 'center',
@@ -462,13 +533,24 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
           {
             type: 'text',
             style: {
-              text: `Target ${targetLabel}`,
-              fill: '#94a3b8',
-              font: `600 12px ${this.chartFont}`,
+              text: targetLabel,
+              fill: '#047857',
+              font: `800 21px ${this.chartFont}`,
               align: 'center'
             },
             left: 'center',
-            top: 18
+            top: 14
+          },
+          {
+            type: 'text',
+            style: {
+              text: `${remainingPct}% remaining`,
+              fill: '#64748b',
+              font: `700 12px ${this.chartFont}`,
+              align: 'center'
+            },
+            left: 'center',
+            top: 42
           }
         ]
       }],
@@ -521,7 +603,7 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
         textStyle: { fontFamily: this.chartFont, fontSize: 13, fontWeight: 600, color: '#fff' },
         formatter: (params: any) => {
           const user = data.find(d => d.userName === params.name);
-          return `<strong>${params.name}</strong><br/>$${params.value?.toLocaleString()} (${user?.percentage?.toFixed(1) || 0}% of target)`;
+          return `<strong>${params.name}</strong><br/>${params.value?.toLocaleString()}$ (${user?.percentage?.toFixed(1) || 0}% of target)`;
         }
       },
       legend: {
@@ -536,7 +618,7 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
         left: 'center',
         top: '42%',
         children: [
-          { type: 'text', style: { text: `$${totalPrice.toLocaleString()}`, fill: '#0f172a', font: `bold 24px ${this.chartFont}`, align: 'center' }, left: 'center', top: -12 },
+          { type: 'text', style: { text: `${totalPrice.toLocaleString()}$`, fill: '#0f172a', font: `bold 24px ${this.chartFont}`, align: 'center' }, left: 'center', top: -12 },
           { type: 'text', style: { text: 'Total Revenue', fill: '#94a3b8', font: `600 11px ${this.chartFont}`, align: 'center' }, left: 'center', top: 16 },
         ]
       }],
@@ -602,8 +684,8 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
     const booked = data.bookedPrice || 0;
     const target = this.priceTargetAmount;
     const remainingPct = target > 0 ? ((remaining / target) * 100).toFixed(1) : '0';
-    const targetLabel = `$${this.formatFullNumber(target)}`;
-    const remainingLabel = `$${this.formatFullNumber(remaining)}`;
+    const targetLabel = `${this.formatFullNumber(target)}$`;
+    const remainingLabel = `${this.formatFullNumber(remaining)}$`;
 
     const option: echarts.EChartsOption = {
       animationDuration: 1000,
@@ -616,7 +698,7 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
         padding: [10, 14],
         textStyle: { fontFamily: this.chartFont, fontSize: 13, fontWeight: 600, color: '#fff' },
         formatter: () =>
-          `<strong>Revenue vs Target</strong><br/>Remaining: ${remainingLabel}<br/>Target: ${targetLabel}<br/>Booked: $${this.formatFullNumber(booked)}`
+          `<strong>Revenue vs Target</strong><br/>Remaining: ${remainingLabel}<br/>Target: ${targetLabel}<br/>Booked: ${this.formatFullNumber(booked)}$`
       },
       graphic: [{
         type: 'group',
@@ -626,9 +708,9 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
           {
             type: 'text',
             style: {
-              text: `${remainingPct}% remaining`,
-              fill: '#64748b',
-              font: `600 13px ${this.chartFont}`,
+              text: 'TARGET',
+              fill: '#6d28d9',
+              font: `800 11px ${this.chartFont}`,
               align: 'center'
             },
             left: 'center',
@@ -637,13 +719,24 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
           {
             type: 'text',
             style: {
-              text: `Target ${targetLabel}`,
-              fill: '#94a3b8',
-              font: `600 12px ${this.chartFont}`,
+              text: targetLabel,
+              fill: '#6d28d9',
+              font: `800 21px ${this.chartFont}`,
               align: 'center'
             },
             left: 'center',
-            top: 18
+            top: 14
+          },
+          {
+            type: 'text',
+            style: {
+              text: `${remainingPct}% remaining`,
+              fill: '#64748b',
+              font: `700 12px ${this.chartFont}`,
+              align: 'center'
+            },
+            left: 'center',
+            top: 42
           }
         ]
       }],

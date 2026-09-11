@@ -92,6 +92,10 @@
             <span>End</span>
             <strong>{{ currentProject.endDate ? (currentProject.endDate | date:'mediumDate') : '(vide)' }}</strong>
           </div>
+          <div *ngIf="currentProject.status === ProjectStatus.OnHold">
+            <span>Estimated start date</span>
+            <strong>{{ currentProject.estimatedStartDate ? (currentProject.estimatedStartDate | date:'mediumDate') : '(vide)' }}</strong>
+          </div>
           <div>
             <span>Due</span>
             <strong>{{ currentProject.estimatedDueDate ? (currentProject.estimatedDueDate | date:'mediumDate') : '(vide)' }}</strong>

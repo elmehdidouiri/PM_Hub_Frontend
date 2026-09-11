@@ -92,6 +92,110 @@
 
     <ng-container *ngIf="dashboard || internDashboard">
 
+      <!-- ─── Target overview ───────────────────────────────── -->
+      <section class="target-overview" aria-label="Monthly targets">
+        <article class="target-overview__card target-overview__card--hours">
+          <div class="target-overview__icon">
+            <mat-icon>track_changes</mat-icon>
+          </div>
+          <div class="target-overview__content">
+            <span class="target-overview__label">{{ viewMode === 'team' ? 'Team' : 'Intern' }} hours target</span>
+            <strong>{{ activeCapacityTarget?.targetHours | number:'1.1-1' }}<small>h</small></strong>
+            <span class="target-overview__detail">
+              {{ activeCapacityTarget?.actualBookedHours | number:'1.1-1' }}h booked
+              <b>·</b>
+              {{ activeCapacityTarget?.remainingHours | number:'1.1-1' }}h remaining
+            </span>
+          </div>
+          <div class="target-overview__progress" aria-hidden="true">
+            <span [style.width.%]="(activeCapacityTarget?.targetHours || 0) > 0 ? ((activeCapacityTarget?.actualBookedHours || 0) / (activeCapacityTarget?.targetHours || 1)) * 100 : 0"></span>
+          </div>
+        </article>
+
+        <article class="target-overview__card target-overview__card--revenue">
+          <div class="target-overview__icon">
+            <mat-icon>paid</mat-icon>
+          </div>
+          <div class="target-overview__content">
+            <span class="target-overview__label">Revenue target</span>
+            <strong>{{ priceTargetAmount | number:'1.0-0' }}<small>$</small></strong>
+            <span class="target-overview__detail">
+              {{ activePriceTarget?.bookedPrice | number:'1.0-0' }}$ booked
+              <b>·</b>
+              {{ activePriceTarget?.remainingPrice | number:'1.0-0' }}$ remaining
+            </span>
+          </div>
+          <div class="target-overview__progress" aria-hidden="true">
+            <span [style.width.%]="priceTargetAmount > 0 ? ((activePriceTarget?.bookedPrice || 0) / priceTargetAmount) * 100 : 0"></span>
+          </div>
+        </article>
+      </section>
+
+      <!-- ─── Population comparison ─────────────────────────── -->
+      <section class="population-comparison" aria-label="Comparison by population">
+        <header class="population-comparison__header">
+          <div>
+            <mat-icon>groups</mat-icon>
+            <div>
+              <h2>Booking &amp; Target Comparison</h2>
+              <p>Employees, subcontractors and interns for the selected period.</p>
+            </div>
+          </div>
+          <span>Values from booked hours</span>
+        </header>
+
+        <div class="population-comparison__table-wrap">
+          <table class="population-comparison__table">
+            <thead>
+              <tr>
+                <th>Population</th>
+                <th>People</th>
+                <th>Booked / Target Hours</th>
+                <th>Hours Achievement</th>
+                <th>Booked / Target Revenue</th>
+                <th>Revenue Achievement</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let population of populationSummaries">
+                <td>
+                  <strong>{{ population.label }}</strong>
+                  <small *ngIf="population.includesSupervision">Includes supervision hours</small>
+                </td>
+                <td>{{ population.headcount }}</td>
+                <td>
+                  <strong>{{ population.bookedHours | number:'1.1-1' }}h</strong>
+                  <span>/ {{ population.targetHours | number:'1.1-1' }}h</span>
+                  <small>{{ population.remainingHours | number:'1.1-1' }}h remaining</small>
+                </td>
+                <td>
+                  <div class="population-progress">
+                    <span><i [style.width.%]="population.hoursAchievement"></i></span>
+                    <strong>{{ population.hoursAchievement | number:'1.0-1' }}%</strong>
+                  </div>
+                </td>
+                <td>
+                  <strong>{{ population.bookedPrice | number:'1.0-0' }}$</strong>
+                  <span>/ {{ population.targetPrice | number:'1.0-0' }}$</span>
+                  <small>{{ population.remainingPrice | number:'1.0-0' }}$ remaining</small>
+                </td>
+                <td>
+                  <div class="population-progress population-progress--revenue">
+                    <span><i [style.width.%]="population.priceAchievement"></i></span>
+                    <strong>{{ population.priceAchievement | number:'1.0-1' }}%</strong>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="population-comparison__notice">
+          <mat-icon>info_outline</mat-icon>
+          Intern supervision hours are shown with interns only and are not added to a combined global total, avoiding double counting.
+        </p>
+      </section>
+
       <!-- ─── Metric Strip ──────────────────────────────────── -->
       <section class="metric-strip">
         <div class="metric-card" [style.--metric-tone]="'#3b82f6'">
@@ -101,13 +205,13 @@
               <div class="metric-card__icon-badge">
                 <mat-icon>groups</mat-icon>
               </div>
-              <span class="metric-card__label">{{ viewMode === 'team' ? 'Total Members' : 'Total Interns' }}</span>
+              <span class="metric-card__label">{{ viewMode === 'team' ? 'Active Employees' : 'Total Interns' }}</span>
             </div>
           </div>
           <div class="metric-card__body">
             <div class="metric-card__values">
-              <strong>{{ viewMode === 'team' ? (dashboard?.memberCapacities?.length || 0) : (internDashboard?.totalInterns || 0) }}</strong>
-              <span class="metric-card__sub" *ngIf="viewMode === 'team'">Active this month</span>
+              <strong>{{ viewMode === 'team' ? activeMemberCountsDisplay : (internDashboard?.totalInterns || 0) }}</strong>
+              <span class="metric-card__sub" *ngIf="viewMode === 'team'">Employees / Interns / Subcontractors (active)</span>
               <span class="metric-card__sub" *ngIf="viewMode === 'interns'">{{ internDashboard?.activeInternsWithEntries || 0 }} with entries</span>
             </div>
           </div>
@@ -127,7 +231,10 @@
           <div class="metric-card__body">
             <div class="metric-card__values">
               <strong>{{ activeCapacityTarget?.actualBookedHours | number:'1.1-1' }}h</strong>
-              <span class="metric-card__sub">of {{ activeCapacityTarget?.targetHours | number:'1.0-0' }}h target</span>
+              <span class="metric-card__target metric-card__target--hours">
+                <mat-icon>track_changes</mat-icon>
+                Target {{ activeCapacityTarget?.targetHours | number:'1.1-1' }}h
+              </span>
             </div>
           </div>
           <mat-icon class="metric-card__watermark">schedule</mat-icon>
@@ -145,8 +252,11 @@
           </div>
           <div class="metric-card__body">
             <div class="metric-card__values">
-              <strong>${{ activePriceTarget?.bookedPrice | number:'1.0-0' }}</strong>
-              <span class="metric-card__sub">Total billed value</span>
+              <strong>{{ activePriceTarget?.bookedPrice | number:'1.0-0' }}$</strong>
+              <span class="metric-card__target metric-card__target--revenue">
+                <mat-icon>track_changes</mat-icon>
+                Target {{ priceTargetAmount | number:'1.0-0' }}$
+              </span>
             </div>
           </div>
           <mat-icon class="metric-card__watermark">attach_money</mat-icon>
@@ -164,8 +274,11 @@
           </div>
           <div class="metric-card__body">
             <div class="metric-card__values">
-              <strong>${{ activePriceTarget?.remainingPrice | number:'1.0-0' }}</strong>
-              <span class="metric-card__sub">Unbilled capacity value</span>
+              <strong>{{ activePriceTarget?.remainingPrice | number:'1.0-0' }}$</strong>
+              <span class="metric-card__target metric-card__target--revenue">
+                <mat-icon>track_changes</mat-icon>
+                Target {{ priceTargetAmount | number:'1.0-0' }}$
+              </span>
             </div>
           </div>
           <mat-icon class="metric-card__watermark">savings</mat-icon>
@@ -179,7 +292,7 @@
             <mat-icon>bar_chart</mat-icon>
             <h2>Capacity Analysis</h2>
           </div>
-          <span>{{ memberCapacitiesData.length || 0 }} {{ viewMode === 'team' ? 'members' : 'interns' }}</span>
+          <span>{{ viewMode === 'team' ? activeEmployeeCount : (memberCapacitiesData.length || 0) }} {{ viewMode === 'team' ? 'active employees' : 'interns' }}</span>
         </header>
 
         <div class="performance-grid performance-grid--kpis">
@@ -208,9 +321,13 @@
                 <mat-icon>pie_chart</mat-icon>
                 <div>
                   <strong>Capacity vs Target</strong>
-                  <span>Remaining {{ activeCapacityTarget?.remainingHours | number:'1.0-0' }}h · Target {{ activeCapacityTarget?.targetHours | number:'1.0-0' }}h</span>
+                  <span>Remaining {{ activeCapacityTarget?.remainingHours | number:'1.1-1' }}h · Target {{ activeCapacityTarget?.targetHours | number:'1.1-1' }}h</span>
                 </div>
               </div>
+              <span class="chart-target-badge chart-target-badge--hours">
+                <mat-icon>track_changes</mat-icon>
+                Target {{ activeCapacityTarget?.targetHours | number:'1.1-1' }}h
+              </span>
             </header>
             <div class="kpi-chart-wrapper">
               <div #capacityTargetChart class="kpi-chart-container" [hidden]="!activeCapacityTarget"></div>
@@ -230,7 +347,7 @@
             <mat-icon>payments</mat-icon>
             <h2>Financial Analysis</h2>
           </div>
-          <span>{{ memberPricesData.length || 0 }} {{ viewMode === 'team' ? 'members' : 'interns' }}</span>
+          <span>{{ viewMode === 'team' ? activeEmployeeCount : (memberPricesData.length || 0) }} {{ viewMode === 'team' ? 'active employees' : 'interns' }}</span>
         </header>
 
         <div class="performance-grid performance-grid--kpis">
@@ -259,9 +376,13 @@
                 <mat-icon>donut_large</mat-icon>
                 <div>
                   <strong>Revenue vs Target</strong>
-                  <span>Remaining ${{ activePriceTarget?.remainingPrice | number:'1.0-0' }} · Target ${{ priceTargetAmount | number:'1.0-0' }}</span>
+                  <span>Remaining {{ activePriceTarget?.remainingPrice | number:'1.0-0' }}$ · Target {{ priceTargetAmount | number:'1.0-0' }}$</span>
                 </div>
               </div>
+              <span class="chart-target-badge chart-target-badge--revenue">
+                <mat-icon>track_changes</mat-icon>
+                Target {{ priceTargetAmount | number:'1.0-0' }}$
+              </span>
             </header>
             <div class="kpi-chart-wrapper">
               <div #priceTargetChart class="kpi-chart-container" [hidden]="!activePriceTarget"></div>
@@ -311,7 +432,7 @@
                       <span>{{ intern.progressionPercentage | number:'1.0-1' }}%</span>
                     </div>
                   </td>
-                  <td class="text-right">${{ intern.bookedPrice | number:'1.0-0' }}</td>
+                  <td class="text-right">{{ intern.bookedPrice | number:'1.0-0' }}$</td>
                   <td class="text-right">{{ intern.entriesCount }}</td>
                 </tr>
                 <tr *ngIf="!internDashboard.internDetails.length">
@@ -346,7 +467,7 @@
                   <td class="font-bold">{{ proj.projectName }}</td>
                   <td class="text-right">{{ proj.internsCount }}</td>
                   <td class="text-right">{{ proj.bookedHours | number:'1.1-1' }}h</td>
-                  <td class="text-right">${{ proj.bookedPrice | number:'1.0-0' }}</td>
+                  <td class="text-right">{{ proj.bookedPrice | number:'1.0-0' }}$</td>
                   <td class="text-right">{{ proj.entriesCount }}</td>
                 </tr>
                 <tr *ngIf="!internDashboard.projectDetails.length">
@@ -487,4 +608,3 @@
     </footer>
   </div>
 </div>
-
