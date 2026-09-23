@@ -1,0 +1,250 @@
+<section class="btc-page">
+
+  <!-- ─── Header ─────────────────────────────────────────────────────── -->
+  <header class="btc-header">
+    <div class="btc-header__eyebrow">
+      <mat-icon>trending_up</mat-icon>
+      <span>Analytics · Booking vs Target</span>
+    </div>
+    <div class="btc-header__title-row">
+      <h1>Booking vs Target</h1>
+      <span class="btc-period-badge" *ngIf="data">
+        <mat-icon>calendar_month</mat-icon>
+        {{ periodLabel }} &mdash; FY {{ data.fiscalYear }}
+      </span>
+    </div>
+    <p>Consolidated comparison (hours &amp; revenue) by population, with fiscal year time trend.</p>
+  </header>
+
+  <!-- ─── Filter Bar ──────────────────────────────────────────────────── -->
+  <section class="btc-filter-bar">
+    <div class="btc-filter-bar__filters">
+
+      <!-- Period mode -->
+      <div class="btc-toggle-group">
+        <button type="button" [class.active]="periodMode==='ytd'" (click)="periodMode='ytd'; onModeChange()">YTD</button>
+        <button type="button" [class.active]="periodMode==='fiscal_year'" (click)="periodMode='fiscal_year'; onModeChange()">Fiscal Year</button>
+        <button type="button" [class.active]="periodMode==='month'" (click)="periodMode='month'; onModeChange()">Month</button>
+      </div>
+
+      <!-- Fiscal year -->
+      <label class="btc-filter-label">
+        <span>Fiscal Year</span>
+        <select [(ngModel)]="selectedFiscalYear" (ngModelChange)="onModeChange()">
+          <option *ngFor="let y of fiscalYearOptions" [ngValue]="y">FY {{ y }}</option>
+        </select>
+      </label>
+
+      <!-- Month (only if mode = month) -->
+      <label class="btc-filter-label" *ngIf="periodMode==='month'">
+        <span>Month</span>
+        <select [(ngModel)]="selectedMonth" (ngModelChange)="onModeChange()">
+          <option *ngFor="let m of monthOptions" [ngValue]="m.value">{{ m.label }}</option>
+        </select>
+      </label>
+
+      <!-- Calculation mode -->
+      <div class="btc-toggle-group">
+        <button type="button" [class.active]="calculationMode==='Net'" (click)="calculationMode='Net'; onModeChange()">Net</button>
+        <button type="button" [class.active]="calculationMode==='Brut'" (click)="calculationMode='Brut'; onModeChange()">Gross</button>
+      </div>
+
+      <!-- Hourly rate -->
+      <label class="btc-filter-label">
+        <span>Rate ($/h)</span>
+        <input type="number" [(ngModel)]="hourlyRate" (change)="onModeChange()" min="1" max="999" style="width: 80px" />
+      </label>
+
+      <!-- Target hours per member -->
+      <label class="btc-filter-label">
+        <span>Target h/member</span>
+        <input type="number" [(ngModel)]="targetHoursPerMember" (change)="onModeChange()" min="1" max="9999" placeholder="Auto" style="width: 90px" />
+      </label>
+
+    </div>
+
+    <!-- Reload -->
+    <button type="button" class="btc-btn btc-btn--icon" (click)="loadData()" [disabled]="isLoading" title="Refresh">
+      <mat-icon [class.spinning]="isLoading">refresh</mat-icon>
+    </button>
+  </section>
+
+  <!-- ─── Error ───────────────────────────────────────────────────────── -->
+  <div class="btc-alert" *ngIf="errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+
+  <!-- ─── Loading ─────────────────────────────────────────────────────── -->
+  <app-loading-spinner *ngIf="isLoading && !data" [fullPage]="false"></app-loading-spinner>
+
+  <ng-container *ngIf="data">
+
+    <!-- ─── Metric toggle (Hours / Revenue) ─────────────────────────── -->
+    <div class="btc-metric-toggle">
+      <button type="button" [class.active]="viewMetric==='hours'" (click)="onMetricChange('hours')">
+        <mat-icon>schedule</mat-icon> Hours
+      </button>
+      <button type="button" [class.active]="viewMetric==='revenue'" (click)="onMetricChange('revenue')">
+        <mat-icon>payments</mat-icon> Revenue
+      </button>
+      <span class="btc-mode-chip" [attr.data-mode]="data.calculationMode">
+        Mode: {{ data.calculationMode === 'Brut' ? 'Gross' : data.calculationMode }}
+      </span>
+    </div>
+
+    <!-- ─── Population Summary Cards ────────────────────────────────── -->
+    <section class="btc-population-grid">
+      <article
+        class="btc-pop-card"
+        *ngFor="let row of populationRows; trackBy: trackByLabel"
+        [class.btc-pop-card--total]="row.label === 'Total'"
+        [style.--pop-color]="row.color"
+      >
+        <div class="btc-pop-card__header">
+          <div class="btc-pop-card__icon">
+            <mat-icon>{{ row.icon }}</mat-icon>
+          </div>
+          <div>
+            <strong>{{ row.label }}</strong>
+            <span>{{ row.headcount }} members</span>
+          </div>
+        </div>
+
+        <div class="btc-pop-card__body" *ngIf="viewMetric==='hours'">
+          <div class="btc-pop-card__kv">
+            <span>Booked</span>
+            <strong>{{ formatHours(row.bookedHours) }}</strong>
+          </div>
+          <div class="btc-pop-card__kv" *ngIf="data.calculationMode==='Net' && row.label !== 'Total'">
+            <span>Gross</span>
+            <span class="btc-sub">{{ formatHours(row.grossBookedHours) }}</span>
+          </div>
+          <div class="btc-pop-card__kv">
+            <span>Target</span>
+            <span>{{ formatHours(row.targetHours) }}</span>
+          </div>
+          <div class="btc-pop-card__kv">
+            <span>Remaining</span>
+            <span [style.color]="row.remainingHours < 0 ? '#ef4444' : '#64748b'">{{ formatHours(row.remainingHours) }}</span>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="btc-progress">
+            <div class="btc-progress__bar"
+              [style.width.%]="Math.min(row.hoursAchievementPercent, 100)"
+              [style.background]="achievementColor(row.hoursAchievementPercent)">
+            </div>
+          </div>
+          <span class="btc-pct" [style.color]="achievementColor(row.hoursAchievementPercent)">
+            {{ formatPct(row.hoursAchievementPercent) }}
+          </span>
+        </div>
+
+        <div class="btc-pop-card__body" *ngIf="viewMetric==='revenue'">
+          <div class="btc-pop-card__kv">
+            <span>Booked Revenue</span>
+            <strong>{{ formatRevenue(row.bookedRevenue) }}</strong>
+          </div>
+          <div class="btc-pop-card__kv">
+            <span>Target Revenue</span>
+            <span>{{ formatRevenue(row.targetRevenue) }}</span>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="btc-progress">
+            <div class="btc-progress__bar"
+              [style.width.%]="Math.min(row.revenueAchievementPercent, 100)"
+              [style.background]="achievementColor(row.revenueAchievementPercent)">
+            </div>
+          </div>
+          <span class="btc-pct" [style.color]="achievementColor(row.revenueAchievementPercent)">
+            {{ formatPct(row.revenueAchievementPercent) }}
+          </span>
+        </div>
+      </article>
+    </section>
+
+    <!-- ─── Line Chart – Monthly Trend ──────────────────────────────── -->
+    <article class="btc-chart-card btc-chart-card--wide" *ngIf="hasTrend">
+      <header class="btc-chart-header">
+        <div>
+          <mat-icon>show_chart</mat-icon>
+          <div>
+            <strong>Time Trend — {{ viewMetric === 'hours' ? 'Hours' : 'Revenue ($)' }}</strong>
+            <span>Monthly trend over fiscal year {{ data.fiscalYear }}</span>
+          </div>
+        </div>
+
+        <!-- Cumulative / Monthly toggle -->
+        <div class="btc-toggle-group btc-toggle-group--sm">
+          <button type="button" [class.active]="chartView==='cumulative'" (click)="onChartViewChange('cumulative')">Cumulative</button>
+          <button type="button" [class.active]="chartView==='monthly'" (click)="onChartViewChange('monthly')">Monthly</button>
+        </div>
+      </header>
+
+      <div #trendChart class="btc-chart-container" style="height: 380px; width: 100%;"></div>
+    </article>
+
+    <!-- ─── Bar Chart – Population Comparison ───────────────────────── -->
+    <article class="btc-chart-card btc-chart-card--half">
+      <header class="btc-chart-header">
+        <div>
+          <mat-icon>bar_chart</mat-icon>
+          <div>
+            <strong>Booked vs Target by Population</strong>
+            <span>{{ viewMetric === 'hours' ? 'In hours' : 'In revenue' }}</span>
+          </div>
+        </div>
+      </header>
+      <div #barChart class="btc-chart-container" style="height: 220px; width: 100%;"></div>
+    </article>
+
+    <!-- ─── Monthly Trend Table ──────────────────────────────────────── -->
+    <article class="btc-table-card" *ngIf="hasTrend">
+      <header class="btc-chart-header">
+        <div>
+          <mat-icon>table_view</mat-icon>
+          <div>
+            <strong>Monthly Details</strong>
+            <span>{{ data.monthlyTrend.length }} months · {{ viewMetric === 'hours' ? 'Hours' : 'Revenue ($)' }}</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="btc-table-wrap">
+        <table class="btc-table">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th *ngIf="viewMetric==='hours'">Booked</th>
+              <th *ngIf="viewMetric==='hours' && data.calculationMode==='Net'">Gross</th>
+              <th *ngIf="viewMetric==='hours' && data.calculationMode==='Net'">Net</th>
+              <th *ngIf="viewMetric==='hours'">Target</th>
+              <th *ngIf="viewMetric==='revenue'">Booked Revenue</th>
+              <th *ngIf="viewMetric==='revenue'">Target Revenue</th>
+              <th>Cumulative Booked</th>
+              <th>Cumulative Target</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let point of data.monthlyTrend">
+              <td class="btc-table__month">{{ point.monthName }}</td>
+              <td *ngIf="viewMetric==='hours'">{{ formatHours(point.bookedHours) }}</td>
+              <td *ngIf="viewMetric==='hours' && data.calculationMode==='Net'">{{ formatHours(point.grossBookedHours) }}</td>
+              <td *ngIf="viewMetric==='hours' && data.calculationMode==='Net'">{{ formatHours(point.netBookedHours) }}</td>
+              <td *ngIf="viewMetric==='hours'">{{ formatHours(point.targetHours) }}</td>
+              <td *ngIf="viewMetric==='revenue'">{{ formatRevenue(point.bookedRevenue) }}</td>
+              <td *ngIf="viewMetric==='revenue'">{{ formatRevenue(point.targetRevenue) }}</td>
+              <td *ngIf="viewMetric==='hours'">{{ formatHours(point.cumulativeBookedHours) }}</td>
+              <td *ngIf="viewMetric==='hours'">{{ formatHours(point.cumulativeTargetHours) }}</td>
+              <td *ngIf="viewMetric==='revenue'">{{ formatRevenue(point.cumulativeBookedRevenue) }}</td>
+              <td *ngIf="viewMetric==='revenue'">{{ formatRevenue(point.cumulativeTargetRevenue) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+  </ng-container>
+</section>

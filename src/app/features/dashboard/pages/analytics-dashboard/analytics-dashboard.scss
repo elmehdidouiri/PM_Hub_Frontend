@@ -625,6 +625,36 @@
   }
 }
 
+.kpi-card-header__target {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px dashed #94a3b8;
+  border-radius: 999px;
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.hours-target {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 0.45rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px dashed #fb923c;
+  border-radius: 999px;
+  color: #c2410c;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.chart-card .kpi-card-header__title .kpi-card-header__target {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 .kpi-chart-container {
   width: 100%;
   height: 260px;

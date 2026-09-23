@@ -8,7 +8,12 @@ import {
   AnalyticsDashboardDto,
   AnalyticsDashboardParams,
   AnalyticsFiltersDto,
+  ProjectCapacityPriceAnalyticsDto,
 } from '../models/analytics-dashboard.models';
+import {
+  BookingTargetComparisonDto,
+  BookingTargetComparisonQuery,
+} from '../models/booking-target-comparison.model';
 
 @Injectable({
   providedIn: 'root',
@@ -89,8 +94,130 @@ export class AnalyticsDashboardService {
       .get<ApiResponse<AnalyticsDashboardDto['hours']> | AnalyticsDashboardDto['hours']>(`${this.apiUrl}/hours`, {
         params: buildAnalyticsQueryParams(params),
       })
-      .pipe(map((response) => this.unwrap(response)));
+      .pipe(map((response) => this.normalizeDashboard({ hours: this.unwrap(response) }).hours));
   }
+
+  getProjectCapacityPrice(params: AnalyticsDashboardParams = {}): Observable<ProjectCapacityPriceAnalyticsDto> {
+    return this.http
+      .get<ApiResponse<ProjectCapacityPriceAnalyticsDto> | ProjectCapacityPriceAnalyticsDto>(
+        `${this.apiUrl}/project-capacity-price`,
+        { params: buildAnalyticsQueryParams(params) }
+      )
+      .pipe(map((response) => this.normalizeProjectCapacityPrice(this.unwrap(response))));
+  }
+
+  /** GET /api/analytics/booking-target-comparison */
+  getBookingTargetComparison(query: BookingTargetComparisonQuery): Observable<BookingTargetComparisonDto> {
+    let httpParams = new HttpParams();
+    const entries: Array<[keyof BookingTargetComparisonQuery, string | number | undefined]> = [
+      ['fiscalYear', query.fiscalYear],
+      ['periodMode', query.periodMode],
+      ['month', query.month],
+      ['year', query.year],
+      ['calculationMode', query.calculationMode],
+      ['hourlyRate', query.hourlyRate],
+      ['targetHoursPerMember', query.targetHoursPerMember],
+      ['projectId', query.projectId],
+      ['departmentId', query.departmentId],
+      ['businessUnitId', query.businessUnitId],
+      ['plantId', query.plantId],
+    ];
+    for (const [key, value] of entries) {
+      if (value !== undefined && value !== null && value !== '') {
+        httpParams = httpParams.set(key, String(value));
+      }
+    }
+    return this.http
+      .get<ApiResponse<BookingTargetComparisonDto> | BookingTargetComparisonDto>(
+        `${this.apiUrl}/booking-target-comparison`,
+        { params: httpParams },
+      )
+      .pipe(map((response) => this.normalizeBookingComparison(this.unwrap(response))));
+  }
+
+  private normalizeBookingComparison(raw: unknown): BookingTargetComparisonDto {
+    const r = this.asRecord(raw);
+    const summary = this.asRecord(this.pick(r, ['summary', 'Summary']));
+    const rawPopulations = this.asArray(this.pick(r, ['populations', 'Populations']));
+
+    const pop = (key: string): BookingTargetComparisonDto['summary']['employees'] => {
+      let p = this.asRecord(this.pick(summary, [key, key[0].toUpperCase() + key.slice(1)]));
+      if (Object.keys(p).length === 0 && rawPopulations.length > 0) {
+        const found = rawPopulations.find((item) => {
+          const itemRec = this.asRecord(item);
+          const popKey = this.str(itemRec, ['populationKey', 'population', 'label']).toLowerCase();
+          return popKey === key.toLowerCase();
+        });
+        if (found) {
+          p = this.asRecord(found);
+        }
+      }
+      return {
+        label: this.str(p, ['label', 'Label', 'population', 'Population', 'name', 'Name']) || (key[0].toUpperCase() + key.slice(1)),
+        headcount: this.num(p, ['headcount', 'Headcount', 'people', 'People', 'totalPeople', 'count', 'Count']),
+        bookedHours: this.num(p, ['bookedHours', 'BookedHours']),
+        targetHours: this.num(p, ['targetHours', 'TargetHours']),
+        remainingHours: this.num(p, ['remainingHours', 'RemainingHours']),
+        hoursAchievementPercent: this.num(p, ['hoursAchievementPercent', 'HoursAchievementPercent', 'hoursAchievementPercentage', 'HoursAchievementPercentage', 'hoursAchievement', 'achievementPercentage']),
+        grossBookedHours: this.num(p, ['grossBookedHours', 'GrossBookedHours', 'grossHours']),
+        netBookedHours: this.num(p, ['netBookedHours', 'NetBookedHours', 'netHours']),
+        bookedRevenue: this.num(p, ['bookedRevenue', 'BookedRevenue', 'bookedPrice', 'BookedPrice']),
+        targetRevenue: this.num(p, ['targetRevenue', 'TargetRevenue', 'targetPrice', 'TargetPrice']),
+        remainingRevenue: this.num(p, ['remainingRevenue', 'RemainingRevenue', 'remainingPrice']),
+        revenueAchievementPercent: this.num(p, ['revenueAchievementPercent', 'RevenueAchievementPercent', 'revenueAchievementPercentage', 'RevenueAchievementPercentage', 'priceAchievement']),
+        grossRevenue: this.num(p, ['grossRevenue', 'GrossRevenue', 'grossBookedRevenue', 'GrossBookedRevenue', 'grossPrice']),
+        netRevenue: this.num(p, ['netRevenue', 'NetRevenue', 'netBookedRevenue', 'NetBookedRevenue', 'netPrice']),
+      };
+    };
+
+    const rawTrend = this.asArray(this.pick(r, ['monthlyTrend', 'MonthlyTrend', 'trend', 'Trend']));
+    const monthlyTrend = rawTrend.map((item) => {
+      const t = this.asRecord(item);
+      const emp = this.asRecord(this.pick(t, ['employees', 'Employees']));
+      return {
+        fiscalMonth: this.num(t, ['fiscalMonth', 'FiscalMonth', 'fiscalMonthIndex', 'FiscalMonthIndex']),
+        year: this.num(t, ['year', 'Year']),
+        month: this.num(t, ['month', 'Month']),
+        monthName: this.str(t, ['monthName', 'MonthName', 'month', 'Month']),
+        bookedHours: this.num(t, ['bookedHours', 'BookedHours']),
+        targetHours: this.num(t, ['targetHours', 'TargetHours']),
+        bookedRevenue: this.num(t, ['bookedRevenue', 'BookedRevenue', 'bookedPrice']),
+        targetRevenue: this.num(t, ['targetRevenue', 'TargetRevenue', 'targetPrice']),
+        grossBookedHours: this.num(t, ['grossBookedHours', 'GrossBookedHours']) || this.num(emp, ['grossBookedHours']),
+        netBookedHours: this.num(t, ['netBookedHours', 'NetBookedHours']) || this.num(emp, ['netBookedHours']),
+        cumulativeBookedHours: this.num(t, ['cumulativeBookedHours', 'CumulativeBookedHours']),
+        cumulativeTargetHours: this.num(t, ['cumulativeTargetHours', 'CumulativeTargetHours']),
+        cumulativeBookedRevenue: this.num(t, ['cumulativeBookedRevenue', 'CumulativeBookedRevenue']),
+        cumulativeTargetRevenue: this.num(t, ['cumulativeTargetRevenue', 'CumulativeTargetRevenue']),
+        cumulativeGrossBookedHours: this.num(t, ['cumulativeGrossBookedHours', 'CumulativeGrossBookedHours']),
+        cumulativeNetBookedHours: this.num(t, ['cumulativeNetBookedHours', 'CumulativeNetBookedHours']),
+      };
+    });
+
+    const period = this.asRecord(this.pick(r, ['period', 'Period']));
+
+    return {
+      fiscalYear: this.num(r, ['fiscalYear', 'FiscalYear']) || this.num(period, ['fiscalYear', 'FiscalYear']),
+      periodMode: (this.str(r, ['periodMode', 'PeriodMode']) || 'ytd') as BookingTargetComparisonDto['periodMode'],
+      startDate: this.str(r, ['startDate', 'StartDate']) || this.str(period, ['startDate', 'StartDate']),
+      endDate: this.str(r, ['endDate', 'EndDate']) || this.str(period, ['endDate', 'EndDate']),
+      calculationMode: (this.str(r, ['calculationMode', 'CalculationMode']) || 'Brut') as BookingTargetComparisonDto['calculationMode'],
+      hourlyRate: this.num(r, ['hourlyRate', 'HourlyRate']),
+      summary: {
+        employees: pop('employees'),
+        subcontractors: pop('subcontractors'),
+        interns: pop('interns'),
+        total: pop('total'),
+      },
+      monthlyTrend,
+    };
+  }
+
+  private asArray(value: unknown): unknown[] {
+    if (Array.isArray(value)) return value;
+    return [];
+  }
+
 
   private buildMemberTahParams(params: MemberTahQuery): HttpParams {
     let httpParams = new HttpParams();
@@ -109,6 +236,7 @@ export class AnalyticsDashboardService {
       ['projectStatus', params.projectStatus],
       ['projectPhase', params.projectPhase],
     ];
+
 
     for (const [key, value] of entries) {
       if (value !== undefined && value !== null && value !== '') {
@@ -155,7 +283,7 @@ export class AnalyticsDashboardService {
     return (
       typeof value === 'object' &&
       value !== null &&
-      ['Success', 'isSuccess', 'IsSuccess', 'Data', 'Result', 'payload'].some((key) => key in value)
+      ['success', 'Success', 'isSuccess', 'IsSuccess', 'data', 'Data', 'Result', 'payload'].some((key) => key in value)
     );
   }
 
@@ -290,46 +418,127 @@ export class AnalyticsDashboardService {
         }),
       },
       hours: {
-        monthlyByCategory: this.array(this.pick(hours, ['monthlyByCategory', 'MonthlyByCategory'])).map((item) => {
-          const r = this.asRecord(item);
-          return {
-            year: this.num(r, ['year', 'Year']),
-            month: this.num(r, ['month', 'Month']),
-            monthName: this.str(r, ['monthName', 'MonthName']),
-            executionHours: this.num(r, ['executionHours', 'ExecutionHours']),
-            technicalSupervisionHours: this.num(r, [
-              'technicalSupervisionHours',
-              'TechnicalSupervisionHours',
-              'supervisionHours',
-              'SupervisionHours',
-            ]),
-            processHours: this.num(r, ['processHours', 'ProcessHours']),
-            projectManagementHours: this.num(r, [
-              'projectManagementHours',
-              'ProjectManagementHours',
-              'managementHours',
-              'ManagementHours',
-            ]),
-            researchAndDevHours: this.num(r, [
-              'researchAndDevHours',
-              'ResearchAndDevHours',
-              'rAndDHours',
-              'RAndDHours',
-            ]),
-            workshopHours: this.num(r, ['workshopHours', 'WorkshopHours']),
-            otherHours: this.num(r, ['otherHours', 'OtherHours']),
-            internManagementHours: this.num(r, ['internManagementHours', 'InternManagementHours']),
-            totalHours: this.num(r, ['totalHours', 'TotalHours']),
-          };
-        }),
+        monthlyByCategory: (() => {
+          const rawMonthly = this.array(this.pick(hours, ['monthlyByCategory', 'MonthlyByCategory'])).map((item) => {
+            const r = this.asRecord(item);
+            return {
+              year: this.num(r, ['year', 'Year']),
+              month: this.num(r, ['month', 'Month']),
+              monthName: this.str(r, ['monthName', 'MonthName']),
+              executionHours: this.num(r, ['executionHours', 'ExecutionHours']),
+              technicalSupervisionHours: this.num(r, [
+                'technicalSupervisionHours',
+                'TechnicalSupervisionHours',
+                'supervisionHours',
+                'SupervisionHours',
+              ]),
+              processHours: this.num(r, ['processHours', 'ProcessHours']),
+              projectManagementHours: this.num(r, [
+                'projectManagementHours',
+                'ProjectManagementHours',
+                'managementHours',
+                'ManagementHours',
+              ]),
+              researchAndDevHours: this.num(r, [
+                'researchAndDevHours',
+                'ResearchAndDevHours',
+                'rAndDHours',
+                'RAndDHours',
+              ]),
+              workshopHours: this.num(r, ['workshopHours', 'WorkshopHours']),
+              otherHours: this.num(r, ['otherHours', 'OtherHours']),
+              internManagementHours: this.num(r, ['internManagementHours', 'InternManagementHours']),
+              totalHours: this.num(r, ['totalHours', 'TotalHours']),
+              activeNonInternMembers: this.num(r, [
+                'activeNonInternMembers',
+                'ActiveNonInternMembers',
+                'activeMembers',
+                'ActiveMembers',
+                'headcount',
+                'Headcount',
+                'nonInternMembers',
+                'NonInternMembers',
+              ]),
+              targetHoursPerMember: this.num(r, [
+                'targetHoursPerMember',
+                'TargetHoursPerMember',
+                'monthlyTargetHours',
+                'MonthlyTargetHours',
+                'targetHoursPerUser',
+                'TargetHoursPerUser',
+              ]),
+              targetHours: this.num(r, [
+                'targetHours',
+                'TargetHours',
+                'targetCapacity',
+                'TargetCapacity',
+                'capacityTarget',
+                'CapacityTarget',
+                'expectedHours',
+                'ExpectedHours',
+                'monthlyTargetHours',
+                'MonthlyTargetHours',
+              ]),
+            };
+          });
+
+          const rawUtilization = this.array(this.pick(hours, ['utilizationTrend', 'UtilizationTrend'])).map((item) => {
+            const r = this.asRecord(item);
+            return {
+              year: this.num(r, ['year', 'Year']),
+              month: this.num(r, ['month', 'Month']),
+              loggedHours: this.num(r, ['loggedHours', 'LoggedHours', 'totalHours', 'TotalHours']),
+              targetHours: this.num(r, [
+                'targetHours',
+                'TargetHours',
+                'targetCapacity',
+                'TargetCapacity',
+                'capacityTarget',
+                'CapacityTarget',
+                'expectedHours',
+                'ExpectedHours',
+                'monthlyTargetHours',
+                'MonthlyTargetHours',
+              ]),
+              utilizationPercentage: this.num(r, ['utilizationPercentage', 'UtilizationPercentage']),
+            };
+          });
+
+          return rawMonthly.map((m) => {
+            if (m.targetHours <= 0) {
+              const utilMatch = rawUtilization.find((u) => Number(u.month) === Number(m.month));
+              if (utilMatch && utilMatch.targetHours > 0) {
+                return { ...m, targetHours: utilMatch.targetHours };
+              }
+              if (utilMatch && utilMatch.loggedHours > 0 && utilMatch.utilizationPercentage > 0) {
+                return {
+                  ...m,
+                  targetHours: Math.round((utilMatch.loggedHours / utilMatch.utilizationPercentage) * 100),
+                };
+              }
+            }
+            return m;
+          });
+        })(),
         utilizationTrend: this.array(this.pick(hours, ['utilizationTrend', 'UtilizationTrend'])).map((item) => {
           const r = this.asRecord(item);
           return {
             year: this.num(r, ['year', 'Year']),
             month: this.num(r, ['month', 'Month']),
             monthName: this.str(r, ['monthName', 'MonthName']),
-            loggedHours: this.num(r, ['loggedHours', 'LoggedHours']),
-            targetHours: this.num(r, ['targetHours', 'TargetHours']),
+            loggedHours: this.num(r, ['loggedHours', 'LoggedHours', 'totalHours', 'TotalHours']),
+            targetHours: this.num(r, [
+              'targetHours',
+              'TargetHours',
+              'targetCapacity',
+              'TargetCapacity',
+              'capacityTarget',
+              'CapacityTarget',
+              'expectedHours',
+              'ExpectedHours',
+              'monthlyTargetHours',
+              'MonthlyTargetHours',
+            ]),
             utilizationPercentage: this.num(r, ['utilizationPercentage', 'UtilizationPercentage']),
           };
         }),
@@ -360,6 +569,37 @@ export class AnalyticsDashboardService {
       departments: this.optionArray(this.pick(row, ['departments', 'Departments'])),
       businessUnits: this.optionArray(this.pick(row, ['businessUnits', 'BusinessUnits'])),
       plants: this.optionArray(this.pick(row, ['plants', 'Plants'])),
+    };
+  }
+
+  private normalizeProjectCapacityPrice(raw: unknown): ProjectCapacityPriceAnalyticsDto {
+    const row = this.asRecord(raw);
+    const summary = this.asRecord(this.pick(row, ['summary', 'Summary', 'portfolioSummary', 'PortfolioSummary']));
+    const toSummary = (value: Record<string, unknown>) => ({
+      totalProjects: this.num(value, ['totalProjects', 'TotalProjects', 'projectCount', 'ProjectCount']),
+      bookedCapacity: this.num(value, ['bookedCapacity', 'BookedCapacity', 'capacityBooked', 'CapacityBooked', 'bookedHours', 'BookedHours', 'actualCapacity', 'ActualCapacity']),
+      targetCapacity: this.num(value, ['targetCapacity', 'TargetCapacity', 'capacityTarget', 'CapacityTarget', 'targetHours', 'TargetHours', 'estimatedHours', 'EstimatedHours']),
+      remainingCapacity: this.num(value, ['remainingCapacity', 'RemainingCapacity', 'capacityRemaining', 'CapacityRemaining', 'remainingHours', 'RemainingHours']),
+      varianceCapacity: this.num(value, ['varianceCapacity', 'VarianceCapacity', 'capacityVariance', 'CapacityVariance', 'varianceHours', 'VarianceHours']),
+      capacityPercentage: this.num(value, ['capacityPercentage', 'CapacityPercentage', 'capacityProgressionPercentage', 'CapacityProgressionPercentage', 'capacityPercent', 'CapacityPercent', 'percentage', 'Percentage']),
+      bookedCost: this.num(value, ['bookedCost', 'BookedCost', 'costBooked', 'CostBooked', 'actualCost', 'ActualCost', 'consumedCost', 'ConsumedCost']),
+      targetCost: this.num(value, ['targetCost', 'TargetCost', 'costTarget', 'CostTarget', 'budget', 'Budget']),
+      remainingCost: this.num(value, ['remainingCost', 'RemainingCost', 'costRemaining', 'CostRemaining']),
+      varianceCost: this.num(value, ['varianceCost', 'VarianceCost', 'costVariance', 'CostVariance']),
+      costPercentage: this.num(value, ['costPercentage', 'CostPercentage', 'costProgressionPercentage', 'CostProgressionPercentage', 'costPercent', 'CostPercent']),
+    });
+
+    return {
+      summary: toSummary(summary),
+      projects: this.array(this.pick(row, ['projects', 'Projects', 'items', 'Items', 'rows', 'Rows'])).map((item) => {
+        const project = this.asRecord(item);
+        return {
+          projectId: this.str(project, ['projectId', 'ProjectId', 'id', 'Id']),
+          projectName: this.str(project, ['projectName', 'ProjectName', 'name', 'Name']) || 'Project',
+          projectStatus: this.str(project, ['projectStatus', 'ProjectStatus', 'status', 'Status', 'statusLabel', 'StatusLabel']),
+          ...toSummary(project),
+        };
+      }),
     };
   }
 

@@ -35,6 +35,15 @@ import {
   HoursAllocationDashboardParams,
 } from '../../../dashboard/models/hours-allocation-dashboard.models';
 import { HoursAllocationDashboardService } from '../../../dashboard/services/hours-allocation-dashboard.service';
+import {
+  PROJECT_PHASE_STATUS_MESSAGES,
+  allowedPhasesForStatus,
+  allowedStatusesForPhase,
+  coercePhaseForStatus,
+  coerceStatusForPhase,
+  isPhaseStatusAllowed,
+  validateProjectForm,
+} from '../../utils/project-phase-status';
 
 @Component({
   selector: 'app-project-edit-page',
@@ -42,11 +51,13 @@ import { HoursAllocationDashboardService } from '../../../dashboard/services/hou
   templateUrl: './project-edit-page.html',
   styleUrls: ['./project-edit-page.scss'],
 })
-export class ProjectEditPage implements OnInit {
+export class ProjectEditPage implements OnInit, OnDestroy {
   mode: 'details' | 'edit' = 'details';
   public readonly ProjectPhase = ProjectPhase;
   public readonly ProjectStatus = ProjectStatus;
   public readonly ProcessStatus = ProcessStatus;
+  public readonly phaseStatusMessages = PROJECT_PHASE_STATUS_MESSAGES;
+  private syncingPhaseStatus = false;
 
   project!: ProjectDto;
   references: ProjectReferenceData = {
@@ -258,7 +269,14 @@ export class ProjectEditPage implements OnInit {
       processStatus: [this.project.processStatus],
       progressPercentage: [this.project.progressPercentage || 0, [Validators.min(0), Validators.max(100)]],
       estimatedStartDate: [this.formatDateForInput(this.project.estimatedStartDate)],
-    }, { validators: [this.phaseStatusValidator, this.estimatedStartDateValidator] });
+      endDate: [this.formatDateForInput(this.project.endDate)],
+    }, { validators: [this.phaseStatusValidator, this.estimatedStartDateValidator, this.doneEndDateValidator] });
+    this.formSubscriptions.add(
+      this.statusForm.controls['phase'].valueChanges.subscribe((phase) => this.onPhaseChange(phase))
+    );
+    this.formSubscriptions.add(
+      this.statusForm.controls['status'].valueChanges.subscribe((status) => this.onStatusChange(status))
+    );
 
     // ── Timeline & Effort ──
     this.timelineForm = this.fb.group({
@@ -267,7 +285,10 @@ export class ProjectEditPage implements OnInit {
         this.formatDateForInput(this.project.estimatedStartDate),
         this.project.status === ProjectStatus.OnHold ? Validators.required : [],
       ],
-      endDate: [this.formatDateForInput(this.project.endDate)],
+      endDate: [
+        this.formatDateForInput(this.project.endDate),
+        this.project.status === ProjectStatus.Done ? Validators.required : [],
+      ],
       estimatedDueDate: [this.formatDateForInput(this.project.estimatedDueDate)],
       estimatedHours: [this.project.estimatedHours, Validators.min(0)],
       actualHours: [this.project.actualHours, Validators.min(0)],
@@ -382,6 +403,11 @@ export class ProjectEditPage implements OnInit {
       return;
     }
 
+    if (this.hasInvalidStoredPhaseStatus && section !== 'status') {
+      this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.historicalInvalid);
+      return;
+    }
+
     this.editingSection = (this.editingSection === section) ? null : section;
   }
 
@@ -401,6 +427,13 @@ export class ProjectEditPage implements OnInit {
     }
 
     const form = this.getFormBySection(section);
+    const phaseStatusError = this.validateSectionBeforeSave(section);
+    if (phaseStatusError) {
+      form?.markAllAsTouched();
+      this.notificationService.showWarning(phaseStatusError);
+      return;
+    }
+
     if (form && form.invalid) {
       form.markAllAsTouched();
       if (section === 'status' && form.errors?.['invalidPhaseStatus']) {
@@ -412,13 +445,17 @@ export class ProjectEditPage implements OnInit {
       } else if (section === 'identity' && form.errors?.['parentProjectSelf']) {
         this.notificationService.showWarning('A project cannot be its own parent.');
       } else if (section === 'timeline' && form.errors?.['endDateInvalid']) {
-        this.notificationService.showWarning('Project end date must be strictly after the start date.');
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.endDateInvalid);
       } else if (section === 'timeline' && form.errors?.['estimatedDateInvalid']) {
-        this.notificationService.showWarning('Estimated due date must be strictly after the start date.');
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.estimatedDueInvalid);
       } else if (section === 'status' && form.errors?.['estimatedStartDateRequired']) {
-        this.notificationService.showWarning('Estimated start date is required for projects on hold.');
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.estimatedStartRequired);
+      } else if (section === 'status' && form.errors?.['endDateRequired']) {
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.endDateRequired);
+      } else if (section === 'timeline' && form.get('endDate')?.hasError('required')) {
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.endDateRequired);
       } else if (section === 'timeline' && form.get('estimatedStartDate')?.hasError('required')) {
-        this.notificationService.showWarning('Estimated start date is required for projects on hold.');
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.estimatedStartRequired);
       }
       return;
     }
@@ -515,7 +552,7 @@ export class ProjectEditPage implements OnInit {
 
       case 'status': {
         const status = this.statusForm.getRawValue();
-        return {
+        const payload: Record<string, unknown> = {
           status: Number(status.status),
           phase: Number(status.phase),
           processStatus: status.processStatus === null || status.processStatus === ''
@@ -524,6 +561,12 @@ export class ProjectEditPage implements OnInit {
           progressPercentage: Number(status.progressPercentage) || 0,
           estimatedStartDate: this.toNullableDate(status.estimatedStartDate),
         };
+
+        if (Number(status.status) === ProjectStatus.Done) {
+          payload['endDate'] = this.toNullableDate(status.endDate);
+        }
+
+        return payload;
       }
 
       case 'timeline': {
@@ -984,19 +1027,83 @@ export class ProjectEditPage implements OnInit {
   public getEnumLabel(val: any, enumObj: any): string { return enumObj[val] || val; }
 
   public isStatusAllowedForPhase(status: ProjectStatus, phase = this.statusForm?.get('phase')?.value): boolean {
-    if (phase === ProjectPhase.Pipeline) {
-      return status === ProjectStatus.Planned;
+    return isPhaseStatusAllowed(phase, status);
+  }
+
+  public isPhaseAllowedForStatus(phase: ProjectPhase, status = this.statusForm?.get('status')?.value): boolean {
+    return isPhaseStatusAllowed(phase, status);
+  }
+
+  get visiblePhaseOptions(): ProjectPhase[] {
+    const status = this.statusForm?.get('status')?.value as ProjectStatus | null;
+    const current = this.statusForm?.get('phase')?.value as ProjectPhase | null;
+    const allowed = new Set(allowedPhasesForStatus(status));
+    return this.phaseOptions.filter((phase) => allowed.has(phase) || phase === current);
+  }
+
+  get visibleStatusOptions(): ProjectStatus[] {
+    const phase = this.statusForm?.get('phase')?.value as ProjectPhase | null;
+    const current = this.statusForm?.get('status')?.value as ProjectStatus | null;
+    const allowed = new Set(allowedStatusesForPhase(phase));
+    return this.statusOptions.filter((status) => allowed.has(status) || status === current);
+  }
+
+  get hasInvalidStoredPhaseStatus(): boolean {
+    return !!this.project && !isPhaseStatusAllowed(this.project.phase, this.project.status);
+  }
+
+  canEditSection(section: string): boolean {
+    if (!this.isAdmin || this.editingSection === section) {
+      return false;
     }
 
-    return true;
+    return section === 'status' || !this.hasInvalidStoredPhaseStatus;
+  }
+
+  get canMutateProjectFiles(): boolean {
+    return this.isAdmin && !this.hasInvalidStoredPhaseStatus;
   }
 
   public phaseStatusError(): string {
-    if (!this.statusForm?.errors?.['invalidPhaseStatus']) {
-      return '';
+    if (this.statusForm?.errors?.['invalidPhaseStatus']) {
+      return PROJECT_PHASE_STATUS_MESSAGES.incompatible;
     }
 
-    return 'Pipeline projects must use the Planned status before they can be saved.';
+    if (this.statusForm?.errors?.['endDateRequired']) {
+      return PROJECT_PHASE_STATUS_MESSAGES.endDateRequired;
+    }
+
+    return this.hasInvalidStoredPhaseStatus ? PROJECT_PHASE_STATUS_MESSAGES.historicalInvalid : '';
+  }
+
+  onPhaseChange(phase: ProjectPhase | null): void {
+    if (this.syncingPhaseStatus || phase === null || !this.statusForm) {
+      return;
+    }
+
+    this.syncingPhaseStatus = true;
+    const statusControl = this.statusForm.controls['status'];
+    const nextStatus = coerceStatusForPhase(phase, statusControl.value);
+    if (nextStatus !== statusControl.value) {
+      statusControl.setValue(nextStatus);
+    }
+    this.syncingPhaseStatus = false;
+    this.statusForm.updateValueAndValidity();
+  }
+
+  onStatusChange(status: ProjectStatus | null): void {
+    if (this.syncingPhaseStatus || status === null || !this.statusForm) {
+      return;
+    }
+
+    this.syncingPhaseStatus = true;
+    const phaseControl = this.statusForm.controls['phase'];
+    const nextPhase = coercePhaseForStatus(status, phaseControl.value);
+    if (nextPhase !== phaseControl.value) {
+      phaseControl.setValue(nextPhase);
+    }
+    this.syncingPhaseStatus = false;
+    this.statusForm.updateValueAndValidity();
   }
 
   public getUserLabel(userId: string): string {
@@ -1245,11 +1352,7 @@ export class ProjectEditPage implements OnInit {
     const phase = group.get('phase')?.value as ProjectPhase | null;
     const status = group.get('status')?.value as ProjectStatus | null;
 
-    if (phase === ProjectPhase.Pipeline && status !== null && status !== ProjectStatus.Planned) {
-      return { invalidPhaseStatus: true };
-    }
-
-    return null;
+    return isPhaseStatusAllowed(phase, status) ? null : { invalidPhaseStatus: true };
   }
 
   private estimatedStartDateValidator(group: AbstractControl): { estimatedStartDateRequired: true } | null {
@@ -1259,6 +1362,43 @@ export class ProjectEditPage implements OnInit {
     return status === ProjectStatus.OnHold && !estimatedStartDate
       ? { estimatedStartDateRequired: true }
       : null;
+  }
+
+  private doneEndDateValidator(group: AbstractControl): { endDateRequired: true } | null {
+    const status = group.get('status')?.value as ProjectStatus | null;
+    const endDate = String(group.get('endDate')?.value || '').trim();
+
+    return status === ProjectStatus.Done && !endDate ? { endDateRequired: true } : null;
+  }
+
+  private validateSectionBeforeSave(section: string): string | null {
+    if (this.hasInvalidStoredPhaseStatus && section !== 'status') {
+      return PROJECT_PHASE_STATUS_MESSAGES.historicalInvalid;
+    }
+
+    const statusValues = this.statusForm?.getRawValue() ?? {};
+    const timelineValues = this.timelineForm?.getRawValue() ?? {};
+    const usingStatusForm = section === 'status';
+    const usingTimelineForm = section === 'timeline';
+
+    return validateProjectForm({
+      phase: usingStatusForm ? statusValues.phase : this.project.phase,
+      status: usingStatusForm ? statusValues.status : this.project.status,
+      estimatedStartDate: usingStatusForm
+        ? statusValues.estimatedStartDate
+        : usingTimelineForm
+          ? timelineValues.estimatedStartDate
+          : this.formatDateForInput(this.project.estimatedStartDate),
+      startDate: usingTimelineForm ? timelineValues.startDate : this.formatDateForInput(this.project.startDate),
+      endDate: usingStatusForm
+        ? (statusValues.endDate || this.formatDateForInput(this.project.endDate))
+        : usingTimelineForm
+          ? timelineValues.endDate
+          : this.formatDateForInput(this.project.endDate),
+      estimatedDueDate: usingTimelineForm
+        ? timelineValues.estimatedDueDate
+        : this.formatDateForInput(this.project.estimatedDueDate),
+    });
   }
 
   private dateValidator(group: AbstractControl): { endDateInvalid?: true; estimatedDateInvalid?: true } | null {

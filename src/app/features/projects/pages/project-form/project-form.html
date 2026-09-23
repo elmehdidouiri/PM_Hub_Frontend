@@ -128,9 +128,8 @@
 
             <select formControlName="phase">
 
-              <option [ngValue]="null">Select phase</option>
-
-              <option *ngFor="let option of phaseOptions" [ngValue]="option">{{ enumLabel(option, ProjectPhase) }}
+              <option *ngFor="let option of visiblePhaseOptions" [ngValue]="option"
+                [disabled]="!isPhaseAllowedForStatus(option)">{{ enumLabel(option, ProjectPhase) }}
 
               </option>
 
@@ -146,9 +145,7 @@
 
             <select formControlName="status">
 
-              <option [ngValue]="null">Select status</option>
-
-              <option *ngFor="let option of statusOptions" [ngValue]="option"
+              <option *ngFor="let option of visibleStatusOptions" [ngValue]="option"
 
                 [disabled]="!isStatusAllowedForPhase(option)">{{ enumLabel(option, ProjectStatus) }}
 
@@ -165,7 +162,19 @@
             <input type="date" formControlName="estimatedStartDate" />
 
             <small *ngIf="step2Group.errors?.['estimatedStartDateRequired'] && (step2Group.get('estimatedStartDate')?.touched || step2Group.touched)">
-              Estimated start date is required for projects on hold.
+              {{ phaseStatusMessages.estimatedStartRequired }}
+            </small>
+
+          </div>
+
+          <div class="field" *ngIf="step2Group.get('status')?.value === ProjectStatus.Done">
+
+            <label>End date *</label>
+
+            <input type="date" formControlName="endDate" />
+
+            <small *ngIf="step2Group.errors?.['endDateRequired'] && (step2Group.get('endDate')?.touched || step2Group.touched)">
+              {{ phaseStatusMessages.endDateRequired }}
             </small>
 
           </div>

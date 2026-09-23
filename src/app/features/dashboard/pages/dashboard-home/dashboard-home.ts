@@ -385,7 +385,20 @@ export class DashboardHome implements OnInit {
     allTickets: FilterTicket[],
     selectedId: string
   ): FilterSection {
-    const validTickets = allTickets.filter(t => t.id !== 'all' && !!t.label && t.count > 0);
+    // Never surface backend placeholders as filter cards (for example: "VIDE").
+    // DashboardHome is reused by Capacity & Price, so this guards both pages.
+    const validTickets = allTickets.filter(
+      (ticket) => ticket.id !== 'all' && ticket.count > 0 && this.hasMeaningfulTicketLabel(ticket.label)
+    );
+
+    if (kind === 'status') {
+      const statusOrder = ['done', 'ongoing', 'onhold', 'planned'];
+      validTickets.sort((a, b) => {
+        const aIndex = statusOrder.indexOf(a.id.toLowerCase());
+        const bIndex = statusOrder.indexOf(b.id.toLowerCase());
+        return (aIndex === -1 ? statusOrder.length : aIndex) - (bIndex === -1 ? statusOrder.length : bIndex);
+      });
+    }
     let visibleTickets = validTickets;
     let hiddenCount = 0;
 
@@ -412,6 +425,11 @@ export class DashboardHome implements OnInit {
       visibleTickets,
       hiddenCount
     };
+  }
+
+  private hasMeaningfulTicketLabel(label: unknown): boolean {
+    const value = String(label ?? '').trim().toLowerCase();
+    return !!value && !['-', '—', 'vide', 'empty', 'null', 'undefined', 'n/a', 'na'].includes(value);
   }
 
   get filterSections(): FilterSection[] {
@@ -1860,7 +1878,7 @@ export class DashboardHome implements OnInit {
         count: item.count ?? 0,
         projects: item.projects ?? [],
       }))
-      .filter((ticket) => ticket.id && ticket.label)
+      .filter((ticket) => ticket.id && this.hasMeaningfulTicketLabel(ticket.label))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
   }

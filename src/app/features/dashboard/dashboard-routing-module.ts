@@ -4,6 +4,7 @@ import { DashboardHome } from './pages/dashboard-home/dashboard-home';
 import { AnalyticsDashboard } from './pages/analytics-dashboard/analytics-dashboard';
 import { HoursAllocationDashboard } from './pages/hours-allocation-dashboard/hours-allocation-dashboard';
 import { CapacityPriceDashboardComponent } from './pages/capacity-price-dashboard/capacity-price-dashboard.component';
+import { BookingTargetComparisonDashboard } from './pages/booking-target-comparison-dashboard/booking-target-comparison-dashboard';
 import { roleGuard } from '../../core/guards/role-guard';
 import { projectManagementAdminGuard } from '../projects/guards/admin-projects.guard';
 
@@ -28,7 +29,13 @@ const routes: Routes = [
     canActivate: [roleGuard],
     data: { adminOnly: true },
     component: CapacityPriceDashboardComponent,
-  }
+  },
+  {
+    path: 'booking-target-comparison',
+    canActivate: [roleGuard],
+    data: { adminOnly: true },
+    component: BookingTargetComparisonDashboard,
+  },
 ];
 
 @NgModule({

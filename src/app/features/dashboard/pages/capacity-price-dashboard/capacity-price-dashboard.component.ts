@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, inject, PLATFORM_ID, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, inject, PLATFORM_ID, ViewChild, ElementRef, AfterViewInit, OnDestroy, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -12,6 +12,10 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 import { AnalyticsDashboardService } from '../../services/analytics-dashboard.service';
 import { CapacityPriceDashboardDto, CapacityPriceQueryDto, InternCapacityPriceAnalyticsDto } from '../../../../core/models';
+import { AnalyticsDashboardDto } from '../../models/analytics-dashboard.models';
+import { AnalyticsDashboard } from '../analytics-dashboard/analytics-dashboard';
+import { DashboardHome } from '../dashboard-home/dashboard-home';
+import { BookingTargetComparisonDashboard } from '../booking-target-comparison-dashboard/booking-target-comparison-dashboard';
 import { UsersApiService } from '../../../../core/services/users-api.service';
 import { SharedModule } from '../../../../shared/shared.module';
 
@@ -30,24 +34,22 @@ export interface MonthlySynthesisItem {
   status: 'optimal' | 'warning' | 'neutral';
 }
 
-interface PopulationSummary {
-  label: string;
-  headcount: number;
-  bookedHours: number;
-  targetHours: number;
-  remainingHours: number;
-  hoursAchievement: number;
-  bookedPrice: number;
-  targetPrice: number;
-  remainingPrice: number;
-  priceAchievement: number;
-  includesSupervision: boolean;
-}
+export type ManagementTab = 'dashboard' | 'overview' | 'portfolio' | 'capacity' | 'comparison' | (string & {});
 
 @Component({
   selector: 'app-capacity-price-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, SharedModule, MatButtonToggleModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatIconModule,
+    SharedModule,
+    MatButtonToggleModule,
+    AnalyticsDashboard,
+    DashboardHome,
+    BookingTargetComparisonDashboard
+  ],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './capacity-price-dashboard.component.html',
   styleUrls: ['./capacity-price-dashboard.component.scss']
 })
@@ -67,6 +69,10 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
   
   dashboard: CapacityPriceDashboardDto | null = null;
   internDashboard: InternCapacityPriceAnalyticsDto | null = null;
+  portfolioDashboard: AnalyticsDashboardDto | null = null;
+  isManagementLoading = false;
+  // Default to the capacity & price view for this dashboard
+  managementTab: ManagementTab = 'capacity';
 
   isSynthesisModalOpen = false;
   synthesisSearchQuery = '';
@@ -102,10 +108,13 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
   @ViewChild('priceTargetChart') priceTargetContainer!: ElementRef;
 
   private charts: echarts.ECharts[] = [];
-  private resizeObserver: ResizeObserver | null = null;
+  private resizeObservers: ResizeObserver[] = [];
 
   ngOnInit(): void {
     this.route.queryParams.subscribe(params => {
+      if (params['tab'] && ['dashboard', 'overview', 'portfolio', 'capacity', 'comparison'].includes(params['tab'])) {
+        this.managementTab = params['tab'] as ManagementTab;
+      }
       let changed = false;
       if (params['month'] && !isNaN(+params['month'])) {
         this.query.month = +params['month'];
@@ -123,7 +132,7 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
   ngAfterViewInit(): void {
     if (isPlatformBrowser(this.platformId)) {
       window.addEventListener('resize', this.resizeCharts.bind(this));
-      if (this.dashboard) {
+      if (this.dashboard || this.internDashboard) {
         setTimeout(() => this.updateCharts(), 200);
       }
     }
@@ -133,14 +142,34 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
     if (isPlatformBrowser(this.platformId)) {
       window.removeEventListener('resize', this.resizeCharts.bind(this));
     }
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-    }
-    this.charts.forEach(c => c.dispose());
+    this.resizeObservers.forEach(o => o.disconnect());
+    this.resizeObservers = [];
+    this.charts.forEach(c => {
+      if (!c.isDisposed()) {
+        c.dispose();
+      }
+    });
+    this.charts = [];
   }
 
   private resizeCharts(): void {
-    this.charts.forEach(c => c.resize());
+    this.charts.forEach(c => {
+      if (c && !c.isDisposed()) {
+        c.resize();
+      }
+    });
+  }
+
+  private setupResizeObserver(element: HTMLElement, chart: echarts.ECharts): void {
+    if (typeof ResizeObserver !== 'undefined' && element) {
+      const observer = new ResizeObserver(() => {
+        if (chart && !chart.isDisposed()) {
+          chart.resize();
+        }
+      });
+      observer.observe(element);
+      this.resizeObservers.push(observer);
+    }
   }
 
   onViewModeChange(): void {
@@ -151,6 +180,7 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
     this.isRefreshing = true;
     this.errorMessage = '';
     this.loadSynthesisData();
+    this.loadManagementOverview();
     
     forkJoin({
       team: this.analyticsService.getCapacityPriceDashboard(this.query),
@@ -166,12 +196,45 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
       });
   }
 
+  /** Loads the portfolio KPIs independently so a management insight failure never hides capacity data. */
+  private loadManagementOverview(): void {
+    this.isManagementLoading = true;
+    this.analyticsService.getDashboard({
+      fiscalYear: this.query.year,
+      periodMode: 'ytd',
+    })
+      .pipe(finalize(() => {
+        this.isManagementLoading = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (dashboard) => this.portfolioDashboard = dashboard,
+        error: () => this.portfolioDashboard = null,
+      });
+  }
+
+  setManagementTab(tab: ManagementTab): void {
+    this.managementTab = tab;
+    if (tab === 'capacity' && isPlatformBrowser(this.platformId)) {
+      this.cdr.detectChanges();
+      setTimeout(() => {
+        this.updateCharts();
+        this.resizeCharts();
+      }, 50);
+    }
+  }
+
   private finalizeLoad(): void {
     this.isLoading = false;
     this.isRefreshing = false;
     this.cdr.markForCheck();
     if (isPlatformBrowser(this.platformId)) {
-      setTimeout(() => this.updateCharts(), 100);
+      this.cdr.detectChanges();
+      setTimeout(() => {
+        if (this.managementTab === 'capacity') {
+          this.updateCharts();
+        }
+      }, 100);
     }
   }
 
@@ -184,7 +247,13 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
 
   private updateCharts(): void {
     if (!this.dashboard && !this.internDashboard) return;
-    this.charts.forEach(c => c.dispose());
+    this.resizeObservers.forEach(o => o.disconnect());
+    this.resizeObservers = [];
+    this.charts.forEach(c => {
+      if (!c.isDisposed()) {
+        c.dispose();
+      }
+    });
     this.charts = [];
 
     this.renderMemberCapacitiesChart();
@@ -237,56 +306,7 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
     return data.targetPrice ?? ((data.bookedPrice || 0) + (data.remainingPrice || 0));
   }
 
-  get populationSummaries(): PopulationSummary[] {
-    const members = this.dashboard?.memberCapacities || [];
-    const memberPrices = new Map((this.dashboard?.memberPrices || []).map((item) => [item.userId, item]));
-    const summaryForMemberType = (memberType: string, label: string): PopulationSummary => {
-      const population = members.filter((member) => member.memberType.toLowerCase() === memberType);
-      const prices = population.map((member) => memberPrices.get(member.userId));
-      const bookedHours = population.reduce((total, member) => total + member.bookedHours, 0);
-      const targetHours = population.reduce((total, member) => total + member.targetHours, 0);
-      const bookedPrice = prices.reduce((total, price) => total + (price?.bookedPrice || 0), 0);
-      const targetPrice = prices.reduce((total, price) => total + (price?.targetPrice || 0), 0);
 
-      return this.createPopulationSummary(label, population.length, bookedHours, targetHours, bookedPrice, targetPrice, false);
-    };
-
-    const interns = this.internDashboard?.internDetails || [];
-    const internBookedHours = interns.reduce((total, intern) => total + intern.bookedHours, 0);
-    const internTargetHours = interns.reduce((total, intern) => total + intern.targetHours, 0);
-    const internBookedPrice = interns.reduce((total, intern) => total + intern.bookedPrice, 0);
-    const internTargetPrice = interns.reduce((total, intern) => total + intern.targetPrice, 0);
-
-    return [
-      summaryForMemberType('employee', 'Employés TE'),
-      summaryForMemberType('subcontractor', 'Sous-traitants'),
-      this.createPopulationSummary('Stagiaires', interns.length, internBookedHours, internTargetHours, internBookedPrice, internTargetPrice, true),
-    ];
-  }
-
-  private createPopulationSummary(
-    label: string,
-    headcount: number,
-    bookedHours: number,
-    targetHours: number,
-    bookedPrice: number,
-    targetPrice: number,
-    includesSupervision: boolean,
-  ): PopulationSummary {
-    return {
-      label,
-      headcount,
-      bookedHours,
-      targetHours,
-      remainingHours: Math.max(0, targetHours - bookedHours),
-      hoursAchievement: targetHours > 0 ? (bookedHours / targetHours) * 100 : 0,
-      bookedPrice,
-      targetPrice,
-      remainingPrice: Math.max(0, targetPrice - bookedPrice),
-      priceAchievement: targetPrice > 0 ? (bookedPrice / targetPrice) * 100 : 0,
-      includesSupervision,
-    };
-  }
 
   private readonly chartFont = 'Inter, system-ui, sans-serif';
 
@@ -399,9 +419,14 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
   }
 
   private renderMemberCapacitiesChart(): void {
-    if (!this.memberCapacitiesContainer) return;
+    if (!this.memberCapacitiesContainer?.nativeElement) return;
+    const existingChart = echarts.getInstanceByDom(this.memberCapacitiesContainer.nativeElement);
+    if (existingChart) {
+      existingChart.dispose();
+    }
     const chart = echarts.init(this.memberCapacitiesContainer.nativeElement);
     this.charts.push(chart);
+    this.setupResizeObserver(this.memberCapacitiesContainer.nativeElement, chart);
 
     const data = this.memberCapacitiesData;
     const totalHours = data.reduce((sum, d) => sum + d.bookedHours, 0);
@@ -488,9 +513,14 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
   }
 
   private renderCapacityTargetChart(): void {
-    if (!this.capacityTargetContainer) return;
+    if (!this.capacityTargetContainer?.nativeElement) return;
+    const existingChart = echarts.getInstanceByDom(this.capacityTargetContainer.nativeElement);
+    if (existingChart) {
+      existingChart.dispose();
+    }
     const chart = echarts.init(this.capacityTargetContainer.nativeElement);
     this.charts.push(chart);
+    this.setupResizeObserver(this.capacityTargetContainer.nativeElement, chart);
 
     const data = this.activeCapacityTarget;
     if (!data) return;
@@ -584,9 +614,14 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
   }
 
   private renderMemberPricesChart(): void {
-    if (!this.memberPricesContainer) return;
+    if (!this.memberPricesContainer?.nativeElement) return;
+    const existingChart = echarts.getInstanceByDom(this.memberPricesContainer.nativeElement);
+    if (existingChart) {
+      existingChart.dispose();
+    }
     const chart = echarts.init(this.memberPricesContainer.nativeElement);
     this.charts.push(chart);
+    this.setupResizeObserver(this.memberPricesContainer.nativeElement, chart);
 
     const data = this.memberPricesData;
     const totalPrice = data.reduce((sum, d) => sum + d.bookedPrice, 0);
@@ -673,9 +708,14 @@ export class CapacityPriceDashboardComponent implements OnInit, AfterViewInit, O
   }
 
   private renderPriceTargetChart(): void {
-    if (!this.priceTargetContainer) return;
+    if (!this.priceTargetContainer?.nativeElement) return;
+    const existingChart = echarts.getInstanceByDom(this.priceTargetContainer.nativeElement);
+    if (existingChart) {
+      existingChart.dispose();
+    }
     const chart = echarts.init(this.priceTargetContainer.nativeElement);
     this.charts.push(chart);
+    this.setupResizeObserver(this.priceTargetContainer.nativeElement, chart);
 
     const data = this.activePriceTarget;
     if (!data) return;

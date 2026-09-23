@@ -1,5 +1,6 @@
-import { Component, HostListener, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Observable, forkJoin, of, catchError, map } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
@@ -23,6 +24,17 @@ import {
 } from '../../models';
 import { ProjectReferenceService } from '../../services/project-reference.service';
 import { ProjectService } from '../../services/project';
+import {
+  DEFAULT_PROJECT_PHASE,
+  DEFAULT_PROJECT_STATUS,
+  PROJECT_PHASE_STATUS_MESSAGES,
+  allowedPhasesForStatus,
+  allowedStatusesForPhase,
+  coercePhaseForStatus,
+  coerceStatusForPhase,
+  isPhaseStatusAllowed,
+  validateProjectForm,
+} from '../../utils/project-phase-status';
 
 @Component({
   selector: 'app-project-form',
@@ -30,7 +42,7 @@ import { ProjectService } from '../../services/project';
   templateUrl: './project-form.html',
   styleUrls: ['./project-form.scss'],
 })
-export class ProjectForm implements OnInit {
+export class ProjectForm implements OnInit, OnDestroy {
   private readonly draftStorageKey = 'pmhub.project.create.draft';
   private readonly allowedProjectFileExtensions = new Set(['.pdf', '.xlsx', '.docx', '.pptx']);
   private readonly allowedProjectFileContentTypes = new Set([
@@ -44,6 +56,7 @@ export class ProjectForm implements OnInit {
   protected readonly ProjectPhase = ProjectPhase;
   protected readonly ProjectStatus = ProjectStatus;
   protected readonly ProjectFileType = ProjectFileType;
+  protected readonly phaseStatusMessages = PROJECT_PHASE_STATUS_MESSAGES;
   isSubmitting = false;
   stepperOrientation: 'horizontal' | 'vertical' = 'vertical';
   references: ProjectReferenceData = {
@@ -91,6 +104,8 @@ export class ProjectForm implements OnInit {
   pendingProjectFile: File | null = null;
   pendingProjectFileError = '';
   private submittedSuccessfully = false;
+  private formSubscriptions = new Subscription();
+  private syncingPhaseStatus = false;
 
   constructor(
     private readonly fb: FormBuilder,
@@ -132,11 +147,12 @@ export class ProjectForm implements OnInit {
       }),
       step2: this.fb.group({
         name: this.fb.nonNullable.control('', Validators.required),
-        phase: this.fb.control<ProjectPhase | null>(null, Validators.required),
-        status: this.fb.control<ProjectStatus | null>(null, Validators.required),
+        phase: this.fb.control<ProjectPhase | null>(DEFAULT_PROJECT_PHASE, Validators.required),
+        status: this.fb.control<ProjectStatus | null>(DEFAULT_PROJECT_STATUS, Validators.required),
         estimatedStartDate: this.fb.nonNullable.control(''),
+        endDate: this.fb.nonNullable.control(''),
         description: this.fb.nonNullable.control(''),
-      }, { validators: [this.phaseStatusValidator, this.estimatedStartDateValidator] }),
+      }, { validators: [this.phaseStatusValidator, this.estimatedStartDateValidator, this.doneEndDateValidator] }),
       step3: this.fb.group({
         projectManagerId: this.fb.control<string | null>(null),
         sponsor: this.fb.nonNullable.control(''),
@@ -194,8 +210,9 @@ export class ProjectForm implements OnInit {
     const step5 = (group as FormGroup).get('step5');
     if (!step5) return null;
 
+    const step2 = (group as FormGroup).get('step2');
     const start = step5.get('startDate')?.value;
-    const end = step5.get('endDate')?.value;
+    const end = step5.get('endDate')?.value || step2?.get('endDate')?.value;
     const estimated = step5.get('estimatedDueDate')?.value;
 
     const errors: any = {};
@@ -295,10 +312,28 @@ export class ProjectForm implements OnInit {
     this.loadReferences();
     this.restoreDraft();
     this.updateDynamicValidators();
-    this.step1Group.controls['projectManagementType'].valueChanges.subscribe(() => this.updateDynamicValidators());
-    this.step1Group.controls['projectType'].valueChanges.subscribe(() => this.updateDynamicValidators());
-    this.step3Group.controls['projectManagerId'].valueChanges.subscribe((pmUserId) => this.onProjectManagerChange(pmUserId));
-    this.memberDraft.controls['userId'].valueChanges.subscribe((userId) => this.syncMemberRole(userId));
+    this.formSubscriptions.add(
+      this.step1Group.controls['projectManagementType'].valueChanges.subscribe(() => this.updateDynamicValidators())
+    );
+    this.formSubscriptions.add(
+      this.step1Group.controls['projectType'].valueChanges.subscribe(() => this.updateDynamicValidators())
+    );
+    this.formSubscriptions.add(
+      this.step3Group.controls['projectManagerId'].valueChanges.subscribe((pmUserId) => this.onProjectManagerChange(pmUserId))
+    );
+    this.formSubscriptions.add(
+      this.memberDraft.controls['userId'].valueChanges.subscribe((userId) => this.syncMemberRole(userId))
+    );
+    this.formSubscriptions.add(
+      this.step2Group.controls['phase'].valueChanges.subscribe((phase) => this.onPhaseChange(phase))
+    );
+    this.formSubscriptions.add(
+      this.step2Group.controls['status'].valueChanges.subscribe((status) => this.onStatusChange(status))
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.formSubscriptions.unsubscribe();
   }
 
   @HostListener('window:resize')
@@ -616,16 +651,25 @@ export class ProjectForm implements OnInit {
   }
 
   submitProject(): void {
+    const phaseStatusError = this.validateProjectFormValues();
+    if (phaseStatusError) {
+      this.wizardForm.markAllAsTouched();
+      this.notificationService.showWarning(phaseStatusError);
+      return;
+    }
+
     if (this.wizardForm.invalid) {
       this.wizardForm.markAllAsTouched();
       if (this.wizardForm.errors?.['endDateInvalid']) {
-        this.notificationService.showWarning('Project end date must be strictly after the start date.');
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.endDateInvalid);
       } else if (this.wizardForm.errors?.['estimatedDateInvalid']) {
-        this.notificationService.showWarning('Estimated due date must be strictly after the start date.');
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.estimatedDueInvalid);
       } else if (this.step2Group.errors?.['invalidPhaseStatus']) {
         this.notificationService.showWarning(this.phaseStatusError());
       } else if (this.step2Group.errors?.['estimatedStartDateRequired']) {
-        this.notificationService.showWarning('Estimated start date is required for projects on hold.');
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.estimatedStartRequired);
+      } else if (this.step2Group.errors?.['endDateRequired']) {
+        this.notificationService.showWarning(PROJECT_PHASE_STATUS_MESSAGES.endDateRequired);
       } else {
         this.notificationService.showWarning('Please complete all required fields before submitting.');
       }
@@ -700,11 +744,37 @@ export class ProjectForm implements OnInit {
   }
 
   phaseStatusError(): string {
-    if (!this.step2Group.errors?.['invalidPhaseStatus']) {
-      return '';
+    if (this.step2Group.errors?.['invalidPhaseStatus']) {
+      return PROJECT_PHASE_STATUS_MESSAGES.incompatible;
     }
 
-    return 'Pipeline projects must use the Planned status before they can be submitted.';
+    if (this.step2Group.errors?.['endDateRequired']) {
+      return PROJECT_PHASE_STATUS_MESSAGES.endDateRequired;
+    }
+
+    return '';
+  }
+
+  isStatusAllowedForPhase(status: ProjectStatus, phase = this.step2Group.controls['phase'].value): boolean {
+    return isPhaseStatusAllowed(phase, status);
+  }
+
+  isPhaseAllowedForStatus(phase: ProjectPhase, status = this.step2Group.controls['status'].value): boolean {
+    return isPhaseStatusAllowed(phase, status);
+  }
+
+  get visiblePhaseOptions(): ProjectPhase[] {
+    const status = this.step2Group.controls['status'].value as ProjectStatus | null;
+    const current = this.step2Group.controls['phase'].value as ProjectPhase | null;
+    const allowed = new Set(allowedPhasesForStatus(status));
+    return this.phaseOptions.filter((phase) => allowed.has(phase) || phase === current);
+  }
+
+  get visibleStatusOptions(): ProjectStatus[] {
+    const phase = this.step2Group.controls['phase'].value as ProjectPhase | null;
+    const current = this.step2Group.controls['status'].value as ProjectStatus | null;
+    const allowed = new Set(allowedStatusesForPhase(phase));
+    return this.statusOptions.filter((status) => allowed.has(status) || status === current);
   }
 
   projectFileTypeError(): string {
@@ -792,7 +862,7 @@ export class ProjectForm implements OnInit {
       technologyIds: step4.technologyIds ?? [],
       solutionDomainIds: step4.solutionDomainIds ?? [],
       startDate: this.toApiDate(step5.startDate),
-      endDate: this.toApiDate(step5.endDate),
+      endDate: this.toApiDate(step2.endDate || step5.endDate),
       estimatedDueDate: this.toApiDate(step5.estimatedDueDate),
       estimatedHours: this.numberOrNull(step5.estimatedHours),
       actualHours: this.numberOrNull(step5.actualHours),
@@ -823,23 +893,55 @@ export class ProjectForm implements OnInit {
     };
   }
 
-  isStatusAllowedForPhase(status: ProjectStatus, phase = this.step2Group.controls['phase'].value): boolean {
-    if (phase === ProjectPhase.Pipeline) {
-      return status === ProjectStatus.Planned;
+  onPhaseChange(phase: ProjectPhase | null): void {
+    if (this.syncingPhaseStatus || phase === null) {
+      return;
     }
 
-    return true;
+    this.syncingPhaseStatus = true;
+    const statusControl = this.step2Group.controls['status'];
+    const nextStatus = coerceStatusForPhase(phase, statusControl.value);
+    if (nextStatus !== statusControl.value) {
+      statusControl.setValue(nextStatus);
+    }
+    this.syncingPhaseStatus = false;
+    this.step2Group.updateValueAndValidity();
+  }
+
+  onStatusChange(status: ProjectStatus | null): void {
+    if (this.syncingPhaseStatus || status === null) {
+      return;
+    }
+
+    this.syncingPhaseStatus = true;
+    const phaseControl = this.step2Group.controls['phase'];
+    const nextPhase = coercePhaseForStatus(status, phaseControl.value);
+    if (nextPhase !== phaseControl.value) {
+      phaseControl.setValue(nextPhase);
+    }
+    this.syncingPhaseStatus = false;
+    this.step2Group.updateValueAndValidity();
+  }
+
+  private validateProjectFormValues(): string | null {
+    const step2 = this.step2Group.getRawValue();
+    const step5 = this.step5Group.getRawValue();
+
+    return validateProjectForm({
+      phase: step2.phase,
+      status: step2.status,
+      estimatedStartDate: step2.estimatedStartDate,
+      startDate: step5.startDate,
+      endDate: step2.endDate || step5.endDate,
+      estimatedDueDate: step5.estimatedDueDate,
+    });
   }
 
   private phaseStatusValidator(group: AbstractControl): { invalidPhaseStatus: true } | null {
     const phase = group.get('phase')?.value as ProjectPhase | null;
     const status = group.get('status')?.value as ProjectStatus | null;
 
-    if (phase === ProjectPhase.Pipeline && status !== null && status !== ProjectStatus.Planned) {
-      return { invalidPhaseStatus: true };
-    }
-
-    return null;
+    return isPhaseStatusAllowed(phase, status) ? null : { invalidPhaseStatus: true };
   }
 
   private estimatedStartDateValidator(group: AbstractControl): { estimatedStartDateRequired: true } | null {
@@ -849,6 +951,13 @@ export class ProjectForm implements OnInit {
     return status === ProjectStatus.OnHold && !estimatedStartDate
       ? { estimatedStartDateRequired: true }
       : null;
+  }
+
+  private doneEndDateValidator(group: AbstractControl): { endDateRequired: true } | null {
+    const status = group.get('status')?.value as ProjectStatus | null;
+    const endDate = String(group.get('endDate')?.value || '').trim();
+
+    return status === ProjectStatus.Done && !endDate ? { endDateRequired: true } : null;
   }
 
   private syncMemberRole(userId: string): void {
@@ -934,6 +1043,7 @@ export class ProjectForm implements OnInit {
       });
 
       this.wizardForm.markAsPristine();
+      this.onPhaseChange(this.step2Group.controls['phase'].value);
       this.notificationService.showInfo('Saved project draft restored.');
     } catch {
       localStorage.removeItem(this.draftStorageKey);

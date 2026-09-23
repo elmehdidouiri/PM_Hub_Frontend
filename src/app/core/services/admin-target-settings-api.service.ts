@@ -70,6 +70,16 @@ export class AdminTargetSettingsApiService {
       .pipe(map((response) => this.unwrapList(response).map((item) => this.toKpi(item))));
   }
 
+  /**
+   * Read the KPI targets used as references in dashboards.
+   * This intentionally omits the optional includeInactive query parameter.
+   */
+  getActiveKpis(): Observable<KpiTargetSetting[]> {
+    return this.http
+      .get<ApiResponse<unknown[]> | unknown[]>(`${this.apiUrl}/kpis`)
+      .pipe(map((response) => this.unwrapList(response).map((item) => this.toKpi(item))));
+  }
+
   getKpi(id: string): Observable<KpiTargetSetting> {
     return this.http
       .get<ApiResponse<unknown> | unknown>(`${this.apiUrl}/kpis/${encodeURIComponent(id)}`)
@@ -103,6 +113,9 @@ export class AdminTargetSettingsApiService {
     }
     if (this.isApiResponse(response) && !response.success) {
       throw new Error(response.message || 'Unable to load target settings.');
+    }
+    if (this.hasDataList(response)) {
+      return response.data;
     }
     return [];
   }
@@ -200,4 +213,12 @@ export class AdminTargetSettingsApiService {
   private isApiResponse<T>(value: ApiResponse<T> | T): value is ApiResponse<T> {
     return typeof value === 'object' && value !== null && 'success' in value;
   }
+
+  private hasDataList(value: unknown): value is { data: unknown[] } {
+    return typeof value === 'object'
+      && value !== null
+      && 'data' in value
+      && Array.isArray((value as { data?: unknown }).data);
+  }
+
 }

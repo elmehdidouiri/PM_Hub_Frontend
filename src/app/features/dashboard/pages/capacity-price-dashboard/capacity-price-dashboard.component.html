@@ -92,6 +92,82 @@
 
     <ng-container *ngIf="dashboard || internDashboard">
 
+      <!-- ─── Management cockpit: portfolio + people, kept compact with tabs ─── -->
+      <section class="management-cockpit" aria-label="Management cockpit">
+        <header class="management-cockpit__header">
+          <div>
+            <div class="management-cockpit__eyebrow">
+              <mat-icon>insights</mat-icon>
+              Management cockpit
+            </div>
+            <h2>Portfolio and capacity performance</h2>
+            <p>One decision view for {{ query.year }}: delivery quality, workload and capacity.</p>
+          </div>
+          <div class="management-tabs" aria-label="Management views">
+            <button type="button" [class.active]="managementTab === 'dashboard'" (click)="setManagementTab('dashboard')">
+              <mat-icon>space_dashboard</mat-icon> Dashboard overview
+            </button>
+           
+            <button type="button" [class.active]="managementTab === 'portfolio'" (click)="setManagementTab('portfolio')">
+              <mat-icon>query_stats</mat-icon> Detailed analytics
+            </button>
+            <button type="button" [class.active]="managementTab === 'capacity'" (click)="setManagementTab('capacity')">
+              <mat-icon>payments</mat-icon> Capacity &amp; price
+            </button>
+            <button type="button" [class.active]="managementTab === 'comparison'" (click)="setManagementTab('comparison')">
+              <mat-icon>trending_up</mat-icon> Booking vs Target
+            </button>
+          </div>
+        </header>
+
+        <div class="management-loading" *ngIf="isManagementLoading">
+          <mat-icon>sync</mat-icon> Loading portfolio indicators…
+        </div>
+
+        <!-- Exact reuse of /dashboard: all its filters, project statistics and charts live here too. -->
+        <div class="management-embedded-overview" *ngIf="managementTab === 'dashboard'">
+          <app-dashboard-home></app-dashboard-home>
+        </div>
+
+        <!-- Reuse the complete analytics component: identical OTD calculations, charts and scope filters. -->
+        <div class="management-embedded-analytics" *ngIf="managementTab === 'portfolio'">
+          <app-analytics-dashboard></app-analytics-dashboard>
+        </div>
+
+        <!-- Embedded Booking vs Target comparison dashboard -->
+        <div class="management-embedded-comparison" *ngIf="managementTab === 'comparison'">
+          <app-booking-target-comparison-dashboard></app-booking-target-comparison-dashboard>
+        </div>
+
+        <ng-container *ngIf="portfolioDashboard as portfolio; else managementUnavailable">
+          <div class="management-kpis" *ngIf="managementTab === 'overview'">
+            <article class="management-kpi management-kpi--green">
+              <mat-icon>verified</mat-icon><span>Effectiveness</span><strong>{{ portfolio.summary.averageEffectiveness | number:'1.0-1' }}%</strong><small>Portfolio average</small>
+            </article>
+            <article class="management-kpi management-kpi--blue">
+              <mat-icon>schedule</mat-icon><span>OTD</span><strong>{{ portfolio.summary.averageOtd | number:'1.0-1' }}%</strong><small>On-time delivery</small>
+            </article>
+            <article class="management-kpi management-kpi--violet">
+              <mat-icon>speed</mat-icon><span>Utilization</span><strong>{{ portfolio.summary.averageUtilization | number:'1.0-1' }}%</strong><small>Team capacity used</small>
+            </article>
+            <article class="management-kpi management-kpi--orange">
+              <mat-icon>workspaces</mat-icon><span>Projects</span><strong>{{ portfolio.summary.totalProjects }}</strong><small>{{ portfolio.summary.projectsWithData }} with KPI data</small>
+            </article>
+            <article class="management-kpi management-kpi--teal">
+              <mat-icon>groups</mat-icon><span>Active people</span><strong>{{ portfolio.summary.activeTeamMembers }}</strong><small>People with activity</small>
+            </article>
+          </div>
+
+        </ng-container>
+
+        <ng-template #managementUnavailable>
+          <div class="management-empty" *ngIf="!isManagementLoading"><mat-icon>info_outline</mat-icon> Portfolio KPI data is unavailable for this period. Capacity and price details remain available below.</div>
+        </ng-template>
+      </section>
+
+      <!-- Capacity & Price remains complete, but is displayed only when selected. -->
+      <ng-container *ngIf="managementTab === 'capacity'">
+
       <!-- ─── Target overview ───────────────────────────────── -->
       <section class="target-overview" aria-label="Monthly targets">
         <article class="target-overview__card target-overview__card--hours">
@@ -131,70 +207,6 @@
         </article>
       </section>
 
-      <!-- ─── Population comparison ─────────────────────────── -->
-      <section class="population-comparison" aria-label="Comparison by population">
-        <header class="population-comparison__header">
-          <div>
-            <mat-icon>groups</mat-icon>
-            <div>
-              <h2>Booking &amp; Target Comparison</h2>
-              <p>Employees, subcontractors and interns for the selected period.</p>
-            </div>
-          </div>
-          <span>Values from booked hours</span>
-        </header>
-
-        <div class="population-comparison__table-wrap">
-          <table class="population-comparison__table">
-            <thead>
-              <tr>
-                <th>Population</th>
-                <th>People</th>
-                <th>Booked / Target Hours</th>
-                <th>Hours Achievement</th>
-                <th>Booked / Target Revenue</th>
-                <th>Revenue Achievement</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let population of populationSummaries">
-                <td>
-                  <strong>{{ population.label }}</strong>
-                  <small *ngIf="population.includesSupervision">Includes supervision hours</small>
-                </td>
-                <td>{{ population.headcount }}</td>
-                <td>
-                  <strong>{{ population.bookedHours | number:'1.1-1' }}h</strong>
-                  <span>/ {{ population.targetHours | number:'1.1-1' }}h</span>
-                  <small>{{ population.remainingHours | number:'1.1-1' }}h remaining</small>
-                </td>
-                <td>
-                  <div class="population-progress">
-                    <span><i [style.width.%]="population.hoursAchievement"></i></span>
-                    <strong>{{ population.hoursAchievement | number:'1.0-1' }}%</strong>
-                  </div>
-                </td>
-                <td>
-                  <strong>{{ population.bookedPrice | number:'1.0-0' }}$</strong>
-                  <span>/ {{ population.targetPrice | number:'1.0-0' }}$</span>
-                  <small>{{ population.remainingPrice | number:'1.0-0' }}$ remaining</small>
-                </td>
-                <td>
-                  <div class="population-progress population-progress--revenue">
-                    <span><i [style.width.%]="population.priceAchievement"></i></span>
-                    <strong>{{ population.priceAchievement | number:'1.0-1' }}%</strong>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <p class="population-comparison__notice">
-          <mat-icon>info_outline</mat-icon>
-          Intern supervision hours are shown with interns only and are not added to a combined global total, avoiding double counting.
-        </p>
-      </section>
 
       <!-- ─── Metric Strip ──────────────────────────────────── -->
       <section class="metric-strip">
@@ -480,7 +492,9 @@
       </ng-container>
 
 
-    </ng-container>
+      </ng-container>
+
+      </ng-container>
   </div>
 </section>
 

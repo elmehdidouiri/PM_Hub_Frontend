@@ -3,7 +3,7 @@ import { ChangeDetectorRef, Component, OnInit, inject, PLATFORM_ID, ViewChild, E
 import { isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { finalize, of } from 'rxjs';
+import { finalize, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import * as echarts from 'echarts';
 
@@ -16,6 +16,10 @@ import {
 } from '../../models/analytics-dashboard.models';
 import { AnalyticsDashboardService } from '../../services/analytics-dashboard.service';
 import { SharedModule } from '../../../../shared/shared.module';
+import {
+  AdminTargetSettingsApiService,
+  KpiTargetSetting,
+} from '../../../../core/services/admin-target-settings-api.service';
 
 type AnalyticsTab = 'overview' | 'kpis' | 'hours';
 import { MetricTone, DashboardMetric } from '../../models/dashboard-metric.model';
@@ -51,6 +55,7 @@ interface HourCategoryConfig {
 })
 export class AnalyticsDashboard implements OnInit {
   private readonly analyticsService = inject(AnalyticsDashboardService);
+  private readonly targetSettingsApi = inject(AdminTargetSettingsApiService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly now = new Date();
   private readonly platformId = inject(PLATFORM_ID);
@@ -107,6 +112,8 @@ export class AnalyticsDashboard implements OnInit {
   isLoading = true;
   isRefreshing = false;
   errorMessage = '';
+  private readonly defaultKpiTarget = 85;
+  private kpiTargets: KpiTargetSetting[] = [];
   private latestDashboardRequest = 0;
 
   periodFilterMode: PeriodFilterMode = 'ytd';
@@ -574,6 +581,29 @@ export class AnalyticsDashboard implements OnInit {
     return new Intl.NumberFormat('en-US').format(num);
   }
 
+  kpiTarget(key: KpiChartConfig['key']): number {
+    const targetName = key === 'otd' ? 'otd' : 'effectiveness';
+    const target = this.kpiTargets.find((item) =>
+      item.isActive && item.name.trim().toLowerCase() === targetName
+    )?.targetValue;
+
+    return Number.isFinite(target) ? Number(target) : this.defaultKpiTarget;
+  }
+
+  kpiTargetLabel(key: KpiChartConfig['key']): string {
+    return `Target: ${this.kpiTarget(key)}%`;
+  }
+
+  get hasMonthlyHoursTargets(): boolean {
+    return this.monthlyHours.some((item) => Number(item.targetHours) > 0);
+  }
+
+  get monthlyHoursTargetLabel(): string {
+    const hoursPerMember = this.monthlyHours.find((item) => Number(item.targetHoursPerMember) > 0)
+      ?.targetHoursPerMember;
+    return hoursPerMember ? `Monthly target: ${this.formatNumber(hoursPerMember)}h per member` : '';
+  }
+
   private loadInitialData(): void {
     this.isLoading = true;
     this.errorMessage = '';
@@ -586,8 +616,11 @@ export class AnalyticsDashboard implements OnInit {
         this.cdr.markForCheck();
       });
 
-    this.analyticsService
-      .getDashboard(this.buildParams())
+    const params = this.buildParams();
+    forkJoin({
+      dashboard: this.analyticsService.getDashboard(params),
+      hours: this.analyticsService.getHours(params).pipe(catchError(() => of(null))),
+    })
       .pipe(finalize(() => {
         this.isLoading = false;
         this.cdr.markForCheck();
@@ -596,15 +629,28 @@ export class AnalyticsDashboard implements OnInit {
         }
       }))
       .subscribe({
-        next: (dashboard) => {
-          this.dashboard = dashboard;
-          this.syncSelectionFromDashboard(dashboard);
+        next: ({ dashboard, hours }) => {
+          this.dashboard = { ...dashboard, hours: hours ?? dashboard.hours };
+          this.syncSelectionFromDashboard(this.dashboard);
         },
         error: () => {
           this.dashboard = null;
           this.errorMessage = 'Unable to load analytics right now.';
         },
       });
+
+    // Targets are global reference values, so load them once rather than on each filter change.
+    this.targetSettingsApi
+      .getActiveKpis()
+      .pipe(catchError(() => of([])))
+      .subscribe((targets) => {
+        this.kpiTargets = targets;
+        this.cdr.markForCheck();
+        if (isPlatformBrowser(this.platformId)) {
+          setTimeout(() => this.updateKpiCharts(), 0);
+        }
+      });
+
   }
 
   loadDashboard(initial: boolean = false): void {
@@ -612,8 +658,11 @@ export class AnalyticsDashboard implements OnInit {
     this.isRefreshing = !initial;
     this.errorMessage = '';
 
-    this.analyticsService
-      .getDashboard(this.buildParams())
+    const params = this.buildParams();
+    forkJoin({
+      dashboard: this.analyticsService.getDashboard(params),
+      hours: this.analyticsService.getHours(params).pipe(catchError(() => of(null))),
+    })
       .pipe(finalize(() => {
         if (requestId === this.latestDashboardRequest) {
           this.isRefreshing = false;
@@ -624,13 +673,13 @@ export class AnalyticsDashboard implements OnInit {
         }
       }))
       .subscribe({
-        next: (dashboard) => {
+        next: ({ dashboard, hours }) => {
           if (requestId !== this.latestDashboardRequest) {
             return;
           }
 
-          this.dashboard = dashboard;
-          this.syncSelectionFromDashboard(dashboard);
+          this.dashboard = { ...dashboard, hours: hours ?? dashboard.hours };
+          this.syncSelectionFromDashboard(this.dashboard);
         },
         error: () => {
           if (requestId !== this.latestDashboardRequest) {
@@ -747,6 +796,7 @@ export class AnalyticsDashboard implements OnInit {
       });
 
       const toneColor = this.getToneColor(config.tone);
+      const target = this.kpiTarget(config.key);
 
       const option: echarts.EChartsOption = {
         grid: { top: 20, right: 10, bottom: 30, left: 45 },
@@ -770,7 +820,7 @@ export class AnalyticsDashboard implements OnInit {
         },
         yAxis: {
           type: 'value',
-          max: 100,
+          max: Math.max(100, target),
           splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
           axisLabel: { color: '#94a3b8', fontSize: 10, fontWeight: 700, formatter: '{value}%' }
         },
@@ -787,7 +837,24 @@ export class AnalyticsDashboard implements OnInit {
               { offset: 1, color: toneColor + '00' }
             ])
           },
-          connectNulls: false
+          connectNulls: false,
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            lineStyle: { color: toneColor, type: 'dashed', width: 1.5, opacity: 0.85 },
+            label: {
+              show: true,
+              formatter: `Target: ${target}%`,
+              position: 'insideEndTop',
+              color: toneColor,
+              fontSize: 10,
+              fontWeight: 700,
+              backgroundColor: '#ffffff',
+              padding: [2, 4],
+              borderRadius: 3
+            },
+            data: [{ yAxis: target }]
+          }
         }]
       };
 
@@ -970,6 +1037,32 @@ export class AnalyticsDashboard implements OnInit {
       barWidth: '55%'
     }));
 
+    const targetSeries = {
+      name: 'Monthly target',
+      type: 'line',
+      data: fiscalMonths.map((month) => {
+        const target = rawData.find((item) => Number(item.month) === month)?.targetHours;
+        return Number(target) > 0 ? Number(target) : null;
+      }),
+      symbol: 'circle',
+      symbolSize: 9,
+      lineStyle: { color: '#ea580c', type: 'dashed', width: 3 },
+      itemStyle: { color: '#f97316', borderColor: '#ffffff', borderWidth: 2 },
+      label: {
+        show: true,
+        position: 'top',
+        color: '#c2410c',
+        fontWeight: 800,
+        fontSize: 10,
+        formatter: (params: any) =>
+          params.dataIndex === 0 || params.dataIndex === fiscalMonths.length - 1
+            ? `Target ${this.formatNumber(params.value)}h`
+            : '',
+      },
+      z: 10,
+      connectNulls: false,
+    };
+
     const option: echarts.EChartsOption = {
       tooltip: {
         trigger: 'axis',
@@ -982,6 +1075,15 @@ export class AnalyticsDashboard implements OnInit {
           let res = `<div style="font-weight: 800; color: #1e293b; margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px;">${params[0].name}</div>`;
           let total = 0;
           params.forEach((p: any) => {
+            if (p.seriesName === 'Monthly target') {
+              if (p.value > 0) {
+                res += `<div style="display: flex; justify-content: space-between; gap: 30px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #fed7aa;">
+                  <span style="color: #c2410c; font-weight: 800;">Monthly target</span>
+                  <strong style="color: #c2410c;">${this.formatNumber(p.value)}h</strong>
+                </div>`;
+              }
+              return;
+            }
             if (p.value > 0) {
               res += `<div style="display: flex; justify-content: space-between; gap: 30px; margin-bottom: 3px;">
                 <span style="display: flex; align-items: center; gap: 8px;">
@@ -1019,7 +1121,7 @@ export class AnalyticsDashboard implements OnInit {
         }
       },
       grid: {
-        top: '8%',
+        top: '12%',
         left: '3%',
         right: '4%',
         bottom: '15%',
@@ -1054,7 +1156,7 @@ export class AnalyticsDashboard implements OnInit {
           fontSize: 11
         }
       },
-      series: seriesData as any
+      series: [...seriesData, ...(this.hasMonthlyHoursTargets ? [targetSeries] : [])] as any
     };
 
     this.hoursBreakdownChart.setOption(option);

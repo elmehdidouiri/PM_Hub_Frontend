@@ -86,6 +86,7 @@ export class MainLayout implements OnInit, OnDestroy {
         { label: 'Analytics', route: '/dashboard/analytics', adminOnly: true },
         { label: 'Hours allocation', route: '/dashboard/hours-allocation', adminOnly: true },
         { label: 'Capacity & Price', route: '/dashboard/capacity-price', adminOnly: true },
+        { label: 'Booking vs Target', route: '/dashboard/booking-target-comparison', adminOnly: true },
       ],
     },
     {

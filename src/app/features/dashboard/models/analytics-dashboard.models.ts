@@ -46,6 +46,10 @@ export interface AnalyticsMonthlyHoursDto {
   otherHours: number;
   internManagementHours: number;
   totalHours: number;
+  /** Server-calculated capacity target; interns are excluded. */
+  activeNonInternMembers: number;
+  targetHoursPerMember: number;
+  targetHours: number;
 }
 
 export interface AnalyticsUtilizationDto {
@@ -103,4 +107,39 @@ export interface AnalyticsDashboardParams {
   plantId?: string | null;
   projectStatus?: string | number | null;
   projectPhase?: string | number | null;
+}
+
+export interface ProjectCapacityPriceSummaryDto {
+  totalProjects: number;
+  bookedCapacity: number;
+  targetCapacity: number;
+  remainingCapacity: number;
+  varianceCapacity: number;
+  capacityPercentage: number;
+  bookedCost: number;
+  targetCost: number;
+  remainingCost: number;
+  varianceCost: number;
+  costPercentage: number;
+}
+
+export interface ProjectCapacityPriceRowDto {
+  projectId: string;
+  projectName: string;
+  projectStatus: string;
+  bookedCapacity: number;
+  targetCapacity: number;
+  remainingCapacity: number;
+  varianceCapacity: number;
+  capacityPercentage: number;
+  bookedCost: number;
+  targetCost: number;
+  remainingCost: number;
+  varianceCost: number;
+  costPercentage: number;
+}
+
+export interface ProjectCapacityPriceAnalyticsDto {
+  summary: ProjectCapacityPriceSummaryDto;
+  projects: ProjectCapacityPriceRowDto[];
 }

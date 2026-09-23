@@ -178,6 +178,7 @@
                 <div>
                   <strong>{{ chart.title }}</strong>
                   <span>{{ chart.subtitle }}</span>
+                  <span class="kpi-card-header__target">{{ kpiTargetLabel(chart.key) }}</span>
                   <div class="kpi-card-header__formula" *ngIf="chart.key === 'effectiveness'">
                     <mat-icon>functions</mat-icon>
                     <div>
@@ -220,6 +221,7 @@
           <header>
             <div>
               <span>Stacked view of logged hours across the selected portfolio.</span>
+              <span class="hours-target" *ngIf="hasMonthlyHoursTargets">{{ monthlyHoursTargetLabel }} · Excluding interns</span>
             </div>
           </header>
 
