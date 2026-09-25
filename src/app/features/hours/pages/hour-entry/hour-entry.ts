@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ConfirmationDialog, ConfirmationDialogData } from '../../../../shared/components/confirmation-dialog/confirmation-dialog';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
-import { catchError, finalize, forkJoin, of } from 'rxjs';
+import { catchError, finalize, forkJoin, map, of } from 'rxjs';
 
 import {
   AllocationFrequency,
@@ -69,6 +69,15 @@ export class HourEntry implements OnInit {
   internDraftHours = 0;
   editingInternAllocationId: string | null = null;
 
+  // ── Multi-project booking ────────────────────────────────────────
+  /** IDs of all projects chosen in the multi-select */
+  selectedProjectIds: string[] = [];
+  /** Live search text inside the project select panel */
+  projectSearchQuery = '';
+  /** Which selected project is currently shown in the pager (0-based) */
+  currentProjectPage = 0;
+  // ─────────────────────────────────────────────────────────────────
+
   isLoadingProjects = true;
   isLoadingInterns = true;
   isSubmitting = false;
@@ -127,6 +136,36 @@ export class HourEntry implements OnInit {
     return this.form.controls.category.value === CategoryWork.Project;
   }
 
+  // ── Multi-project getters ────────────────────────────────────────
+
+  /** Project list filtered by the inline search query */
+  get filteredProjectOptions(): Array<{ projectId: string; label: string }> {
+    const q = this.projectSearchQuery.trim().toLowerCase();
+    if (!q) return this.projectOptions;
+    return this.projectOptions.filter(p => p.label.toLowerCase().includes(q));
+  }
+
+  /** ID of the project shown in the current pager page */
+  get currentProjectId(): string {
+    return this.selectedProjectIds[this.currentProjectPage] ?? '';
+  }
+
+  /** Label of the project shown in the current pager page */
+  get currentProjectLabel(): string {
+    const id = this.currentProjectId;
+    return this.projectOptions.find(p => p.projectId === id)?.label ?? id;
+  }
+
+  /** Total number of selected projects (= number of pager pages) */
+  get totalProjectPages(): number {
+    return this.selectedProjectIds.length;
+  }
+
+  get canGoPrev(): boolean { return this.currentProjectPage > 0; }
+  get canGoNext(): boolean { return this.currentProjectPage < this.totalProjectPages - 1; }
+
+  // ────────────────────────────────────────────────────────────────
+
   get filteredDateModeOptions() {
     const freq = this.form.controls.allocationFrequency.value;
     if (freq === AllocationFrequency.Daily) {
@@ -136,7 +175,7 @@ export class HourEntry implements OnInit {
   }
 
   get activeInternOptions(): SupervisedInternOption[] {
-    const projectId = this.form.controls.projectId.value;
+    const projectId = this.currentProjectId || this.form.controls.projectId.value;
     if (!projectId) {
       return this.internOptions;
     }
@@ -320,8 +359,73 @@ export class HourEntry implements OnInit {
     const isProjectWork = this.isProjectWorkMode;
     const activityNote = v.activityNote?.trim() ? v.activityNote.trim() : null;
 
-    const payload: CreateHourEntryDto = {
-      projectId: isProjectWork ? v.projectId : null,
+    // ── Edit mode: single-project update (unchanged behaviour) ───────
+    if (this.editingEntryId) {
+      const payload: CreateHourEntryDto = {
+        projectId: isProjectWork ? v.projectId : null,
+        allocationFrequency: v.allocationFrequency,
+        dateSelectionMode: v.dateSelectionMode!,
+        selectedDates,
+        rangeStartDate,
+        rangeEndDate,
+        category: v.category,
+        bookingType: v.bookingType,
+        totalHours: isProjectWork ? this.totalHours : v.simpleTotalHours,
+        activityNote,
+        executionHours: isProjectWork ? v.executionHours : 0,
+        technicalSupervisionHours: isProjectWork ? v.technicalSupervisionHours : 0,
+        processRelatedHours: isProjectWork ? v.processRelatedHours : 0,
+        projectManagementHours: isProjectWork ? v.projectManagementHours : 0,
+        researchAndDevHours: isProjectWork ? v.researchAndDevHours : 0,
+        workshopHours: isProjectWork ? v.workshopHours : 0,
+        otherActivitiesHours: isProjectWork ? v.otherActivitiesHours : 0,
+        internManagementHours: isProjectWork ? v.internManagementHours : 0,
+        supervisedInterns: isProjectWork
+          ? this.selectedInterns
+              .filter((intern) => intern.hours > 0)
+              .map((intern) => ({ internAllocationId: intern.internAllocationId, hours: intern.hours }))
+          : [],
+        notes: v.notes?.trim() ? v.notes.trim() : null,
+      };
+
+      this.isSubmitting = true;
+      this.hours.updateEntry(this.editingEntryId, this.toUpdatePayload(payload))
+        .pipe(
+          finalize(() => {
+            this.zone.run(() => {
+              this.isSubmitting = false;
+              this.cdr.markForCheck();
+            });
+          })
+        )
+        .subscribe({
+          next: (result) => {
+            if (!result) {
+              this.zone.run(() => {
+                this.notifications.showError('Unable to update entry.');
+                this.cdr.markForCheck();
+              });
+              return;
+            }
+            this.zone.run(() => {
+              this.notifications.showSuccess('Hours updated successfully.');
+              this.resetForm();
+              this.loadRecentEntries();
+              this.cdr.markForCheck();
+            });
+          },
+          error: (err: unknown) => {
+            this.zone.run(() => {
+              this.notifications.showError(this.extractApiError(err));
+              this.cdr.markForCheck();
+            });
+          },
+        });
+      return;
+    }
+
+    // ── Create mode: one request per selected project (forkJoin) ────
+    const baseHours = {
       allocationFrequency: v.allocationFrequency,
       dateSelectionMode: v.dateSelectionMode!,
       selectedDates,
@@ -347,12 +451,23 @@ export class HourEntry implements OnInit {
       notes: v.notes?.trim() ? v.notes.trim() : null,
     };
 
-    this.isSubmitting = true;
-    const request$ = this.editingEntryId
-      ? this.hours.updateEntry(this.editingEntryId, this.toUpdatePayload(payload))
-      : this.hours.createEntry(payload);
+    // Build one observable per project; catch errors individually so that a
+    // failure on one project does not cancel the others.
+    const projectIds = isProjectWork && this.selectedProjectIds.length > 0
+      ? this.selectedProjectIds
+      : [null]; // non-project activity → single call with no projectId
 
-    request$
+    const requests$ = projectIds.map((projectId) =>
+      this.hours.createEntry({ ...baseHours, projectId }).pipe(
+        map(() => ({ projectId, success: true as const, error: null })),
+        catchError((err: unknown) =>
+          of({ projectId, success: false as const, error: this.extractApiError(err) })
+        )
+      )
+    );
+
+    this.isSubmitting = true;
+    forkJoin(requests$)
       .pipe(
         finalize(() => {
           this.zone.run(() => {
@@ -361,44 +476,77 @@ export class HourEntry implements OnInit {
           });
         })
       )
-      .subscribe({
-        next: (result) => {
-          if (!result) {
-            this.zone.run(() => {
-              this.notifications.showError('Unable to save hours.');
-              this.cdr.markForCheck();
-            });
-            return;
-          }
-          this.zone.run(() => {
-            this.notifications.showSuccess(this.editingEntryId ? 'Hours updated successfully.' : 'Hours saved successfully.');
+      .subscribe((results) => {
+        this.zone.run(() => {
+          const successes = results.filter((r) => r.success);
+          const failures  = results.filter((r) => !r.success);
+
+          if (successes.length > 0) {
+            const n = successes.length;
+            this.notifications.showSuccess(
+              `${n} entr${n > 1 ? 'ies' : 'y'} saved successfully.`
+            );
             this.resetForm();
             this.loadRecentEntries();
-            this.cdr.markForCheck();
+          }
+
+          failures.forEach((f) => {
+            const label = this.projectOptions.find((p) => p.projectId === f.projectId)?.label
+              ?? f.projectId
+              ?? 'Activity';
+            this.notifications.showError(`${label}: ${f.error}`);
           });
-        },
-        error: (err: unknown) => {
-          this.zone.run(() => {
-            this.notifications.showError(this.extractApiError(err));
-            this.cdr.markForCheck();
-          });
-        },
+
+          this.cdr.markForCheck();
+        });
       });
   }
 
-  onProjectChanged(): void {
-    const projectId = this.form.controls.projectId.value;
+  // ── Multi-project selection / pagination ─────────────────────────
+
+  onProjectsSelectionChanged(ids: string[]): void {
+    this.selectedProjectIds = ids;
+    // Clamp page index so it stays within bounds after removing projects
+    this.currentProjectPage = Math.min(this.currentProjectPage, Math.max(0, ids.length - 1));
+    // Sync the hidden projectId control with the first selection (for validators)
+    const first = ids[0] ?? '';
+    this.form.controls.projectId.setValue(first, { emitEvent: false });
+
+    // Reset intern state
     this.selectedInternAllocationId = '';
     this.internDraftHours = 0;
     this.editingInternAllocationId = null;
-
-    if (projectId) {
-      this.selectedInterns = this.selectedInterns.filter((intern) => !intern.projectId || intern.projectId === projectId);
-    }
+    this.selectedInterns = this.selectedInterns.filter(
+      (intern) => !intern.projectId || ids.includes(intern.projectId)
+    );
 
     this.computeTotals();
     this.cdr.markForCheck();
   }
+
+  goToPrevProject(): void {
+    if (this.canGoPrev) {
+      this.currentProjectPage -= 1;
+      this.cdr.markForCheck();
+    }
+  }
+
+  goToNextProject(): void {
+    if (this.canGoNext) {
+      this.currentProjectPage += 1;
+      this.cdr.markForCheck();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+
+  /** Clear search filter when the project select panel closes */
+  onProjectPanelOpenChanged(opened: boolean): void {
+    if (!opened) {
+      this.projectSearchQuery = '';
+    }
+  }
+
 
   onInternSelectionChanged(internAllocationId: string): void {
     this.selectedInternAllocationId = internAllocationId;
@@ -709,8 +857,11 @@ export class HourEntry implements OnInit {
   }
 
   private validateForm(): boolean {
+    // For project-work mode, we validate that at least one project is selected
+    // via the multi-select (selectedProjectIds) rather than the hidden form control.
+    const hasProjects = this.isProjectWorkMode ? this.selectedProjectIds.length > 0 : true;
     const validBase = this.isProjectWorkMode
-      ? !this.form.invalid && !!this.projectOptions.length
+      ? !this.form.invalid && hasProjects
       : !this.form.invalid;
     const values = this.form.getRawValue();
     const selectedDates = this.buildSelectedDates(values);
@@ -725,12 +876,17 @@ export class HourEntry implements OnInit {
     const projectControl = this.form.controls.projectId;
 
     if (this.isProjectWorkMode) {
+      // The multi-select keeps projectId in sync via onProjectsSelectionChanged.
+      // Only set required if still empty (nothing selected yet).
       projectControl.setValidators(Validators.required);
     } else {
       projectControl.clearValidators();
       if (projectControl.value) {
         projectControl.setValue('', { emitEvent: false });
       }
+      // Also clear multi-select state when switching away from project mode
+      this.selectedProjectIds = [];
+      this.currentProjectPage = 0;
       if (this.selectedInterns.length || this.selectedInternAllocationId || this.internDraftHours) {
         this.selectedInterns = [];
         this.selectedInternAllocationId = '';
@@ -869,6 +1025,11 @@ export class HourEntry implements OnInit {
     this.totalHours = 0;
     this.overtimeWarning = false;
     this.totalOver24 = false;
+    // Reset multi-project state
+    this.selectedProjectIds = [];
+    this.projectSearchQuery = '';
+    this.currentProjectPage = 0;
+    this.form.controls.projectId.setValue('', { emitEvent: false });
   }
 
   private toUpdatePayload(payload: CreateHourEntryDto): HourEntryUpdateDto {

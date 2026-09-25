@@ -208,14 +208,55 @@
           </div>
 
           <div class="grid-row three-cols" *ngIf="isProjectWorkMode">
-            <mat-form-field appearance="outline">
-              <mat-label>Project</mat-label>
-              <mat-select formControlName="projectId" required (selectionChange)="onProjectChanged()">
-                <mat-option *ngFor="let p of projectOptions" [value]="p.projectId">{{ p.label }}</mat-option>
+            <mat-form-field appearance="outline" class="project-select-field">
+              <mat-label>Projects</mat-label>
+              <mat-select
+                multiple
+                [value]="selectedProjectIds"
+                (selectionChange)="onProjectsSelectionChanged($event.value)"
+                (openedChange)="onProjectPanelOpenChanged($event)"
+                panelClass="project-select-panel"
+                required
+              >
+                <!-- Sticky search bar (disabled option = not selectable) -->
+                <mat-option disabled class="project-search-option">
+                  <div class="project-search-wrapper" (click)="$event.stopPropagation()">
+                    <mat-icon>search</mat-icon>
+                    <input
+                      class="project-search-input"
+                      placeholder="Filter projects…"
+                      [(ngModel)]="projectSearchQuery"
+                      [ngModelOptions]="{standalone: true}"
+                      (keydown.space)="$event.stopPropagation()"
+                      (click)="$event.stopPropagation()"
+                      autocomplete="off"
+                    />
+                    <button
+                      *ngIf="projectSearchQuery"
+                      type="button"
+                      class="search-clear-btn"
+                      (click)="projectSearchQuery = ''; $event.stopPropagation()"
+                    >
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                </mat-option>
+                <!-- Selectable project options -->
+                <mat-option
+                  *ngFor="let p of filteredProjectOptions"
+                  [value]="p.projectId"
+                >
+                  {{ p.label }}
+                </mat-option>
+                <!-- Empty state -->
+                <mat-option disabled class="no-match-option" *ngIf="filteredProjectOptions.length === 0">
+                  <mat-icon class="no-match-icon">search_off</mat-icon>
+                  No project matches "{{ projectSearchQuery }}"
+                </mat-option>
               </mat-select>
               <mat-icon matPrefix>work</mat-icon>
-              <mat-error *ngIf="form.controls.projectId.touched && form.controls.projectId.invalid">
-                Selection is required
+              <mat-error *ngIf="!selectedProjectIds.length && form.controls.projectId.touched">
+                Select at least one project
               </mat-error>
             </mat-form-field>
 
@@ -243,6 +284,41 @@
               <mat-icon matPrefix>calendar_view_day</mat-icon>
             </mat-form-field>
           </div>
+
+          <!-- Project pager — shown when 2+ projects are selected -->
+          <div class="project-pager" *ngIf="isProjectWorkMode && totalProjectPages > 1">
+            <button
+              type="button"
+              class="icon-btn"
+              [disabled]="!canGoPrev"
+              (click)="goToPrevProject()"
+              aria-label="Previous project"
+            >
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <div class="pager-info">
+              <span class="panel-label">Filling hours for</span>
+              <strong>{{ currentProjectLabel }}</strong>
+              <small>{{ currentProjectPage + 1 }}&thinsp;/&thinsp;{{ totalProjectPages }} projects</small>
+            </div>
+            <button
+              type="button"
+              class="icon-btn"
+              [disabled]="!canGoNext"
+              (click)="goToNextProject()"
+              aria-label="Next project"
+            >
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+
+          <!-- Single project badge — shown when exactly 1 project is selected -->
+          <div class="project-badge" *ngIf="isProjectWorkMode && totalProjectPages === 1">
+            <mat-icon>folder_open</mat-icon>
+            <span>{{ currentProjectLabel }}</span>
+          </div>
+
+
 
           <div class="grid-row two-cols" *ngIf="!isProjectWorkMode">
             <mat-form-field appearance="outline">
@@ -516,10 +592,19 @@
             <mat-icon>close</mat-icon>
             <span>Cancel</span>
           </button>
-          <button mat-flat-button class="submit-btn" type="submit" [disabled]="isSubmitting || form.invalid || totalOver24">
+          <button
+            mat-flat-button
+            class="submit-btn"
+            type="submit"
+            [disabled]="isSubmitting || form.invalid || totalOver24 || (isProjectWorkMode && !selectedProjectIds.length)"
+          >
             <span class="btn-content" *ngIf="!isSubmitting">
               <mat-icon>{{ editingEntryId ? 'done_all' : 'save_alt' }}</mat-icon>
-              <span>{{ editingEntryId ? 'Update entry' : 'Save entry' }}</span>
+              <span *ngIf="editingEntryId">Update entry</span>
+              <span *ngIf="!editingEntryId && totalProjectPages <= 1">Save entry</span>
+              <span *ngIf="!editingEntryId && totalProjectPages > 1">
+                Save {{ totalProjectPages }} entries
+              </span>
             </span>
             <span class="btn-content" *ngIf="isSubmitting">
               <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>

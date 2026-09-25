@@ -611,6 +611,179 @@
   }
 }
 
+// ── Project select panel (rendered in CDK overlay → needs ::ng-deep) ─────────
+::ng-deep .project-select-panel {
+  // ── Search option ──────────────────────────────────────────────
+  .project-search-option {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f5f8fa !important;
+    border-bottom: 1px solid #e2eaf0;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+
+    // Hide the checkbox on the search "option"
+    .mat-pseudo-checkbox,
+    .mat-mdc-option-pseudo-checkbox {
+      display: none !important;
+    }
+
+    // Kill the disabled look
+    .mdc-list-item__primary-text {
+      opacity: 1 !important;
+      width: 100%;
+    }
+  }
+
+  .project-search-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    width: 100%;
+    box-sizing: border-box;
+
+    mat-icon {
+      color: $primary-500;
+      flex-shrink: 0;
+    }
+  }
+
+  .project-search-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #102034;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.4;
+
+    &::placeholder {
+      color: #9aabb7;
+      font-weight: 500;
+    }
+  }
+
+  .search-clear-btn {
+    display: inline-grid;
+    place-items: center;
+    padding: 2px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.06);
+    color: #5f7284;
+    cursor: pointer;
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.12);
+    }
+
+    mat-icon {
+      width: 16px;
+      height: 16px;
+      font-size: 16px;
+      color: inherit;
+    }
+  }
+
+  // ── No-match option ────────────────────────────────────────────
+  .no-match-option {
+    opacity: 1 !important;
+    pointer-events: none;
+    color: #7b8c9c;
+    font-style: italic;
+    font-size: 0.86rem;
+
+    .mat-pseudo-checkbox,
+    .mat-mdc-option-pseudo-checkbox {
+      display: none !important;
+    }
+
+    .no-match-icon {
+      margin-right: 6px;
+      vertical-align: middle;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+// ── Project pager ─────────────────────────────────────────────────────────────
+.project-pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-top: 4px;
+  border: 1px solid rgba($primary-500, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba($primary-50, 0.9), rgba(255, 255, 255, 0.96));
+
+  .pager-info {
+    flex: 1;
+    min-width: 0;
+
+    span.panel-label {
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    strong {
+      display: block;
+      color: #102034;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 1rem;
+    }
+
+    small {
+      display: block;
+      margin-top: 2px;
+      color: #7b8c9c;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+  }
+}
+
+// ── Single-project badge ──────────────────────────────────────────────────────
+.project-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: rgba($primary-500, 0.1);
+  color: $primary-700;
+  font-weight: 800;
+  font-size: 0.9rem;
+  max-width: 100%;
+  overflow: hidden;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 .date-range-container {
   max-width: 760px;
 }
